@@ -32,6 +32,7 @@ export interface InvoiceItem {
   cessRate?: number;
   cessAmount?: number;
   totalAmount: number;
+  rateIncl?: number; // Unit rate inclusive of GST
   originalPrice?: number;
   batchNumber?: string;
   expiryDate?: string;
@@ -203,6 +204,7 @@ export interface PurchaseBillItem {
   quantity: number;
   unit: string;
   rate: number;
+  rateIncl?: number; // Unit rate inclusive of GST
   taxableAmount: number;
   gstRate: GstTaxRate;
   cgstAmount: number;

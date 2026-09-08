@@ -3416,16 +3416,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Increase stock for purchase inward items
     newBill.items.forEach(item => {
-      if (item.productId) {
-        setProducts(prev => prev.map(prod => {
-          if (prod.id === item.productId && !prod.isService) {
-            const updatedProd = { ...prod, currentStock: prod.currentStock + item.quantity };
-            cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
-            return updatedProd;
-          }
-          return prod;
-        }));
-      }
+      const qty = Number(item.quantity) || 0;
+      if (qty <= 0) return;
+      const rate = Number(item.rate) || 0;
+
+      setProducts(prev => prev.map(prod => {
+        const isMatch = (item.productId && prod.id === item.productId) ||
+          (!item.productId && prod.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+
+        if (isMatch && !prod.isService) {
+          const updatedProd = {
+            ...prod,
+            currentStock: Math.round(((prod.currentStock || 0) + qty) * 1000) / 1000,
+            purchasePrice: rate > 0 ? rate : prod.purchasePrice
+          };
+          cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
+          return updatedProd;
+        }
+        return prod;
+      }));
     });
 
     showToast('success', 'Purchase Bill Logged', `Bill ${newBill.billNumber} recorded.`);
@@ -3536,6 +3545,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deletePurchaseBill = (id: string) => {
     const target = purchaseBills.find(b => b.id === id);
+    if (target?.items) {
+      target.items.forEach(item => {
+        const qty = Number(item.quantity) || 0;
+        if (qty <= 0) return;
+        setProducts(prev => prev.map(prod => {
+          const isMatch = (item.productId && prod.id === item.productId) ||
+            (!item.productId && prod.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+
+          if (isMatch && !prod.isService) {
+            const updatedProd = {
+              ...prod,
+              currentStock: Math.max(0, Math.round(((prod.currentStock || 0) - qty) * 1000) / 1000)
+            };
+            cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
+            return updatedProd;
+          }
+          return prod;
+        }));
+      });
+    }
     setPurchaseBills(prev => prev.filter(b => b.id !== id));
     cloudDb.deleteEntityDoc('purchaseBills', currentCompanyId, id).catch(console.warn);
     showToast('info', 'Purchase Bill Removed', `Bill ${target?.billNumber || ''} deleted.`);

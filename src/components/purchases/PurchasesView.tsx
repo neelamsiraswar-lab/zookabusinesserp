@@ -3,9 +3,15 @@ import { useApp } from '../../context/AppContext';
 import { PurchaseBill, PurchaseBillItem, Expense, GstTaxRate, PaymentMethod } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { STANDARD_UNITS, COMMON_HSN_CODES } from '../../utils/constants';
-import { calculateBaseRateFromInclusive } from '../../utils/gstCalculations';
+import { 
+  calculateBaseRateFromInclusive,
+  calculateExcludeRateFromIncludeRate,
+  calculateIncludeRateFromExcludeRate,
+  calculateItemFromInclusiveTotal
+} from '../../utils/gstCalculations';
 import { CustomHsnModal } from '../common/CustomHsnModal';
 import { HsnLookupDialog } from '../common/HsnLookupDialog';
+import { GstRateCalculatorModal } from '../common/GstRateCalculatorModal';
 import { 
   Truck, 
   Search, 
@@ -15,17 +21,21 @@ import {
   CheckCircle2, 
   Trash2, 
   X,
+  Minus,
   Building2,
   DollarSign,
   TrendingDown,
   PackagePlus,
+  Package,
   ArrowRight,
   Eye,
   Info,
   Calendar,
   Layers,
   Sparkles,
-  Tag
+  Tag,
+  Calculator,
+  ArrowRightLeft
 } from 'lucide-react';
 
 export const PurchasesView: React.FC = () => {
@@ -63,8 +73,322 @@ export const PurchasesView: React.FC = () => {
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
   const [itcEligibility, setItcEligibility] = useState<PurchaseBill['itcEligibility']>('ELIGIBLE_ALL');
   const [isInterState, setIsInterState] = useState(false);
-  // Two Flexible Entry Modes: Base Cost Rate (Tax Exclusive) vs Total Line Amount (Tax Inclusive)
-  const [purchasePriceMode, setPurchasePriceMode] = useState<'EXCLUSIVE' | 'INCLUSIVE'>('EXCLUSIVE');
+  // Flexible Entry Modes: 'EXCLUSIVE' (Base Cost Rate) vs 'INCLUSIVE_RATE' (Unit Rate Incl. Tax) vs 'INCLUSIVE' (Line Total Incl. Tax)
+  const [purchasePriceMode, setPurchasePriceMode] = useState<'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE'>('EXCLUSIVE');
+  const [showGstCalculator, setShowGstCalculator] = useState(false);
+  const [calculatorTargetIndex, setCalculatorTargetIndex] = useState<number | null>(null);
+  // Optional Round-off to nearest rupee (disabled by default so purchase bill matches vendor's exact invoice paise)
+  const [enableRoundOff, setEnableRoundOff] = useState(false);
+
+  const round2 = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
+
+  // Exact GST & Tax Calculation Helpers for Purchase Inward Bills
+  const calculateItemTaxes = (
+    taxableAmount: number,
+    gstRate: GstTaxRate,
+    interState: boolean
+  ) => {
+    const taxable = Math.max(0, round2(taxableAmount));
+    const gstRateVal = Number(gstRate) || 0;
+    const totalTax = round2((taxable * gstRateVal) / 100);
+
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
+    if (interState) {
+      igst = totalTax;
+    } else {
+      cgst = round2(totalTax / 2);
+      sgst = round2(totalTax - cgst);
+    }
+
+    const total = round2(taxable + totalTax);
+
+    return {
+      taxableAmount: taxable,
+      cgstAmount: cgst,
+      sgstAmount: sgst,
+      igstAmount: igst,
+      totalAmount: total
+    };
+  };
+
+  // 1. When Quantity changes:
+  // If in inclusive mode or item has rateIncl, calculate from unit inclusive rate so total = rateIncl * qty (no rounding drift)
+  // If in exclusive mode, calculate from rate so taxable = rate * qty
+  const updateItemByQuantity = (
+    item: PurchaseBillItem,
+    quantity: number,
+    interState: boolean,
+    priceMode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
+  ): PurchaseBillItem => {
+    const qty = Math.max(0, quantity);
+    const gstRateVal = Number(item.gstRate) || 0;
+    const taxFactor = 1 + gstRateVal / 100;
+
+    if (priceMode === 'INCLUSIVE' || priceMode === 'INCLUSIVE_RATE' || (item.rateIncl && item.rateIncl > 0)) {
+      const unitRateIncl = item.rateIncl && item.rateIncl > 0 
+        ? item.rateIncl 
+        : (qty > 0 && item.totalAmount > 0 ? Number((item.totalAmount / (item.quantity || 1)).toFixed(2)) : round2((Number(item.rate) || 0) * taxFactor));
+      
+      const total = round2(unitRateIncl * qty);
+      const taxable = round2(total / taxFactor);
+      const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : round2(unitRateIncl / taxFactor);
+      const totalTax = round2(total - taxable);
+
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+
+      if (interState) {
+        igst = totalTax;
+      } else {
+        cgst = round2(totalTax / 2);
+        sgst = round2(totalTax - cgst);
+      }
+
+      return {
+        ...item,
+        quantity: qty,
+        rate,
+        rateIncl: unitRateIncl,
+        taxableAmount: taxable,
+        cgstAmount: cgst,
+        sgstAmount: sgst,
+        igstAmount: igst,
+        totalAmount: total
+      };
+    }
+
+    const rate = Math.max(0, Number(item.rate) || 0);
+    const taxable = round2(qty * rate);
+    const taxes = calculateItemTaxes(taxable, item.gstRate, interState);
+    const rateIncl = round2(rate * taxFactor);
+
+    return {
+      ...item,
+      quantity: qty,
+      rate,
+      rateIncl,
+      ...taxes
+    };
+  };
+
+  // 2. When Rate (Tax Exclusive) changes: quantity stays fixed, taxable = qty * rate, taxes recomputed
+  const updateItemByRate = (
+    item: PurchaseBillItem,
+    rate: number,
+    interState: boolean
+  ): PurchaseBillItem => {
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    const cleanRate = Math.max(0, round2(rate));
+    const gstRateVal = Number(item.gstRate) || 0;
+    const taxFactor = 1 + gstRateVal / 100;
+    const taxable = round2(qty * cleanRate);
+    const taxes = calculateItemTaxes(taxable, item.gstRate, interState);
+    const rateIncl = round2(cleanRate * taxFactor);
+
+    return {
+      ...item,
+      quantity: qty,
+      rate: cleanRate,
+      rateIncl,
+      ...taxes
+    };
+  };
+
+  // 2b. When Unit Rate (Tax Inclusive) changes:
+  const updateItemByUnitInclusiveRate = (
+    item: PurchaseBillItem,
+    unitRateIncl: number,
+    interState: boolean
+  ): PurchaseBillItem => {
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    const cleanUnitRateIncl = Math.max(0, round2(unitRateIncl));
+    const gstRateVal = Number(item.gstRate) || 0;
+    const taxFactor = 1 + gstRateVal / 100;
+
+    const total = round2(cleanUnitRateIncl * (qty || 1));
+    const taxable = round2(total / taxFactor);
+    const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : round2(cleanUnitRateIncl / taxFactor);
+    const totalTax = round2(total - taxable);
+
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
+    if (interState) {
+      igst = totalTax;
+    } else {
+      cgst = round2(totalTax / 2);
+      sgst = round2(totalTax - cgst);
+    }
+
+    return {
+      ...item,
+      quantity: qty,
+      rate,
+      rateIncl: cleanUnitRateIncl,
+      taxableAmount: taxable,
+      cgstAmount: cgst,
+      sgstAmount: sgst,
+      igstAmount: igst,
+      totalAmount: total
+    };
+  };
+
+  // 3. When Taxable Amount is edited directly: rate back-calculated = taxable / qty, taxes recomputed
+  const updateItemByTaxable = (
+    item: PurchaseBillItem,
+    taxable: number,
+    interState: boolean
+  ): PurchaseBillItem => {
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    const cleanTaxable = Math.max(0, round2(taxable));
+    const rate = qty > 0 ? Number((cleanTaxable / qty).toFixed(2)) : 0;
+    const taxes = calculateItemTaxes(cleanTaxable, item.gstRate, interState);
+    const gstRateVal = Number(item.gstRate) || 0;
+    const rateIncl = round2(rate * (1 + gstRateVal / 100));
+
+    return {
+      ...item,
+      rate,
+      rateIncl,
+      ...taxes
+    };
+  };
+
+  // 4. When Total Amount (Tax-Inclusive) is edited directly:
+  // taxable = total / (1 + gst%), rate = taxable / qty, taxes recomputed
+  const updateItemByTotal = (
+    item: PurchaseBillItem,
+    totalInclusive: number,
+    interState: boolean
+  ): PurchaseBillItem => {
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    const total = Math.max(0, round2(totalInclusive));
+    const gstRateVal = Number(item.gstRate) || 0;
+    const taxFactor = 1 + gstRateVal / 100;
+    const taxable = round2(total / taxFactor);
+    const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : 0;
+    const unitRateIncl = qty > 0 ? Number((total / qty).toFixed(2)) : round2(rate * taxFactor);
+    const totalTax = round2(total - taxable);
+
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
+    if (interState) {
+      igst = totalTax;
+    } else {
+      cgst = round2(totalTax / 2);
+      sgst = round2(totalTax - cgst);
+    }
+
+    return {
+      ...item,
+      quantity: qty,
+      rate,
+      rateIncl: unitRateIncl,
+      taxableAmount: taxable,
+      cgstAmount: cgst,
+      sgstAmount: sgst,
+      igstAmount: igst,
+      totalAmount: total
+    };
+  };
+
+  // 5. When GST Rate changes:
+  const updateItemByGstRate = (
+    item: PurchaseBillItem,
+    gstRate: GstTaxRate,
+    interState: boolean,
+    priceMode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
+  ): PurchaseBillItem => {
+    const gstRateVal = Number(gstRate) || 0;
+    const taxFactor = 1 + gstRateVal / 100;
+    const qty = Math.max(0, Number(item.quantity) || 0);
+
+    if ((priceMode === 'INCLUSIVE' || priceMode === 'INCLUSIVE_RATE') && item.totalAmount > 0) {
+      const total = item.totalAmount;
+      const taxable = round2(total / taxFactor);
+      const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : round2((item.rateIncl || 0) / taxFactor);
+      const unitRateIncl = qty > 0 ? Number((total / qty).toFixed(2)) : (item.rateIncl || round2(rate * taxFactor));
+      const totalTax = round2(total - taxable);
+
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+
+      if (interState) {
+        igst = totalTax;
+      } else {
+        cgst = round2(totalTax / 2);
+        sgst = round2(totalTax - cgst);
+      }
+
+      return {
+        ...item,
+        gstRate,
+        rate,
+        rateIncl: unitRateIncl,
+        taxableAmount: taxable,
+        cgstAmount: cgst,
+        sgstAmount: sgst,
+        igstAmount: igst,
+        totalAmount: total
+      };
+    }
+
+    const taxable = Math.max(
+      0,
+      Number(item.taxableAmount) || round2((Number(item.quantity) || 0) * (Number(item.rate) || 0))
+    );
+    const taxes = calculateItemTaxes(taxable, gstRate, interState);
+    const cleanRate = Number(item.rate) || 0;
+    const rateIncl = round2(cleanRate * taxFactor);
+
+    return {
+      ...item,
+      gstRate,
+      rateIncl,
+      ...taxes
+    };
+  };
+
+  // 6. When Inter-State changes: re-split taxes between IGST and CGST+SGST
+  const updateItemInterState = (
+    item: PurchaseBillItem,
+    interState: boolean
+  ): PurchaseBillItem => {
+    const taxes = calculateItemTaxes(item.taxableAmount, item.gstRate, interState);
+    return {
+      ...item,
+      ...taxes
+    };
+  };
+
+  // Legacy compatibility wrappers
+  const recalculateItem = (
+    item: PurchaseBillItem,
+    interState: boolean,
+    mode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
+  ): PurchaseBillItem => {
+    if ((mode === 'INCLUSIVE' || mode === 'INCLUSIVE_RATE') && item.totalAmount !== undefined && item.totalAmount > 0) {
+      return updateItemByTotal(item, item.totalAmount, interState);
+    }
+    return updateItemByRate(item, item.rate, interState);
+  };
+
+  const recalculateAllItems = (
+    items: PurchaseBillItem[],
+    interState: boolean,
+    mode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
+  ) => {
+    const updated = items.map(item => updateItemInterState(item, interState));
+    setPItems(updated);
+  };
 
   // Purchase items state
   const [pItems, setPItems] = useState<PurchaseBillItem[]>([
@@ -92,8 +416,9 @@ export const PurchasesView: React.FC = () => {
   const [expensePayee, setExpensePayee] = useState('');
   const [expenseAmount, setExpenseAmount] = useState<number>(0);
   const [expenseGstRate, setExpenseGstRate] = useState<GstTaxRate>(18);
-  const [hasGstBill, setHasGstBill] = useState(true);
+  const [hasGstBill, setHasGstBill] = useState(false);
   const [expenseVendorGstin, setExpenseVendorGstin] = useState('');
+  const [expensePaymentMethod, setExpensePaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER');
   const [expenseNotes, setExpenseNotes] = useState('');
 
   const totalPurchasesAmount = purchaseBills.reduce((s, b) => s + b.grandTotal, 0);
@@ -105,13 +430,35 @@ export const PurchasesView: React.FC = () => {
 
   const handleVendorSelect = (vId: string) => {
     setVendorId(vId);
+    if (!vId) {
+      return;
+    }
     const vendor = parties.find(p => p.id === vId);
     if (vendor) {
       setVendorName(vendor.name);
       setVendorGstin(vendor.gstin || '');
-      const isInter = vendor.stateCode ? vendor.stateCode !== business.stateCode : false;
+      let isInter = false;
+      if (vendor.stateCode) {
+        isInter = vendor.stateCode !== business.stateCode;
+      } else if (vendor.gstin && /^\d{2}/.test(vendor.gstin.trim())) {
+        isInter = vendor.gstin.trim().slice(0, 2) !== business.stateCode;
+      }
       setIsInterState(isInter);
       recalculateAllItems(pItems, isInter);
+    }
+  };
+
+  const handleVendorGstinChange = (gstinVal: string) => {
+    const upper = gstinVal.toUpperCase();
+    setVendorGstin(upper);
+    const clean = upper.trim();
+    if (clean.length >= 2 && /^\d{2}/.test(clean)) {
+      const gstinState = clean.slice(0, 2);
+      const isInter = gstinState !== business.stateCode;
+      if (isInter !== isInterState) {
+        setIsInterState(isInter);
+        recalculateAllItems(pItems, isInter);
+      }
     }
   };
 
@@ -127,86 +474,245 @@ export const PurchasesView: React.FC = () => {
     setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
     setItcEligibility('ELIGIBLE_ALL');
 
-    const isInter = defaultVendor?.stateCode ? defaultVendor.stateCode !== business.stateCode : false;
+    let isInter = false;
+    if (defaultVendor?.stateCode) {
+      isInter = defaultVendor.stateCode !== business.stateCode;
+    } else if (defaultVendor?.gstin && /^\d{2}/.test(defaultVendor.gstin.trim())) {
+      isInter = defaultVendor.gstin.trim().slice(0, 2) !== business.stateCode;
+    }
     setIsInterState(isInter);
 
     if (firstProd) {
+      const pPrice = (firstProd.purchasePrice !== undefined && firstProd.purchasePrice > 0)
+        ? firstProd.purchasePrice
+        : (firstProd.sellingPrice ? round2(firstProd.sellingPrice * 0.7) : 500);
+      const gstR = (firstProd.gstRate !== undefined ? firstProd.gstRate : 18) as GstTaxRate;
       const initialItem: PurchaseBillItem = {
         id: 'pbi-' + Date.now(),
         productId: firstProd.id,
         name: firstProd.name,
-        hsnCode: firstProd.hsnCode,
+        hsnCode: firstProd.hsnCode || '',
         quantity: 10,
-        unit: firstProd.unit,
-        rate: firstProd.purchasePrice || 500,
-        taxableAmount: 10 * (firstProd.purchasePrice || 500),
-        gstRate: firstProd.gstRate || 18,
-        cgstAmount: isInter ? 0 : (10 * (firstProd.purchasePrice || 500) * ((firstProd.gstRate || 18) / 2)) / 100,
-        sgstAmount: isInter ? 0 : (10 * (firstProd.purchasePrice || 500) * ((firstProd.gstRate || 18) / 2)) / 100,
-        igstAmount: isInter ? (10 * (firstProd.purchasePrice || 500) * (firstProd.gstRate || 18)) / 100 : 0,
-        totalAmount: (10 * (firstProd.purchasePrice || 500)) * (1 + (firstProd.gstRate || 18) / 100),
+        unit: firstProd.unit || 'PCS',
+        rate: pPrice,
+        taxableAmount: 0,
+        gstRate: gstR,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        totalAmount: 0,
         batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
         expiryDate: '2028-12-31'
       };
-      setPItems([initialItem]);
+      setPItems([updateItemByRate(initialItem, pPrice, isInter)]);
+    } else {
+      const initialItem: PurchaseBillItem = {
+        id: 'pbi-' + Date.now(),
+        productId: '',
+        name: '',
+        hsnCode: '',
+        quantity: 1,
+        unit: 'PCS',
+        rate: 0,
+        taxableAmount: 0,
+        gstRate: 18,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        totalAmount: 0,
+        batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
+        expiryDate: ''
+      };
+      setPItems([updateItemByRate(initialItem, 0, isInter)]);
     }
 
     setIsPurchaseModalOpen(true);
   };
 
-  const recalculateItem = (item: PurchaseBillItem, interState: boolean): PurchaseBillItem => {
-    const taxable = item.quantity * item.rate;
-    const gstRateVal = item.gstRate || 0;
-    
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
-
-    if (interState) {
-      igst = (taxable * gstRateVal) / 100;
-    } else {
-      cgst = (taxable * (gstRateVal / 2)) / 100;
-      sgst = (taxable * (gstRateVal / 2)) / 100;
+  const handleProductSelect = (index: number, selectedProdId: string) => {
+    if (!selectedProdId) {
+      // Clear product link but keep row for custom item entry
+      setPItems(prev => {
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          productId: '',
+        };
+        return next;
+      });
+      return;
     }
 
-    const total = taxable + cgst + sgst + igst;
-
-    return {
-      ...item,
-      taxableAmount: taxable,
-      cgstAmount: cgst,
-      sgstAmount: sgst,
-      igstAmount: igst,
-      totalAmount: total
-    };
-  };
-
-  const recalculateAllItems = (items: PurchaseBillItem[], interState: boolean) => {
-    const updated = items.map(item => recalculateItem(item, interState));
-    setPItems(updated);
-  };
-
-  const handleProductSelect = (index: number, selectedProdId: string) => {
     const prod = products.find(p => p.id === selectedProdId);
     if (!prod) return;
 
     setPItems(prev => {
       const next = [...prev];
+      const purchasePrice = (prod.purchasePrice !== undefined && prod.purchasePrice > 0)
+        ? prod.purchasePrice
+        : (prod.sellingPrice ? round2(prod.sellingPrice * 0.7) : 0);
+      const gstRate = (prod.gstRate !== undefined ? prod.gstRate : 18) as GstTaxRate;
+
       const updatedItem: PurchaseBillItem = {
         ...next[index],
         productId: prod.id,
         name: prod.name,
-        hsnCode: prod.hsnCode,
-        unit: prod.unit,
-        rate: prod.purchasePrice || prod.sellingPrice * 0.7,
-        gstRate: prod.gstRate
+        hsnCode: prod.hsnCode || next[index].hsnCode || '',
+        unit: prod.unit || next[index].unit || 'PCS',
+        rate: purchasePrice,
+        gstRate
       };
-      next[index] = recalculateItem(updatedItem, isInterState);
+      next[index] = updateItemByRate(updatedItem, purchasePrice, isInterState);
+      return next;
+    });
+  };
+
+  // Dedicated handlers for each calculation field to prevent any value drift:
+  const handleItemQuantityChange = (index: number, val: number) => {
+    const cleanQty = Math.max(0, val);
+    setPItems(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = updateItemByQuantity(next[index], cleanQty, isInterState);
+      return next;
+    });
+  };
+
+  const handleItemQtyStep = (index: number, delta: number) => {
+    setPItems(prev => {
+      const next = [...prev];
+      const item = next[index];
+      if (!item) return prev;
+      const currentQty = Number(item.quantity) || 0;
+      const newQty = Math.max(0.01, round2(currentQty + delta));
+      next[index] = updateItemByQuantity(item, newQty, isInterState);
+      return next;
+    });
+  };
+
+  const handleItemRateChange = (index: number, val: number) => {
+    const cleanRate = Math.max(0, val);
+    setPItems(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = updateItemByRate(next[index], cleanRate, isInterState);
+      return next;
+    });
+  };
+
+  const handleItemTaxableChange = (index: number, val: number) => {
+    const cleanTaxable = Math.max(0, val);
+    setPItems(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = updateItemByTaxable(next[index], cleanTaxable, isInterState);
+      return next;
+    });
+  };
+
+  const handleItemTotalChange = (index: number, val: number) => {
+    const cleanTotal = Math.max(0, val);
+    setPItems(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = updateItemByTotal(next[index], cleanTotal, isInterState);
+      return next;
+    });
+  };
+
+  const handleItemUnitInclusiveRateChange = (index: number, val: number) => {
+    const cleanRateIncl = Math.max(0, val);
+    setPItems(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = updateItemByUnitInclusiveRate(next[index], cleanRateIncl, isInterState);
+      return next;
+    });
+  };
+
+  const handleApplyCalculatedGst = (result: {
+    rateExcl: number;
+    rateIncl: number;
+    taxableAmount: number;
+    gstAmount: number;
+    cgstAmount: number;
+    sgstAmount: number;
+    igstAmount: number;
+    totalAmount: number;
+    gstRate: GstTaxRate;
+    quantity: number;
+  }) => {
+    if (calculatorTargetIndex === null) return;
+    const idx = calculatorTargetIndex;
+    setPItems(prev => {
+      const next = [...prev];
+      if (!next[idx]) return prev;
+      const current = next[idx];
+      const qty = result.quantity || current.quantity || 1;
+      
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+      if (isInterState) {
+        igst = result.gstAmount;
+      } else {
+        cgst = round2(result.gstAmount / 2);
+        sgst = round2(result.gstAmount - cgst);
+      }
+
+      next[idx] = {
+        ...current,
+        quantity: qty,
+        rate: result.rateExcl,
+        rateIncl: result.rateIncl,
+        gstRate: result.gstRate,
+        taxableAmount: result.taxableAmount,
+        cgstAmount: cgst,
+        sgstAmount: sgst,
+        igstAmount: igst,
+        totalAmount: result.totalAmount
+      };
+      return next;
+    });
+    setShowGstCalculator(false);
+    setCalculatorTargetIndex(null);
+  };
+
+  const handleItemGstRateChange = (index: number, gstRate: GstTaxRate) => {
+    setPItems(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = updateItemByGstRate(next[index], gstRate, isInterState, purchasePriceMode);
       return next;
     });
   };
 
   const handleItemFieldChange = (index: number, field: keyof PurchaseBillItem, value: any) => {
+    if (field === 'quantity') {
+      handleItemQuantityChange(index, Number(value) || 0);
+      return;
+    }
+    if (field === 'rate') {
+      handleItemRateChange(index, Number(value) || 0);
+      return;
+    }
+    if (field === 'rateIncl') {
+      handleItemUnitInclusiveRateChange(index, Number(value) || 0);
+      return;
+    }
+    if (field === 'taxableAmount') {
+      handleItemTaxableChange(index, Number(value) || 0);
+      return;
+    }
+    if (field === 'totalAmount') {
+      handleItemTotalChange(index, Number(value) || 0);
+      return;
+    }
+    if (field === 'gstRate') {
+      handleItemGstRateChange(index, value as GstTaxRate);
+      return;
+    }
+
     setPItems(prev => {
       const next = [...prev];
       const updatedItem = {
@@ -222,79 +728,63 @@ export const PurchasesView: React.FC = () => {
           if (matchCustom.uqc && matchCustom.uqc !== 'OTH' && (!updatedItem.unit || updatedItem.unit === 'PCS')) {
             updatedItem.unit = matchCustom.uqc;
           }
+          next[index] = updateItemByGstRate(updatedItem, matchCustom.gstRate, isInterState, purchasePriceMode);
+          return next;
         } else {
           const matchStandard = COMMON_HSN_CODES.find(c => c.code === valStr);
           if (matchStandard) {
-            updatedItem.gstRate = matchStandard.defaultGst as GstTaxRate;
+            const stdGst = matchStandard.defaultGst as GstTaxRate;
+            updatedItem.gstRate = stdGst;
+            next[index] = updateItemByGstRate(updatedItem, stdGst, isInterState, purchasePriceMode);
+            return next;
           }
         }
       }
 
-      next[index] = recalculateItem(updatedItem, isInterState);
+      next[index] = updatedItem;
       return next;
     });
   };
 
   // Direct Total Line Purchase Amount (Tax Inclusive) Change Handler
-  // Back-calculates Base Unit Cost Rate, Taxable Value, and item-wise CGST/SGST/IGST breakdown
   const handleItemInclusiveTotalChange = (index: number, val: number) => {
-    const totalInclusive = Math.max(0, val);
-    setPItems(prev => {
-      const next = [...prev];
-      const target = next[index];
-      if (!target) return prev;
-
-      const qty = Math.max(0.0001, target.quantity || 1);
-      const gst = target.gstRate || 0;
-
-      const calculatedRate = calculateBaseRateFromInclusive(totalInclusive, qty, 0, gst, 0);
-      const updatedItem: PurchaseBillItem = {
-        ...target,
-        rate: calculatedRate,
-        totalAmount: totalInclusive
-      };
-      next[index] = recalculateItem(updatedItem, isInterState);
-      return next;
-    });
+    handleItemTotalChange(index, val);
   };
 
   const applyGstRateToAllPurchaseItems = (rate: GstTaxRate) => {
     setPItems(prev => {
-      return prev.map(item => {
-        const updated = { ...item, gstRate: rate };
-        return recalculateItem(updated, isInterState);
-      });
+      return prev.map(item => updateItemByGstRate(item, rate, isInterState, purchasePriceMode));
     });
     showToast('info', 'Tax Rate Applied', `Applied ${rate}% GST (${isInterState ? 'IGST' : 'CGST+SGST'}) to all purchase bill items.`);
   };
 
   const handleAddItemRow = () => {
     const firstProd = products[0];
-    const newItem: PurchaseBillItem = {
+    const defaultRate = firstProd?.purchasePrice || (firstProd?.sellingPrice ? round2(firstProd.sellingPrice * 0.7) : 0);
+    const defaultGst = (firstProd?.gstRate !== undefined ? firstProd.gstRate : 18) as GstTaxRate;
+
+    const rawItem: PurchaseBillItem = {
       id: 'pbi-' + Date.now() + Math.random().toString(36).substr(2, 4),
       productId: firstProd?.id || '',
-      name: firstProd?.name || 'New Inward Item',
+      name: firstProd?.name || '',
       hsnCode: firstProd?.hsnCode || '',
-      quantity: 5,
+      quantity: 1,
       unit: firstProd?.unit || 'PCS',
-      rate: firstProd?.purchasePrice || 500,
-      taxableAmount: 2500,
-      gstRate: firstProd?.gstRate || 18,
-      cgstAmount: isInterState ? 0 : 225,
-      sgstAmount: isInterState ? 0 : 225,
-      igstAmount: isInterState ? 450 : 0,
-      totalAmount: 2950,
+      rate: defaultRate,
+      taxableAmount: 0,
+      gstRate: defaultGst,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount: 0,
+      totalAmount: 0,
       batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
-      expiryDate: '2028-12-31'
+      expiryDate: ''
     };
-    setPItems(prev => [...prev, newItem]);
+    setPItems(prev => [...prev, updateItemByRate(rawItem, defaultRate, isInterState)]);
   };
 
+  // Allow removing any item row freely without blocking constraint
   const handleRemoveItemRow = (index: number) => {
-    if (pItems.length <= 1) {
-      showToast('warning', 'Minimum 1 Item Required', 'A purchase bill must have at least one line item.');
-      return;
-    }
     setPItems(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -306,45 +796,51 @@ export const PurchasesView: React.FC = () => {
     }
 
     if (pItems.length === 0) {
-      showToast('error', 'Empty Bill', 'Please add at least one line item to the purchase bill.');
+      showToast('error', 'Line Items Required', 'Please add at least one line item to the purchase bill before saving.');
       return;
     }
 
-    let subTotalTaxable = 0;
-    let totalCgst = 0;
-    let totalSgst = 0;
-    let totalIgst = 0;
+    const invalidItem = pItems.find(it => !it.name.trim() || it.quantity <= 0);
+    if (invalidItem) {
+      showToast('error', 'Invalid Item Row', 'Please provide a product name and quantity greater than 0 for all items.');
+      return;
+    }
 
-    pItems.forEach(item => {
-      subTotalTaxable += item.taxableAmount;
-      if (isInterState) {
-        totalIgst += (item.taxableAmount * item.gstRate) / 100;
-      } else {
-        totalCgst += (item.taxableAmount * (item.gstRate / 2)) / 100;
-        totalSgst += (item.taxableAmount * (item.gstRate / 2)) / 100;
-      }
-    });
-
-    const totalTax = totalCgst + totalSgst + totalIgst;
-    const grandTotal = Math.round(subTotalTaxable + totalTax);
+    const subTotalTaxable = round2(pItems.reduce((s, it) => s + (it.taxableAmount || 0), 0));
+    const totalCgst = round2(pItems.reduce((s, it) => s + (it.cgstAmount || 0), 0));
+    const totalSgst = round2(pItems.reduce((s, it) => s + (it.sgstAmount || 0), 0));
+    const totalIgst = round2(pItems.reduce((s, it) => s + (it.igstAmount || 0), 0));
+    const totalTax = round2(totalCgst + totalSgst + totalIgst);
+    const rawGrandTotal = round2(subTotalTaxable + totalTax);
+    const grandTotal = enableRoundOff ? Math.round(rawGrandTotal) : rawGrandTotal;
+    const roundOff = enableRoundOff ? round2(grandTotal - rawGrandTotal) : 0;
 
     createPurchaseBill({
       billNumber: `PB/2026/${String(purchaseBills.length + 1).padStart(3, '0')}`,
-      vendorInvoiceNumber: vendorInvoiceNo || `VIN-${Date.now().toString().slice(-4)}`,
+      vendorInvoiceNumber: vendorInvoiceNo.trim() || `VIN-${Date.now().toString().slice(-4)}`,
       vendorId: vendorId || 'vendor-misc',
-      vendorName,
-      vendorGstin,
+      vendorName: vendorName.trim(),
+      vendorGstin: vendorGstin.trim() ? vendorGstin.trim().toUpperCase() : undefined,
       billDate,
       dueDate,
       status: 'UNPAID',
       isInterState,
-      items: pItems,
+      items: pItems.map(it => ({
+        ...it,
+        quantity: Number(it.quantity) || 0,
+        rate: round2(Number(it.rate) || 0),
+        taxableAmount: round2(it.taxableAmount),
+        cgstAmount: round2(it.cgstAmount),
+        sgstAmount: round2(it.sgstAmount),
+        igstAmount: round2(it.igstAmount),
+        totalAmount: round2(it.totalAmount)
+      })),
       subTotalTaxable,
       totalCgst,
       totalSgst,
       totalIgst,
       totalTax,
-      roundOff: 0,
+      roundOff,
       grandTotal,
       amountPaid: 0,
       amountDue: grandTotal,
@@ -361,24 +857,31 @@ export const PurchasesView: React.FC = () => {
       return;
     }
 
-    const gstAmount = hasGstBill ? (expenseAmount * expenseGstRate) / 100 : 0;
+    const total = round2(expenseAmount);
+    let gstAmount = 0;
+    if (hasGstBill && expenseGstRate > 0) {
+      const taxFactor = 1 + expenseGstRate / 100;
+      const taxable = round2(total / taxFactor);
+      gstAmount = round2(total - taxable);
+    }
 
     createExpense({
       date: new Date().toISOString().split('T')[0],
       category: expenseCategory,
-      payee: expensePayee || 'Various Payees',
-      amount: expenseAmount,
+      payee: expensePayee.trim() || 'Various Payees',
+      amount: total,
       gstRate: hasGstBill ? expenseGstRate : 0,
-      gstAmount,
+      gstAmount: hasGstBill ? gstAmount : 0,
       hasGstBill,
-      vendorGstin: expenseVendorGstin || undefined,
-      paymentMethod: 'BANK_TRANSFER',
-      notes: expenseNotes
+      vendorGstin: expenseVendorGstin.trim() ? expenseVendorGstin.trim().toUpperCase() : undefined,
+      paymentMethod: expensePaymentMethod,
+      notes: expenseNotes.trim() || undefined
     });
 
     setIsExpenseModalOpen(false);
     setExpenseAmount(0);
     setExpenseNotes('');
+    setExpenseVendorGstin('');
   };
 
   // Filtered bills
@@ -701,7 +1204,7 @@ export const PurchasesView: React.FC = () => {
                     <input
                       type="text"
                       value={vendorGstin}
-                      onChange={(e) => setVendorGstin(e.target.value.toUpperCase())}
+                      onChange={(e) => handleVendorGstinChange(e.target.value)}
                       placeholder="27ABCDE1234F1Z5"
                       className="w-full px-3 py-2 font-mono uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                     />
@@ -784,7 +1287,7 @@ export const PurchasesView: React.FC = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Two Flexible Entry Modes Selector */}
+                    {/* Three Flexible Entry Modes Selector */}
                     <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
                       <span className="px-2 text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Mode:</span>
                       <button
@@ -801,17 +1304,42 @@ export const PurchasesView: React.FC = () => {
                       </button>
                       <button
                         type="button"
+                        onClick={() => setPurchasePriceMode('INCLUSIVE_RATE')}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                          purchasePriceMode === 'INCLUSIVE_RATE'
+                            ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs border border-indigo-200 dark:border-indigo-600'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                        title="Enter unit rate including GST (e.g. ₹118/pc)"
+                      >
+                        Unit Rate (Incl.)
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setPurchasePriceMode('INCLUSIVE')}
                         className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                           purchasePriceMode === 'INCLUSIVE'
                             ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs border border-indigo-200 dark:border-indigo-600'
                             : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                         }`}
-                        title="Enter total purchase bill line amount inclusive of GST (Tax Inclusive)"
+                        title="Enter total purchase bill line amount inclusive of GST"
                       >
                         Line Total (Incl.)
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalculatorTargetIndex(0);
+                        setShowGstCalculator(true);
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+                      title="Open GST Rate Calculator & Converter"
+                    >
+                      <Calculator className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>GST Calculator</span>
+                    </button>
 
                     <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px]">
                       <span className="px-2 text-slate-500 dark:text-slate-400 font-medium">Quick GST:</span>
@@ -856,16 +1384,19 @@ export const PurchasesView: React.FC = () => {
                             </button>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 text-center w-28">Batch / Exp</th>
-                        <th className="py-2.5 px-2 text-center w-18">Qty</th>
-                        <th className="py-2.5 px-2 text-center w-18">Unit</th>
-                        <th className={`py-2.5 px-2 w-28 ${purchasePriceMode === 'EXCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
+                        <th className="py-2.5 px-2 text-center w-24">Batch / Exp</th>
+                        <th className="py-2.5 px-2 text-center w-32">Qty</th>
+                        <th className="py-2.5 px-2 text-center w-16">Unit</th>
+                        <th className={`py-2.5 px-2 w-32 ${purchasePriceMode !== 'INCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
                           <div className="flex items-center gap-1">
-                            <span>Cost Rate (₹ Excl.)</span>
-                            {purchasePriceMode === 'EXCLUSIVE' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>}
+                            <span>{purchasePriceMode === 'INCLUSIVE_RATE' ? 'Rate (₹ Incl.)' : 'Rate (₹ Excl.)'}</span>
+                            {purchasePriceMode !== 'INCLUSIVE' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>}
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 w-36">
+                        <th className="py-2.5 px-2 w-28">
+                          <span>Taxable (₹)</span>
+                        </th>
+                        <th className="py-2.5 px-2 w-32">
                           Item GST ({isInterState ? 'IGST' : 'CGST+SGST'})
                         </th>
                         <th className={`py-2.5 px-3 text-right w-32 ${purchasePriceMode === 'INCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
@@ -878,211 +1409,299 @@ export const PurchasesView: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {pItems.map((item, idx) => {
-                        const matchedProduct = products.find(p => p.id === item.productId || p.name.toLowerCase() === item.name.toLowerCase());
-                        const currentStock = matchedProduct ? matchedProduct.currentStock : 0;
-                        const newCalculatedStock = currentStock + (Number(item.quantity) || 0);
-
-                        return (
-                          <tr key={item.id} className="bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                            {/* Product Selector / Name */}
-                            <td className="py-2.5 px-3">
-                              <div className="space-y-1">
-                                <select
-                                  value={item.productId || ''}
-                                  onChange={(e) => handleProductSelect(idx, e.target.value)}
-                                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none"
-                                >
-                                  <option value="">-- Choose From Catalog --</option>
-                                  {products.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.name} (Stock: {p.currentStock} {p.unit})
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  type="text"
-                                  value={item.name}
-                                  onChange={(e) => handleItemFieldChange(idx, 'name', e.target.value)}
-                                  placeholder="Custom product name..."
-                                  className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg font-medium"
-                                  required
-                                />
-                                {/* Stock Impact Badge */}
-                                <div className="flex items-center gap-1.5 text-[10px]">
-                                  <span className="text-slate-500 dark:text-slate-400">Current: <strong>{currentStock}</strong></span>
-                                  <ArrowRight className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500" />
-                                  <span className="text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                                    New: {newCalculatedStock} {item.unit} (+{item.quantity})
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-
-                             {/* HSN */}
-                            <td className="py-2.5 px-2 text-center align-top">
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  list={`purch-hsn-list-${idx}`}
-                                  value={item.hsnCode}
-                                  onChange={(e) => handleItemFieldChange(idx, 'hsnCode', e.target.value)}
-                                  placeholder="HSN/SAC"
-                                  className="w-full px-2 py-1 text-xs font-mono uppercase text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                />
-                                <datalist id={`purch-hsn-list-${idx}`}>
-                                  {customHsnCodes.map(h => (
-                                    <option key={`c-${h.id}`} value={h.code}>
-                                      [Custom] {h.code} - {h.description} ({h.gstRate}%)
-                                    </option>
-                                  ))}
-                                  {COMMON_HSN_CODES.map(h => (
-                                    <option key={`s-${h.code}`} value={h.code}>
-                                      {h.code} - {h.description} ({h.defaultGst}%)
-                                    </option>
-                                  ))}
-                                </datalist>
-                                <button
-                                  type="button"
-                                  onClick={() => setHsnLookupTargetIndex(idx)}
-                                  className="mt-1 w-full text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/60 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/60 border border-indigo-200/60 dark:border-indigo-800 rounded py-0.5 px-1 flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs truncate"
-                                  title="Lookup code in App Dialog"
-                                >
-                                  <Search className="w-2.5 h-2.5 shrink-0" />
-                                  <span>Lookup...</span>
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* Batch & Expiry */}
-                            <td className="py-2.5 px-2 align-top space-y-1">
-                              <input
-                                type="text"
-                                value={item.batchNumber || ''}
-                                onChange={(e) => handleItemFieldChange(idx, 'batchNumber', e.target.value)}
-                                placeholder="Batch No"
-                                className="w-full px-1.5 py-1 text-[11px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
-                              />
-                              <input
-                                type="date"
-                                value={item.expiryDate || ''}
-                                onChange={(e) => handleItemFieldChange(idx, 'expiryDate', e.target.value)}
-                                className="w-full px-1.5 py-1 text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
-                              />
-                            </td>
-
-                            {/* Quantity */}
-                            <td className="py-2.5 px-2 text-center align-top">
-                              <input
-                                type="number"
-                                min="0.01"
-                                step="any"
-                                value={item.quantity || ''}
-                                onChange={(e) => handleItemFieldChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                                className="w-full px-2 py-1 text-xs font-bold text-center border border-slate-200 dark:border-slate-700 rounded-lg bg-emerald-50/40 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200"
-                                required
-                              />
-                            </td>
-
-                            {/* Unit */}
-                            <td className="py-2.5 px-2 text-center align-top">
-                              <select
-                                value={item.unit}
-                                onChange={(e) => handleItemFieldChange(idx, 'unit', e.target.value)}
-                                className="w-full px-1 py-1 text-[11px] border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-                              >
-                                {STANDARD_UNITS.map(u => (
-                                  <option key={u} value={u}>{u}</option>
-                                ))}
-                              </select>
-                            </td>
-
-                            {/* Base Cost Rate (Tax Exclusive) Column */}
-                            <td className="py-2.5 px-2 text-right align-top">
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  value={item.rate || ''}
-                                  onChange={(e) => handleItemFieldChange(idx, 'rate', parseFloat(e.target.value) || 0)}
-                                  className={`w-full px-2 py-1 text-xs font-mono font-semibold text-right rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
-                                    purchasePriceMode === 'EXCLUSIVE'
-                                      ? 'bg-white dark:bg-slate-800 border-2 border-indigo-400 dark:border-indigo-500 text-indigo-950 dark:text-indigo-200 shadow-2xs font-bold'
-                                      : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
-                                  }`}
-                                  placeholder="0.00"
-                                  required
-                                />
-                              </div>
-                              <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 text-right">
-                                Cost Excl.
-                              </div>
-                            </td>
-
-                            {/* ITEM-WISE GST RATE & BREAKDOWN */}
-                            <td className="py-2.5 px-2 align-top">
-                              <div className="space-y-1">
-                                <select
-                                  value={item.gstRate}
-                                  onChange={(e) => handleItemFieldChange(idx, 'gstRate', parseInt(e.target.value) as GstTaxRate)}
-                                  className="w-full px-1 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium cursor-pointer"
-                                >
-                                  <option value="0">0% (Nil / Exempt)</option>
-                                  <option value="5">5% (Essential)</option>
-                                  <option value="12">12% (Standard 12)</option>
-                                  <option value="18">18% (Standard 18)</option>
-                                  <option value="28">28% (Luxury 28)</option>
-                                </select>
-
-                                {/* Dynamic Item-Wise Tax Split Tag */}
-                                <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight ${
-                                  isInterState ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                                }`}>
-                                  {isInterState ? (
-                                    <span>IGST: {formatCurrency(item.igstAmount, '')}</span>
-                                  ) : (
-                                    <span>CGST+SGST: {formatCurrency(item.cgstAmount + item.sgstAmount, '')}</span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Total Line Purchase Amount (Tax Inclusive) Column */}
-                            <td className="py-2.5 px-3 text-right font-mono align-top">
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  value={item.totalAmount || ''}
-                                  onChange={(e) => handleItemInclusiveTotalChange(idx, parseFloat(e.target.value) || 0)}
-                                  className={`w-full px-2 py-1 text-xs font-mono font-bold text-right rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
-                                    purchasePriceMode === 'INCLUSIVE'
-                                      ? 'bg-white dark:bg-slate-800 border-2 border-indigo-500 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300 font-extrabold shadow-2xs'
-                                      : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold'
-                                  }`}
-                                  placeholder="0.00"
-                                />
-                              </div>
-                              <div className="text-[10px] font-normal text-slate-400 dark:text-slate-500 mt-0.5">
-                                Taxable: {formatCurrency(item.taxableAmount, '')}
-                              </div>
-                            </td>
-
-                            {/* Delete */}
-                            <td className="py-2.5 px-2 text-center align-top">
+                      {pItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={10} className="py-8 text-center bg-slate-50/50 dark:bg-slate-800/30">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Package className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No items added to this purchase bill</p>
+                              <p className="text-[11px] text-slate-400 dark:text-slate-500">Click below to add your first inward item or raw material</p>
                               <button
                                 type="button"
-                                onClick={() => handleRemoveItemRow(idx)}
-                                className="p-1 text-slate-300 dark:text-slate-600 hover:text-rose-600 dark:hover:text-rose-400 rounded cursor-pointer"
+                                onClick={handleAddItemRow}
+                                className="mt-1 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg cursor-pointer"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add Item Row</span>
                               </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        pItems.map((item, idx) => {
+                          const matchedProduct = products.find(p => p.id === item.productId || p.name.toLowerCase() === item.name.toLowerCase());
+                          const currentStock = matchedProduct ? matchedProduct.currentStock : 0;
+                          const newCalculatedStock = currentStock + (Number(item.quantity) || 0);
+
+                          return (
+                            <tr key={item.id} className="bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                              {/* Product Selector / Name */}
+                              <td className="py-2.5 px-3">
+                                <div className="space-y-1">
+                                  <select
+                                    value={item.productId || ''}
+                                    onChange={(e) => handleProductSelect(idx, e.target.value)}
+                                    className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none"
+                                  >
+                                    <option value="">-- Choose From Catalog --</option>
+                                    {products.map(p => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} (Stock: {p.currentStock} {p.unit})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) => handleItemFieldChange(idx, 'name', e.target.value)}
+                                    placeholder="Custom product name..."
+                                    className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg font-medium"
+                                    required
+                                  />
+                                  {/* Stock Impact Badge */}
+                                  <div className="flex items-center gap-1.5 text-[10px]">
+                                    <span className="text-slate-500 dark:text-slate-400">Current: <strong>{currentStock}</strong></span>
+                                    <ArrowRight className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500" />
+                                    <span className="text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                                      New: {newCalculatedStock} {item.unit} (+{item.quantity})
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* HSN */}
+                              <td className="py-2.5 px-2 text-center align-top">
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    list={`purch-hsn-list-${idx}`}
+                                    value={item.hsnCode}
+                                    onChange={(e) => handleItemFieldChange(idx, 'hsnCode', e.target.value)}
+                                    placeholder="HSN/SAC"
+                                    className="w-full px-2 py-1 text-xs font-mono uppercase text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                  <datalist id={`purch-hsn-list-${idx}`}>
+                                    {customHsnCodes.map(h => (
+                                      <option key={`c-${h.id}`} value={h.code}>
+                                        [Custom] {h.code} - {h.description} ({h.gstRate}%)
+                                      </option>
+                                    ))}
+                                    {COMMON_HSN_CODES.map(h => (
+                                      <option key={`s-${h.code}`} value={h.code}>
+                                        {h.code} - {h.description} ({h.defaultGst}%)
+                                      </option>
+                                    ))}
+                                  </datalist>
+                                  <button
+                                    type="button"
+                                    onClick={() => setHsnLookupTargetIndex(idx)}
+                                    className="mt-1 w-full text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/60 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/60 border border-indigo-200/60 dark:border-indigo-800 rounded py-0.5 px-1 flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs truncate"
+                                    title="Lookup code in App Dialog"
+                                  >
+                                    <Search className="w-2.5 h-2.5 shrink-0" />
+                                    <span>Lookup...</span>
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* Batch & Expiry */}
+                              <td className="py-2.5 px-2 align-top space-y-1">
+                                <input
+                                  type="text"
+                                  value={item.batchNumber || ''}
+                                  onChange={(e) => handleItemFieldChange(idx, 'batchNumber', e.target.value)}
+                                  placeholder="Batch No"
+                                  className="w-full px-1.5 py-1 text-[11px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
+                                />
+                                <input
+                                  type="date"
+                                  value={item.expiryDate || ''}
+                                  onChange={(e) => handleItemFieldChange(idx, 'expiryDate', e.target.value)}
+                                  className="w-full px-1.5 py-1 text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
+                                />
+                              </td>
+
+                              {/* Quantity with Stepper */}
+                              <td className="py-2.5 px-2 align-top">
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleItemQtyStep(idx, -1)}
+                                    className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded border border-slate-200 dark:border-slate-700 cursor-pointer"
+                                    title="Decrease quantity by 1"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="0.01"
+                                    step="any"
+                                    value={item.quantity || ''}
+                                    onChange={(e) => handleItemQuantityChange(idx, parseFloat(e.target.value) || 0)}
+                                    className="w-full px-1.5 py-1 text-xs font-bold text-center border border-slate-200 dark:border-slate-700 rounded-lg bg-emerald-50/40 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                    required
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleItemQtyStep(idx, 1)}
+                                    className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded border border-slate-200 dark:border-slate-700 cursor-pointer"
+                                    title="Increase quantity by 1"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* Unit */}
+                              <td className="py-2.5 px-2 text-center align-top">
+                                <select
+                                  value={item.unit}
+                                  onChange={(e) => handleItemFieldChange(idx, 'unit', e.target.value)}
+                                  className="w-full px-1 py-1 text-[11px] border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                                >
+                                  {STANDARD_UNITS.map(u => (
+                                    <option key={u} value={u}>{u}</option>
+                                  ))}
+                                </select>
+                              </td>
+
+                              {/* Cost Rate (Tax Exclusive or Tax Inclusive Unit Rate) Column */}
+                              <td className="py-2.5 px-2 text-right align-top">
+                                <div className="relative">
+                                  {purchasePriceMode === 'INCLUSIVE_RATE' ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={item.rateIncl !== undefined ? (item.rateIncl || '') : (round2(item.rate * (1 + (item.gstRate || 0) / 100)) || '')}
+                                      onChange={(e) => handleItemUnitInclusiveRateChange(idx, parseFloat(e.target.value) || 0)}
+                                      className="w-full px-2 py-1 text-xs font-mono font-bold text-right rounded-lg bg-white dark:bg-slate-800 border-2 border-indigo-500 dark:border-indigo-400 text-indigo-950 dark:text-indigo-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                      placeholder="0.00"
+                                      required
+                                    />
+                                  ) : (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={item.rate || ''}
+                                      onChange={(e) => handleItemRateChange(idx, parseFloat(e.target.value) || 0)}
+                                      className={`w-full px-2 py-1 text-xs font-mono font-semibold text-right rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
+                                        purchasePriceMode === 'EXCLUSIVE'
+                                          ? 'bg-white dark:bg-slate-800 border-2 border-indigo-400 dark:border-indigo-500 text-indigo-950 dark:text-indigo-200 shadow-2xs font-bold'
+                                          : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
+                                      }`}
+                                      placeholder="0.00"
+                                      required
+                                    />
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
+                                  {purchasePriceMode === 'INCLUSIVE_RATE' ? (
+                                    <span>Excl: ₹{item.rate.toFixed(2)}</span>
+                                  ) : (
+                                    <span>Incl: ₹{(item.rateIncl || round2(item.rate * (1 + (item.gstRate || 0) / 100))).toFixed(2)}</span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCalculatorTargetIndex(idx);
+                                      setShowGstCalculator(true);
+                                    }}
+                                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer flex items-center gap-0.5 ml-1"
+                                    title="Open GST converter for this item"
+                                  >
+                                    <Calculator className="w-2.5 h-2.5" />
+                                    <span>Calc</span>
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* Taxable Amount Column (Editable & Synchronized) */}
+                              <td className="py-2.5 px-2 text-right align-top">
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={item.taxableAmount || ''}
+                                    onChange={(e) => handleItemTaxableChange(idx, parseFloat(e.target.value) || 0)}
+                                    className="w-full px-2 py-1 text-xs font-mono font-medium text-right rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 text-right">
+                                  Taxable Val
+                                </div>
+                              </td>
+
+                              {/* ITEM-WISE GST RATE & BREAKDOWN */}
+                              <td className="py-2.5 px-2 align-top">
+                                <div className="space-y-1">
+                                  <select
+                                    value={item.gstRate}
+                                    onChange={(e) => handleItemGstRateChange(idx, parseInt(e.target.value) as GstTaxRate)}
+                                    className="w-full px-1 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium cursor-pointer"
+                                  >
+                                    <option value="0">0% (Nil / Exempt)</option>
+                                    <option value="5">5% (Essential)</option>
+                                    <option value="12">12% (Standard 12)</option>
+                                    <option value="18">18% (Standard 18)</option>
+                                    <option value="28">28% (Luxury 28)</option>
+                                  </select>
+
+                                  {/* Dynamic Item-Wise Tax Split Tag */}
+                                  <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight ${
+                                    isInterState ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                                  }`}>
+                                    {isInterState ? (
+                                      <span>IGST: {formatCurrency(item.igstAmount, '')}</span>
+                                    ) : (
+                                      <span>CGST+SGST: {formatCurrency(item.cgstAmount + item.sgstAmount, '')}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Total Line Purchase Amount (Tax Inclusive) Column */}
+                              <td className="py-2.5 px-3 text-right font-mono align-top">
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={item.totalAmount || ''}
+                                    onChange={(e) => handleItemTotalChange(idx, parseFloat(e.target.value) || 0)}
+                                    className={`w-full px-2 py-1 text-xs font-mono font-bold text-right rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
+                                      purchasePriceMode === 'INCLUSIVE'
+                                        ? 'bg-white dark:bg-slate-800 border-2 border-indigo-500 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300 font-extrabold shadow-2xs'
+                                        : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold'
+                                    }`}
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">
+                                  <span>Tax: {formatCurrency(item.cgstAmount + item.sgstAmount + item.igstAmount, '')}</span>
+                                  {item.quantity > 0 && (
+                                    <span className="text-indigo-600 dark:text-indigo-400 font-medium">₹{round2(item.totalAmount / item.quantity).toFixed(2)}/u</span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Delete */}
+                              <td className="py-2.5 px-2 text-center align-top">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemRow(idx)}
+                                  className="p-1 text-slate-300 dark:text-slate-600 hover:text-rose-600 dark:hover:text-rose-400 rounded cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1100,43 +1719,81 @@ export const PurchasesView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5 text-xs">
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                    <span>Taxable Subtotal:</span>
-                    <span className="font-mono font-bold">
-                      {formatCurrency(pItems.reduce((s, it) => s + it.taxableAmount, 0), business.currencySymbol)}
-                    </span>
-                  </div>
-                  {!isInterState ? (
-                    <>
+                {(() => {
+                  const subTotalTaxable = round2(pItems.reduce((s, it) => s + (it.taxableAmount || 0), 0));
+                  const totalCgst = round2(pItems.reduce((s, it) => s + (it.cgstAmount || 0), 0));
+                  const totalSgst = round2(pItems.reduce((s, it) => s + (it.sgstAmount || 0), 0));
+                  const totalIgst = round2(pItems.reduce((s, it) => s + (it.igstAmount || 0), 0));
+                  const totalTax = round2(totalCgst + totalSgst + totalIgst);
+                  const rawGrandTotal = round2(subTotalTaxable + totalTax);
+                  const grandTotal = enableRoundOff ? Math.round(rawGrandTotal) : rawGrandTotal;
+                  const roundOff = enableRoundOff ? round2(grandTotal - rawGrandTotal) : 0;
+
+                  return (
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5 text-xs">
                       <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                        <span>CGST Input:</span>
-                        <span className="font-mono">
-                          {formatCurrency(pItems.reduce((s, it) => s + it.cgstAmount, 0), business.currencySymbol)}
+                        <span>Taxable Subtotal:</span>
+                        <span className="font-mono font-bold">
+                          {formatCurrency(subTotalTaxable, business.currencySymbol)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                        <span>SGST Input:</span>
+                      {!isInterState ? (
+                        <>
+                          <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                            <span>CGST Input:</span>
+                            <span className="font-mono">
+                              {formatCurrency(totalCgst, business.currencySymbol)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                            <span>SGST Input:</span>
+                            <span className="font-mono">
+                              {formatCurrency(totalSgst, business.currencySymbol)}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                          <span>IGST Input:</span>
+                          <span className="font-mono">
+                            {formatCurrency(totalIgst, business.currencySymbol)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-slate-600 dark:text-slate-300 font-semibold border-t border-dashed border-slate-200 dark:border-slate-700 pt-1">
+                        <span>Total Tax (GST):</span>
                         <span className="font-mono">
-                          {formatCurrency(pItems.reduce((s, it) => s + it.sgstAmount, 0), business.currencySymbol)}
+                          {formatCurrency(totalTax, business.currencySymbol)}
                         </span>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                      <span>IGST Input:</span>
-                      <span className="font-mono">
-                        {formatCurrency(pItems.reduce((s, it) => s + it.igstAmount, 0), business.currencySymbol)}
-                      </span>
+
+                      {/* Round-off option */}
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/80 dark:border-slate-700/80">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-300">
+                          <input
+                            type="checkbox"
+                            checked={enableRoundOff}
+                            onChange={(e) => setEnableRoundOff(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded text-indigo-600 cursor-pointer"
+                          />
+                          <span>Round off to nearest ₹</span>
+                        </label>
+                        {roundOff !== 0 && (
+                          <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                            {roundOff > 0 ? `+${roundOff.toFixed(2)}` : roundOff.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between font-extrabold text-sm text-slate-900 dark:text-white pt-1.5 border-t border-slate-200 dark:border-slate-700">
+                        <span>Grand Total Bill Amount:</span>
+                        <span className="font-mono text-indigo-600 dark:text-indigo-400">
+                          {formatCurrency(grandTotal, business.currencySymbol)}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex justify-between font-extrabold text-sm text-slate-900 dark:text-white pt-1.5 border-t border-slate-200 dark:border-slate-700">
-                    <span>Grand Total Bill Amount:</span>
-                    <span className="font-mono text-indigo-600 dark:text-indigo-400">
-                      {formatCurrency(pItems.reduce((s, it) => s + it.totalAmount, 0), business.currencySymbol)}
-                    </span>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Actions */}
@@ -1212,6 +1869,7 @@ export const PurchasesView: React.FC = () => {
                         <th className="py-2 px-2 text-center">Qty Added</th>
                         <th className="py-2 px-2 text-right">Rate</th>
                         <th className="py-2 px-2 text-right">Taxable</th>
+                        <th className="py-2 px-2 text-center">GST %</th>
                         <th className="py-2 px-3 text-right">Total</th>
                       </tr>
                     </thead>
@@ -1230,6 +1888,11 @@ export const PurchasesView: React.FC = () => {
                           <td className="py-2 px-2 text-center font-bold text-emerald-700 dark:text-emerald-300">+{it.quantity} {it.unit}</td>
                           <td className="py-2 px-2 text-right font-mono text-slate-700 dark:text-slate-300">{formatCurrency(it.rate, '')}</td>
                           <td className="py-2 px-2 text-right font-mono text-slate-700 dark:text-slate-300">{formatCurrency(it.taxableAmount, '')}</td>
+                          <td className="py-2 px-2 text-center">
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
+                              {it.gstRate}%
+                            </span>
+                          </td>
                           <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{formatCurrency(it.totalAmount, '')}</td>
                         </tr>
                       ))}
@@ -1240,15 +1903,40 @@ export const PurchasesView: React.FC = () => {
 
               {/* Totals */}
               <div className="flex justify-end pt-2">
-                <div className="w-full sm:w-64 space-y-1 text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="w-full sm:w-72 space-y-1 text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-300">Taxable Value:</span>
                     <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.subTotalTaxable, business.currencySymbol)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">Total Tax:</span>
+                  {!selectedBillForView.isInterState ? (
+                    <>
+                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                        <span>CGST Input:</span>
+                        <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalCgst, business.currencySymbol)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                        <span>SGST Input:</span>
+                        <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalSgst, business.currencySymbol)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                      <span>IGST Input:</span>
+                      <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalIgst, business.currencySymbol)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-600 dark:text-slate-300 border-t border-dashed border-slate-200 dark:border-slate-700 pt-1">
+                    <span>Total Tax:</span>
                     <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalTax, business.currencySymbol)}</span>
                   </div>
+                  {selectedBillForView.roundOff !== 0 && (
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400 text-[11px]">
+                      <span>Round Off:</span>
+                      <span className="font-mono text-slate-700 dark:text-slate-300">
+                        {selectedBillForView.roundOff > 0 ? `+${selectedBillForView.roundOff.toFixed(2)}` : selectedBillForView.roundOff.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold text-sm pt-1 border-t border-slate-200 dark:border-slate-700">
                     <span className="text-slate-900 dark:text-white">Grand Total:</span>
                     <span className="font-mono text-indigo-700 dark:text-indigo-400">{formatCurrency(selectedBillForView.grandTotal, business.currencySymbol)}</span>
@@ -1297,34 +1985,88 @@ export const PurchasesView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Total Amount (₹) *</label>
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Payment Method</label>
+                <select
+                  value={expensePaymentMethod}
+                  onChange={(e) => setExpensePaymentMethod(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none"
+                >
+                  <option value="BANK_TRANSFER">Bank Transfer / NEFT / RTGS</option>
+                  <option value="UPI">UPI / QR Code</option>
+                  <option value="CASH">Cash</option>
+                  <option value="CHEQUE">Cheque</option>
+                  <option value="CREDIT_CARD">Credit / Debit Card</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Total Expense Amount (₹) *</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={expenseAmount || ''}
+                  onChange={(e) => setExpenseAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 font-mono font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  required
+                />
+              </div>
+
+              {/* GST Bill / ITC Toggle */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <div className="flex items-center gap-2">
                   <input
-                    type="number"
-                    min="1"
-                    step="0.01"
-                    value={expenseAmount || ''}
-                    onChange={(e) => setExpenseAmount(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none"
-                    required
+                    type="checkbox"
+                    id="hasGstBillCheck"
+                    checked={hasGstBill}
+                    onChange={(e) => setHasGstBill(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
                   />
+                  <label htmlFor="hasGstBillCheck" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                    Vendor Provided GST Invoice (Claim Input Tax Credit)
+                  </label>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">GST Rate</label>
-                  <select
-                    value={expenseGstRate}
-                    onChange={(e) => setExpenseGstRate(parseInt(e.target.value) as GstTaxRate)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none"
-                  >
-                    <option value="0">0% (Nil)</option>
-                    <option value="5">5%</option>
-                    <option value="12">12%</option>
-                    <option value="18">18%</option>
-                    <option value="28">28%</option>
-                  </select>
-                </div>
+                {hasGstBill && (
+                  <div className="space-y-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-700">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium text-[11px] text-slate-600 dark:text-slate-400 mb-1">GST Rate</label>
+                        <select
+                          value={expenseGstRate}
+                          onChange={(e) => setExpenseGstRate(parseInt(e.target.value) as GstTaxRate)}
+                          className="w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:outline-none text-xs"
+                        >
+                          <option value="0">0% (Nil / Exempt)</option>
+                          <option value="5">5% (Essential)</option>
+                          <option value="12">12%</option>
+                          <option value="18">18%</option>
+                          <option value="28">28%</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-medium text-[11px] text-slate-600 dark:text-slate-400 mb-1">Vendor GSTIN (Optional)</label>
+                        <input
+                          type="text"
+                          value={expenseVendorGstin}
+                          onChange={(e) => setExpenseVendorGstin(e.target.value.toUpperCase())}
+                          placeholder="27ABCDE1234F1Z5"
+                          className="w-full px-2 py-1.5 font-mono uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg focus:outline-none text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {expenseAmount > 0 && expenseGstRate > 0 && (
+                      <div className="p-2 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-lg border border-emerald-200/60 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300 flex justify-between font-mono">
+                        <span>Taxable: ₹{round2(expenseAmount / (1 + expenseGstRate / 100)).toFixed(2)}</span>
+                        <span>ITC Claim: ₹{round2(expenseAmount - round2(expenseAmount / (1 + expenseGstRate / 100))).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1333,7 +2075,7 @@ export const PurchasesView: React.FC = () => {
                   type="text"
                   value={expenseNotes}
                   onChange={(e) => setExpenseNotes(e.target.value)}
-                  placeholder="e.g. August month billing"
+                  placeholder="e.g. August month office electricity bill"
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none"
                 />
               </div>
@@ -1387,6 +2129,33 @@ export const PurchasesView: React.FC = () => {
             if (item.uqc && item.uqc !== 'OTH') handleItemFieldChange(targetIdx, 'unit', item.uqc);
           }
         }}
+      />
+
+      {/* GST Rate Calculator & Inclusive/Exclusive Converter Modal */}
+      <GstRateCalculatorModal
+        isOpen={showGstCalculator}
+        onClose={() => {
+          setShowGstCalculator(false);
+          setCalculatorTargetIndex(null);
+        }}
+        initialAmount={
+          calculatorTargetIndex !== null && pItems[calculatorTargetIndex]
+            ? (purchasePriceMode === 'EXCLUSIVE'
+                ? pItems[calculatorTargetIndex].rate
+                : (pItems[calculatorTargetIndex].rateIncl || round2(pItems[calculatorTargetIndex].rate * (1 + (pItems[calculatorTargetIndex].gstRate || 0) / 100))))
+            : (pItems[0]?.rate || 100)
+        }
+        initialGstRate={
+          calculatorTargetIndex !== null && pItems[calculatorTargetIndex]
+            ? pItems[calculatorTargetIndex].gstRate
+            : (pItems[0]?.gstRate || 18)
+        }
+        initialMode={
+          purchasePriceMode === 'EXCLUSIVE'
+            ? 'EXCLUSIVE_TO_INCLUSIVE'
+            : 'INCLUSIVE_TO_EXCLUSIVE'
+        }
+        onApply={handleApplyCalculatedGst}
       />
     </div>
   );
