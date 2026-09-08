@@ -1,0 +1,6 @@
+{
+  "name": "Zooka Business - Smart Accounting, GST & E-Invoicing Suite",
+  "description": "Comprehensive accounting, billing, inventory, GST compliance and e-invoicing platform designed for small businesses on mobile and desktop.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,345 @@
+import { BottomNavConfig, BottomNavTabItem, QuickActionType } from '../types';
+import { 
+  LayoutDashboard, 
+  FileText, 
+  ShoppingCart, 
+  Package, 
+  Users, 
+  Truck, 
+  BookOpenCheck, 
+  Calculator, 
+  Settings, 
+  ShieldCheck, 
+  Receipt,
+  PlusCircle,
+  QrCode,
+  Landmark,
+  FileSignature
+} from 'lucide-react';
+import React from 'react';
+
+export interface TabMetaDefinition {
+  id: string;
+  defaultLabel: string;
+  shortLabel: string;
+  description: string;
+  icon: React.ElementType;
+  recommendedRoles?: string[];
+  suggestedBadge?: string;
+}
+
+export const ALL_AVAILABLE_NAV_TABS: TabMetaDefinition[] = [
+  {
+    id: 'dashboard',
+    defaultLabel: 'Dashboard',
+    shortLabel: 'Home',
+    description: 'KPIs, real-time sales overview, receivables & alerts',
+    icon: LayoutDashboard,
+  },
+  {
+    id: 'invoices',
+    defaultLabel: 'Invoices & Billing',
+    shortLabel: 'Invoices',
+    description: 'Create & manage Tax Invoices, estimates and delivery challans',
+    icon: FileText,
+  },
+  {
+    id: 'pos_billing',
+    defaultLabel: 'POS Counter Sale',
+    shortLabel: 'POS Sale',
+    description: 'Fast barcode scanning, thermal prints & instant receipts',
+    icon: ShoppingCart,
+  },
+  {
+    id: 'payments',
+    defaultLabel: 'Payments & Receipts',
+    shortLabel: 'Payments',
+    description: 'Record customer money-in, vendor disbursements & contra vouchers',
+    icon: Receipt,
+  },
+  {
+    id: 'inventory',
+    defaultLabel: 'Inventory & Stock',
+    shortLabel: 'Stock',
+    description: 'Products catalog, HSN codes, batches, barcodes & stock alerts',
+    icon: Package,
+  },
+  {
+    id: 'parties',
+    defaultLabel: 'Customers & Vendors',
+    shortLabel: 'Parties',
+    description: 'Party master, GSTIN autofill, ledger accounts & balances',
+    icon: Users,
+  },
+  {
+    id: 'purchases',
+    defaultLabel: 'Purchases & Bills',
+    shortLabel: 'Purchases',
+    description: 'Inward purchase bills, operating expenses & ITC eligibility',
+    icon: Truck,
+  },
+  {
+    id: 'accounting',
+    defaultLabel: 'Accounting & Ledgers',
+    shortLabel: 'Accounts',
+    description: 'General ledger, Trial balance, Profit & Loss, Balance sheet & JVs',
+    icon: BookOpenCheck,
+  },
+  {
+    id: 'gst_returns',
+    defaultLabel: 'GST Returns & Reports',
+    shortLabel: 'GST Tax',
+    description: 'GSTR-1, GSTR-3B registers, B2B/B2C summaries & JSON export',
+    icon: Calculator,
+  },
+  {
+    id: 'cheques',
+    defaultLabel: 'Cheque Printing & Books',
+    shortLabel: 'Cheques',
+    description: 'CTS-2010 bank cheque printing, cheque books & auto-ledger entries',
+    icon: Landmark,
+  },
+  {
+    id: 'letterhead',
+    defaultLabel: 'Letterhead & Documents',
+    shortLabel: 'Letterhead',
+    description: 'Custom letterhead designer, rich text editor & official documents',
+    icon: FileSignature,
+  },
+  {
+    id: 'users',
+    defaultLabel: 'Users & Permissions',
+    shortLabel: 'Users',
+    description: 'Staff accounts, role assignments, security logs & PIN access',
+    icon: ShieldCheck,
+  },
+  {
+    id: 'settings',
+    defaultLabel: 'Company Settings',
+    shortLabel: 'Settings',
+    description: 'GST profile, bank details, authorized sign & data backup',
+    icon: Settings,
+  },
+];
+
+export const DEFAULT_BOTTOM_NAV_TABS: BottomNavTabItem[] = [
+  { id: 'dashboard', label: 'Home', customLabel: '', isEnabled: true, order: 0 },
+  { id: 'invoices', label: 'Invoices', customLabel: '', isEnabled: true, order: 1 },
+  { id: 'pos_billing', label: 'POS Sale', customLabel: '', isEnabled: true, order: 2 },
+  { id: 'inventory', label: 'Stock', customLabel: '', isEnabled: true, order: 3 },
+  { id: 'parties', label: 'Parties', customLabel: '', isEnabled: true, order: 4 },
+  { id: 'payments', label: 'Payments', customLabel: '', isEnabled: false, order: 5 },
+  { id: 'purchases', label: 'Purchases', customLabel: '', isEnabled: false, order: 6 },
+  { id: 'accounting', label: 'Accounts', customLabel: '', isEnabled: false, order: 7 },
+  { id: 'gst_returns', label: 'GST Tax', customLabel: '', isEnabled: false, order: 8 },
+  { id: 'cheques', label: 'Cheques', customLabel: '', isEnabled: false, order: 9 },
+  { id: 'letterhead', label: 'Letterhead', customLabel: '', isEnabled: false, order: 10 },
+  { id: 'users', label: 'Users', customLabel: '', isEnabled: false, order: 11 },
+  { id: 'settings', label: 'Settings', customLabel: '', isEnabled: false, order: 12 },
+];
+
+export const DEFAULT_BOTTOM_NAV_CONFIG: BottomNavConfig = {
+  enabled: true,
+  style: 'FLOATING_PILL',
+  showLabels: true,
+  showBadges: true,
+  showQuickActionCenter: false,
+  centerActionIcon: 'PLUS',
+  quickActionItems: ['invoice', 'pos', 'payment_in', 'product', 'expense'],
+  showMoreDrawerButton: true,
+  tabs: DEFAULT_BOTTOM_NAV_TABS,
+};
+
+export interface BottomNavPreset {
+  id: string;
+  name: string;
+  tagline: string;
+  badge: string;
+  color: string;
+  config: BottomNavConfig;
+}
+
+export const BOTTOM_NAV_PRESETS: BottomNavPreset[] = [
+  {
+    id: 'LIQUID_GLASS_PRO',
+    name: 'Liquid Glass Luxury',
+    tagline: 'Ultra-modern frosted glassmorphism with specular gloss, subtle reflections & glowing active pills',
+    badge: 'Liquid Glass',
+    color: 'cyan',
+    config: {
+      enabled: true,
+      style: 'LIQUID_GLASS',
+      showLabels: true,
+      showBadges: true,
+      showQuickActionCenter: false,
+      centerActionIcon: 'PLUS',
+      quickActionItems: ['invoice', 'pos', 'payment_in', 'product', 'expense'],
+      showMoreDrawerButton: true,
+      tabs: [
+        { id: 'dashboard', label: 'Home', isEnabled: true, order: 0 },
+        { id: 'invoices', label: 'Invoices', isEnabled: true, order: 1 },
+        { id: 'pos_billing', label: 'POS Sale', isEnabled: true, order: 2 },
+        { id: 'inventory', label: 'Stock', isEnabled: true, order: 3 },
+        { id: 'parties', label: 'Parties', isEnabled: true, order: 4 },
+        { id: 'payments', label: 'Payments', isEnabled: false, order: 5 },
+        { id: 'purchases', label: 'Purchases', isEnabled: false, order: 6 },
+        { id: 'accounting', label: 'Accounts', isEnabled: false, order: 7 },
+        { id: 'gst_returns', label: 'GST Tax', isEnabled: false, order: 8 },
+        { id: 'cheques', label: 'Cheques', isEnabled: false, order: 9 },
+        { id: 'users', label: 'Users', isEnabled: false, order: 10 },
+        { id: 'settings', label: 'Settings', isEnabled: false, order: 11 },
+      ],
+    },
+  },
+  {
+    id: 'STANDARD_BALANCED',
+    name: 'General Business & Billing',
+    tagline: 'Balanced setup for small business: Home, Invoices, POS Counter, Stock & Parties',
+    badge: 'Popular',
+    color: 'indigo',
+    config: {
+      enabled: true,
+      style: 'FLOATING_PILL',
+      showLabels: true,
+      showBadges: true,
+      showQuickActionCenter: false,
+      centerActionIcon: 'PLUS',
+      quickActionItems: ['invoice', 'pos', 'payment_in', 'product', 'expense'],
+      showMoreDrawerButton: true,
+      tabs: [
+        { id: 'dashboard', label: 'Home', isEnabled: true, order: 0 },
+        { id: 'invoices', label: 'Invoices', isEnabled: true, order: 1 },
+        { id: 'pos_billing', label: 'POS Sale', isEnabled: true, order: 2 },
+        { id: 'inventory', label: 'Stock', isEnabled: true, order: 3 },
+        { id: 'parties', label: 'Parties', isEnabled: true, order: 4 },
+        { id: 'payments', label: 'Payments', isEnabled: false, order: 5 },
+        { id: 'purchases', label: 'Purchases', isEnabled: false, order: 6 },
+        { id: 'accounting', label: 'Accounts', isEnabled: false, order: 7 },
+        { id: 'gst_returns', label: 'GST Tax', isEnabled: false, order: 8 },
+        { id: 'users', label: 'Users', isEnabled: false, order: 9 },
+        { id: 'settings', label: 'Settings', isEnabled: false, order: 10 },
+      ],
+    },
+  },
+  {
+    id: 'RETAIL_POS_PRO',
+    name: 'Retail Store & Counter Billing',
+    tagline: 'High-speed retail counter priority: Quick POS, Stock, Invoices & Payments',
+    badge: 'Fast Retail',
+    color: 'emerald',
+    config: {
+      enabled: true,
+      style: 'MODERN_CURVED',
+      showLabels: true,
+      showBadges: true,
+      showQuickActionCenter: false,
+      centerActionIcon: 'PLUS',
+      quickActionItems: ['pos', 'invoice', 'payment_in', 'product'],
+      showMoreDrawerButton: true,
+      tabs: [
+        { id: 'pos_billing', label: 'POS Counter', isEnabled: true, order: 0 },
+        { id: 'inventory', label: 'Stock & Items', isEnabled: true, order: 1 },
+        { id: 'invoices', label: 'Sale Bills', isEnabled: true, order: 2 },
+        { id: 'payments', label: 'Cash & UPI', isEnabled: true, order: 3 },
+        { id: 'parties', label: 'Customers', isEnabled: true, order: 4 },
+        { id: 'dashboard', label: 'Home', isEnabled: false, order: 5 },
+        { id: 'purchases', label: 'Purchases', isEnabled: false, order: 6 },
+        { id: 'accounting', label: 'Accounts', isEnabled: false, order: 7 },
+        { id: 'gst_returns', label: 'GST Tax', isEnabled: false, order: 8 },
+        { id: 'users', label: 'Users', isEnabled: false, order: 9 },
+        { id: 'settings', label: 'Settings', isEnabled: false, order: 10 },
+      ],
+    },
+  },
+  {
+    id: 'ACCOUNTING_FINANCE_PRO',
+    name: 'CA, Accounts & GST Taxation',
+    tagline: 'Auditor & accountant workflow: Ledgers, GST Returns, Payments, Bills & JVs',
+    badge: 'Accountant',
+    color: 'blue',
+    config: {
+      enabled: true,
+      style: 'CLASSIC_DOCKED',
+      showLabels: true,
+      showBadges: true,
+      showQuickActionCenter: false,
+      centerActionIcon: 'PLUS',
+      quickActionItems: ['payment_in', 'payment_out', 'invoice', 'expense'],
+      showMoreDrawerButton: true,
+      tabs: [
+        { id: 'dashboard', label: 'Overview', isEnabled: true, order: 0 },
+        { id: 'accounting', label: 'Ledgers & BS', isEnabled: true, order: 1 },
+        { id: 'gst_returns', label: 'GST Filing', isEnabled: true, order: 2 },
+        { id: 'payments', label: 'Vouchers', isEnabled: true, order: 3 },
+        { id: 'purchases', label: 'Bills & ITC', isEnabled: true, order: 4 },
+        { id: 'invoices', label: 'Invoices', isEnabled: false, order: 5 },
+        { id: 'pos_billing', label: 'POS Sale', isEnabled: false, order: 6 },
+        { id: 'inventory', label: 'Stock', isEnabled: false, order: 7 },
+        { id: 'parties', label: 'Parties', isEnabled: false, order: 8 },
+        { id: 'users', label: 'Users', isEnabled: false, order: 9 },
+        { id: 'settings', label: 'Settings', isEnabled: false, order: 10 },
+      ],
+    },
+  },
+  {
+    id: 'WHOLESALE_DISTRIBUTION',
+    name: 'Wholesale & Inventory Dispatch',
+    tagline: 'Bulk B2B orders, Stock tracking, Invoices, Vendors & Purchase Bills',
+    badge: 'Wholesale',
+    color: 'amber',
+    config: {
+      enabled: true,
+      style: 'FLOATING_PILL',
+      showLabels: true,
+      showBadges: true,
+      showQuickActionCenter: false,
+      centerActionIcon: 'PLUS',
+      quickActionItems: ['invoice', 'product', 'payment_in', 'expense'],
+      showMoreDrawerButton: true,
+      tabs: [
+        { id: 'dashboard', label: 'Home', isEnabled: true, order: 0 },
+        { id: 'invoices', label: 'B2B Invoices', isEnabled: true, order: 1 },
+        { id: 'inventory', label: 'Warehouse', isEnabled: true, order: 2 },
+        { id: 'purchases', label: 'Purchases', isEnabled: true, order: 3 },
+        { id: 'parties', label: 'Party Ledgers', isEnabled: true, order: 4 },
+        { id: 'pos_billing', label: 'POS Sale', isEnabled: false, order: 5 },
+        { id: 'payments', label: 'Payments', isEnabled: false, order: 6 },
+        { id: 'accounting', label: 'Accounts', isEnabled: false, order: 7 },
+        { id: 'gst_returns', label: 'GST Tax', isEnabled: false, order: 8 },
+        { id: 'users', label: 'Users', isEnabled: false, order: 9 },
+        { id: 'settings', label: 'Settings', isEnabled: false, order: 10 },
+      ],
+    },
+  },
+  {
+    id: 'MINIMAL_SLIM',
+    name: 'Minimal Clean Dock',
+    tagline: 'Ultra streamlined 3-tab bottom bar with maximum screen real estate',
+    badge: 'Compact',
+    color: 'purple',
+    config: {
+      enabled: true,
+      style: 'COMPACT_SLIM',
+      showLabels: true,
+      showBadges: false,
+      showQuickActionCenter: false,
+      centerActionIcon: 'PLUS',
+      quickActionItems: ['invoice', 'pos', 'payment_in'],
+      showMoreDrawerButton: true,
+      tabs: [
+        { id: 'dashboard', label: 'Home', isEnabled: true, order: 0 },
+        { id: 'invoices', label: 'Invoices', isEnabled: true, order: 1 },
+        { id: 'pos_billing', label: 'POS Sale', isEnabled: true, order: 2 },
+        { id: 'inventory', label: 'Stock', isEnabled: false, order: 3 },
+        { id: 'parties', label: 'Parties', isEnabled: false, order: 4 },
+        { id: 'payments', label: 'Payments', isEnabled: false, order: 5 },
+        { id: 'purchases', label: 'Purchases', isEnabled: false, order: 6 },
+        { id: 'accounting', label: 'Accounts', isEnabled: false, order: 7 },
+        { id: 'gst_returns', label: 'GST Tax', isEnabled: false, order: 8 },
+        { id: 'users', label: 'Users', isEnabled: false, order: 9 },
+        { id: 'settings', label: 'Settings', isEnabled: false, order: 10 },
+      ],
+    },
+  },
+];
+

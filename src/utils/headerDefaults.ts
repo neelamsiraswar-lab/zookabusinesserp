@@ -1,0 +1,256 @@
+import { HeaderConfig, HeaderStyle, HeaderDensity, HeaderSearchStyle } from '../types';
+
+export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
+  enabled: true,
+  style: 'GLASS',
+  density: 'COMFORTABLE',
+  
+  // Branding & Identity Display
+  showLogo: true,
+  logoShape: 'rounded',
+  showTradeName: true,
+  showLegalName: false,
+  showGstin: true,
+  showStateBadge: true,
+  showLocation: true,
+  showFinancialYear: true,
+  customTitle: '',
+  customSubtitle: '',
+  
+  // Universal Search
+  showSearch: true,
+  searchStyle: 'COMPACT',
+  searchPlaceholder: 'Search invoices, inventory, parties... (⌘K)',
+  
+  // Quick Action CTAs
+  showNewInvoiceBtn: true,
+  newInvoiceBtnText: 'New Invoice',
+  showQuickPosBtn: true,
+  quickPosBtnText: 'Quick POS',
+  showQuickExpenseBtn: false,
+  showQuickPaymentBtn: false,
+  
+  // System Tools & Status
+  showCloudSyncBadge: true,
+  showThemeToggle: true,
+  showFullScreenBtn: true,
+  showSidebarToggle: true,
+  showNotificationBell: true,
+  showUserPersona: true,
+  
+  // Layout & Visual Styling
+  customAccentColor: 'auto',
+  showBorderBottom: true,
+  shadow: 'none',
+  sticky: true,
+};
+
+export interface HeaderPreset {
+  id: string;
+  name: string;
+  badge: string;
+  description: string;
+  config: HeaderConfig;
+}
+
+export const HEADER_PRESETS: HeaderPreset[] = [
+  {
+    id: 'modern_business',
+    name: 'Modern Business (Recommended)',
+    badge: 'Balanced',
+    description: 'Complete GST enterprise layout with search, quick POS, compliance alerts, and role switcher.',
+    config: {
+      ...DEFAULT_HEADER_CONFIG,
+      style: 'GLASS',
+      density: 'COMFORTABLE',
+      showLogo: true,
+      logoShape: 'rounded',
+      showTradeName: true,
+      showLegalName: false,
+      showGstin: true,
+      showStateBadge: true,
+      showLocation: true,
+      showFinancialYear: true,
+      showSearch: true,
+      searchStyle: 'COMPACT',
+      showNewInvoiceBtn: true,
+      newInvoiceBtnText: 'New Invoice',
+      showQuickPosBtn: true,
+      quickPosBtnText: 'Quick POS',
+      showCloudSyncBadge: true,
+      showThemeToggle: true,
+      showNotificationBell: true,
+      showUserPersona: true,
+    }
+  },
+  {
+    id: 'retail_pos',
+    name: 'Retail & Fast Counter POS',
+    badge: 'High Speed',
+    description: 'Engineered for shop counters with prominent Quick POS, New Invoice, Payment shortcuts and alerts.',
+    config: {
+      ...DEFAULT_HEADER_CONFIG,
+      style: 'SOLID',
+      density: 'COMFORTABLE',
+      showLogo: true,
+      logoShape: 'square',
+      showTradeName: true,
+      showLegalName: false,
+      showGstin: true,
+      showStateBadge: false,
+      showLocation: false,
+      showFinancialYear: false,
+      showSearch: true,
+      searchStyle: 'PILL',
+      searchPlaceholder: 'Fast Scan Barcode / Search Item (⌘K)',
+      showNewInvoiceBtn: true,
+      newInvoiceBtnText: 'Tax Invoice',
+      showQuickPosBtn: true,
+      quickPosBtnText: '⚡ Fast POS',
+      showQuickPaymentBtn: true,
+      showQuickExpenseBtn: false,
+      showCloudSyncBadge: true,
+      showThemeToggle: true,
+      showNotificationBell: true,
+      showUserPersona: true,
+    }
+  },
+  {
+    id: 'corporate_compliance',
+    name: 'Corporate Tax & Compliance',
+    badge: 'GST Audit',
+    description: 'Detailed compliance header displaying full Legal Entity Name, GSTIN, State code, and FY tag.',
+    config: {
+      ...DEFAULT_HEADER_CONFIG,
+      style: 'BORDERED',
+      density: 'SPACIOUS',
+      showLogo: true,
+      logoShape: 'rounded',
+      showTradeName: true,
+      showLegalName: true,
+      showGstin: true,
+      showStateBadge: true,
+      showLocation: true,
+      showFinancialYear: true,
+      showSearch: true,
+      searchStyle: 'EXPANDED',
+      searchPlaceholder: 'Search ledgers, GST filings, parties...',
+      showNewInvoiceBtn: true,
+      newInvoiceBtnText: 'Create GST Bill',
+      showQuickPosBtn: false,
+      showQuickExpenseBtn: true,
+      showQuickPaymentBtn: true,
+      showCloudSyncBadge: true,
+      showThemeToggle: true,
+      showNotificationBell: true,
+      showUserPersona: true,
+    }
+  },
+  {
+    id: 'minimalist_clean',
+    name: 'Minimalist Clean',
+    badge: 'Distraction Free',
+    description: 'Sleek header keeping only core identity, compact search bar, theme toggle, and user profile.',
+    config: {
+      ...DEFAULT_HEADER_CONFIG,
+      style: 'MINIMAL',
+      density: 'COMPACT',
+      showLogo: true,
+      logoShape: 'circle',
+      showTradeName: true,
+      showLegalName: false,
+      showGstin: false,
+      showStateBadge: false,
+      showLocation: false,
+      showFinancialYear: false,
+      showSearch: true,
+      searchStyle: 'MINIMAL',
+      searchPlaceholder: 'Search...',
+      showNewInvoiceBtn: true,
+      newInvoiceBtnText: 'Invoice',
+      showQuickPosBtn: false,
+      showQuickExpenseBtn: false,
+      showQuickPaymentBtn: false,
+      showCloudSyncBadge: true,
+      showThemeToggle: true,
+      showNotificationBell: false,
+      showUserPersona: true,
+    }
+  },
+  {
+    id: 'compact_dense',
+    name: 'Compact Pro Workspace',
+    badge: 'Max Canvas',
+    description: 'Space-saving slim 52px top bar providing maximum vertical real estate for tables and ledgers.',
+    config: {
+      ...DEFAULT_HEADER_CONFIG,
+      style: 'GLASS',
+      density: 'COMPACT',
+      showLogo: true,
+      logoShape: 'rounded',
+      showTradeName: true,
+      showLegalName: false,
+      showGstin: true,
+      showStateBadge: true,
+      showLocation: false,
+      showFinancialYear: false,
+      showSearch: true,
+      searchStyle: 'COMPACT',
+      searchPlaceholder: 'Search (⌘K)',
+      showNewInvoiceBtn: true,
+      newInvoiceBtnText: '+ Invoice',
+      showQuickPosBtn: true,
+      quickPosBtnText: 'POS',
+      showQuickExpenseBtn: false,
+      showQuickPaymentBtn: false,
+      showCloudSyncBadge: false,
+      showThemeToggle: true,
+      showNotificationBell: true,
+      showUserPersona: true,
+    }
+  },
+  {
+    id: 'floating_luxe',
+    name: 'Floating Pill Luxe',
+    badge: 'Premium UI',
+    description: 'Modern floating header style with curved borders, elevated depth, and luminous accents.',
+    config: {
+      ...DEFAULT_HEADER_CONFIG,
+      style: 'FLOATING',
+      density: 'COMFORTABLE',
+      showLogo: true,
+      logoShape: 'circle',
+      showTradeName: true,
+      showLegalName: false,
+      showGstin: true,
+      showStateBadge: true,
+      showLocation: true,
+      showFinancialYear: true,
+      showSearch: true,
+      searchStyle: 'PILL',
+      showNewInvoiceBtn: true,
+      newInvoiceBtnText: 'New Bill',
+      showQuickPosBtn: true,
+      quickPosBtnText: 'Counter POS',
+      showCloudSyncBadge: true,
+      showThemeToggle: true,
+      showNotificationBell: true,
+      showUserPersona: true,
+      shadow: 'md',
+    }
+  }
+];
+
+export const normalizeHeaderConfig = (config?: Partial<HeaderConfig> | null): HeaderConfig => {
+  if (!config) return DEFAULT_HEADER_CONFIG;
+  return {
+    ...DEFAULT_HEADER_CONFIG,
+    ...config,
+    style: config.style || DEFAULT_HEADER_CONFIG.style,
+    density: config.density || DEFAULT_HEADER_CONFIG.density,
+    searchStyle: config.searchStyle || DEFAULT_HEADER_CONFIG.searchStyle,
+    logoShape: config.logoShape || DEFAULT_HEADER_CONFIG.logoShape,
+    customAccentColor: config.customAccentColor || DEFAULT_HEADER_CONFIG.customAccentColor,
+    shadow: config.shadow || DEFAULT_HEADER_CONFIG.shadow,
+  };
+};

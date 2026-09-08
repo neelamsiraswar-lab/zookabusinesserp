@@ -1,0 +1,268 @@
+{
+  "entities": {
+    "companies": {
+      "title": "Company Profiles",
+      "description": "Multi-company organizational profiles, GST settings, and organizational policies",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "tradeName": { "type": "string" },
+        "gstin": { "type": "string" },
+        "pan": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "state": { "type": "string" },
+        "stateCode": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "pincode": { "type": "string" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "ifscCode": { "type": "string" },
+        "branchName": { "type": "string" },
+        "upiId": { "type": "string" },
+        "currency": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "financialYear": { "type": "string" },
+        "themeColor": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "disabledReason": { "type": "string" },
+        "headerConfig": { "type": "object" },
+        "lowStockSettings": { "type": "object" },
+        "sessionTimeoutSettings": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "businessProfiles": {
+      "title": "Business Configuration",
+      "description": "Company business settings, inventory parameters, invoice prefixes, and low stock configurations",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "tradeName": { "type": "string" },
+        "gstin": { "type": "string" },
+        "pan": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "state": { "type": "string" },
+        "stateCode": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "pincode": { "type": "string" },
+        "currency": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "ifscCode": { "type": "string" },
+        "branchName": { "type": "string" },
+        "upiId": { "type": "string" },
+        "invoicePrefix": { "type": "string" },
+        "nextInvoiceNumber": { "type": "number" },
+        "headerConfig": { "type": "object" },
+        "lowStockSettings": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "defaultThreshold": { "type": "number" },
+            "criticalStockThreshold": { "type": "number" },
+            "allowNegativeStock": { "type": "boolean" },
+            "negativeStockBehavior": { "type": "string" },
+            "blockBillingOnOutOfStock": { "type": "boolean" },
+            "warnOnLowStockBilling": { "type": "boolean" },
+            "showLowStockBadge": { "type": "boolean" },
+            "showDashboardBanner": { "type": "boolean" },
+            "autoReorderSuggestions": { "type": "boolean" },
+            "defaultReorderMultiplier": { "type": "number" },
+            "notifyOnBilling": { "type": "boolean" },
+            "emailAlertDigest": { "type": "boolean" }
+          }
+        },
+        "sessionTimeoutSettings": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "invoices": {
+      "title": "Tax Invoices",
+      "description": "Sales invoices, estimates, delivery challans",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "customer": { "type": "object" },
+        "items": { "type": "array" },
+        "subTotal": { "type": "number" },
+        "totalTax": { "type": "number" },
+        "total": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "invoiceNumber", "total"]
+    },
+    "products": {
+      "title": "Products & Inventory",
+      "description": "Product catalog and stock inventory with low-stock alert thresholds",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "barcode": { "type": "string" },
+        "category": { "type": "string" },
+        "hsnCode": { "type": "string" },
+        "unit": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "gstRate": { "type": "number" },
+        "currentStock": { "type": "number" },
+        "minStockAlert": { "type": "number" },
+        "isService": { "type": "boolean" },
+        "batches": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "parties": {
+      "title": "Parties (Customers & Vendors)",
+      "description": "Customer and vendor master contacts and ledgers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "gstin": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "state": { "type": "string" },
+        "stateCode": { "type": "string" },
+        "balance": { "type": "number" }
+      },
+      "required": ["id", "name"]
+    },
+    "purchases": {
+      "title": "Purchase Inward Bills",
+      "description": "Vendor purchase invoices and ITC tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "billNumber": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "date": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "billNumber", "total"]
+    },
+    "expenses": {
+      "title": "Operating Expenses",
+      "description": "Direct and indirect business expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "paymentMode": { "type": "string" }
+      },
+      "required": ["id", "amount", "category"]
+    },
+    "payments": {
+      "title": "Payment Records",
+      "description": "Customer payments, vendor payouts, contra transfers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "voucherNumber": { "type": "string" },
+        "type": { "type": "string" },
+        "partyName": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentDate": { "type": "string" },
+        "paymentMode": { "type": "string" }
+      },
+      "required": ["id", "voucherNumber", "amount"]
+    },
+    "accountHeads": {
+      "title": "Chart of Accounts",
+      "description": "General ledger accounts, banks, cash, capital and expense heads",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "balance": { "type": "number" }
+      },
+      "required": ["id", "name", "type"]
+    },
+    "journalEntries": {
+      "title": "Journal Entries",
+      "description": "Double entry book-keeping transaction vouchers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "entryNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "description": { "type": "string" },
+        "lines": { "type": "array" },
+        "totalAmount": { "type": "number" }
+      },
+      "required": ["id", "entryNumber"]
+    },
+    "users": {
+      "title": "Users & Access Control",
+      "description": "Authorized staff profiles, roles, and PIN access",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "customHsnCodes": {
+      "title": "Custom HSN & SAC Tariff Directory",
+      "description": "User-defined custom Goods HSN codes and Service SAC codes with GST tax rates and unit codes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "code": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "gstRate": { "type": "number" },
+        "uqc": { "type": "string" },
+        "isCustom": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "code", "description", "gstRate"]
+    },
+    "systemState": {
+      "title": "System Configuration",
+      "description": "Global sync metadata, active company pointer, platform branding, superadmin announcements, and security credentials",
+      "type": "object",
+      "properties": {
+        "activeCompanyId": { "type": "string" },
+        "lastSyncedAt": { "type": "string" },
+        "platformConfig": { "type": "object" },
+        "superAdminAuth": { "type": "object" }
+      }
+    }
+  }
+}

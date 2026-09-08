@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="pwaMaskGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81" />
+      <stop offset="50%" stop-color="#1e40af" />
+      <stop offset="100%" stop-color="#0e7490" />
+    </linearGradient>
+    <linearGradient id="maskAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <!-- Full bleed rectangle for maskable safe-zone -->
+  <rect width="512" height="512" fill="url(#pwaMaskGrad)" />
+  
+  <!-- Safe zone contained icon (80% box) -->
+  <g transform="translate(64, 64) scale(0.75)">
+    <path d="M 120 140 L 392 140 C 405 140 415 152 410 165 L 205 340 L 392 340 C 405 340 412 352 412 364 L 412 372 C 412 384 402 392 390 392 L 118 392 C 105 392 96 380 102 368 L 305 192 L 120 192 C 108 192 100 180 100 168 L 100 160 C 100 148 110 140 120 140 Z" fill="#ffffff" />
+    <path d="M 330 110 L 410 110 L 410 190 L 375 155 L 290 240 L 250 200 L 170 280 L 145 255 L 250 150 L 290 190 L 355 125 Z" fill="url(#maskAccent)" opacity="0.95" />
+    <circle cx="390" cy="366" r="14" fill="#10b981" />
+  </g>
+</svg>

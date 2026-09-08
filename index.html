@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Zooka Business - Smart Accounting, GST & E-Invoicing Suite</title>
+    <meta name="description" content="Comprehensive accounting, billing, inventory, GST compliance and e-invoicing platform designed for small businesses on mobile and desktop." />
+    
+    <!-- PWA Web Manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    
+    <!-- Favicon & Vector Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+
+    <!-- Theme & Status Bar Colors -->
+    <meta name="theme-color" content="#4f46e5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+    
+    <!-- iOS Web App Capabilities -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Zooka Business" />
+    
+    <!-- Android / Chrome / Windows Capabilities -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Zooka Business" />
+    <meta name="msapplication-TileColor" content="#4f46e5" />
+    <meta name="msapplication-tap-highlight" content="no" />
+
+    <!-- Social & OpenGraph Meta -->
+    <meta property="og:title" content="Zooka Business - Smart Accounting, GST & E-Invoicing Suite" />
+    <meta property="og:description" content="Comprehensive accounting, billing, inventory, GST compliance and e-invoicing platform designed for small businesses on mobile and desktop." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icon-512.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Synchronous early theme initializer -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('zooka_enterprise_erp_theme');
+          var theme = saved ? JSON.parse(saved) : 'light';
+          var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
