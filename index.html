@@ -40,8 +40,15 @@
     <script>
       (function() {
         try {
-          var saved = localStorage.getItem('zooka_enterprise_erp_theme');
-          var theme = saved ? JSON.parse(saved) : 'light';
+          var saved = localStorage.getItem('zookabusiness_v2_cloud_theme') || localStorage.getItem('zooka_enterprise_erp_theme');
+          var theme = 'light';
+          if (saved) {
+            try {
+              theme = JSON.parse(saved);
+            } catch (err) {
+              theme = saved;
+            }
+          }
           var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (isDark) {
             document.documentElement.classList.add('dark');

@@ -33,10 +33,18 @@ export function safeStorageGet<T>(key: string, fallback: T, legacyKey?: string):
       }
     }
     if (!item || item === 'undefined' || item === 'null') return fallback;
-    const parsed = JSON.parse(item);
-    if (parsed === null || parsed === undefined) return fallback;
-    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
-    return parsed as T;
+    try {
+      const parsed = JSON.parse(item);
+      if (parsed === null || parsed === undefined) return fallback;
+      if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+      return parsed as T;
+    } catch {
+      // If parsing as JSON fails but fallback or item is a string, return the raw string value
+      if (typeof fallback === 'string' && typeof item === 'string') {
+        return item as unknown as T;
+      }
+      return fallback;
+    }
   } catch (e) {
     console.warn(`Error reading key "${key}" from storage:`, e);
     return fallback;

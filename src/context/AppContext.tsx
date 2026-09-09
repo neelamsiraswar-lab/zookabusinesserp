@@ -395,10 +395,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
       if (!item || item === 'undefined' || item === 'null') return fallback;
-      const parsed = JSON.parse(item);
-      if (parsed === null || parsed === undefined) return fallback;
-      if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
-      return parsed;
+      try {
+        const parsed = JSON.parse(item);
+        if (parsed === null || parsed === undefined) return fallback;
+        if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+        return parsed;
+      } catch {
+        if (typeof fallback === 'string' && typeof item === 'string') {
+          return item as unknown as T;
+        }
+        return fallback;
+      }
     } catch (e) {
       console.warn(`Error reading ${key} from storage:`, e);
       return fallback;
@@ -1405,7 +1412,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let loadedLetterheadTemplates: LetterheadTemplate[] = safeParseArray<LetterheadTemplate>(rawDocTemplates, DEFAULT_LETTERHEAD_TEMPLATES);
 
     if (rawBus) {
-      loadedBusiness = JSON.parse(rawBus);
+      try {
+        loadedBusiness = JSON.parse(rawBus);
+      } catch (e) {
+        console.warn('Failed to parse cached business profile, using fallback metadata:', e);
+        const compMeta = companies.find(c => c.id === targetCompId);
+        loadedBusiness = {
+          ...cleanDefaultBusinessProfile,
+          name: compMeta?.name || 'Company Name',
+          tradeName: compMeta?.tradeName || compMeta?.name || 'Company Name',
+          gstin: compMeta?.gstin || 'UNREGISTERED',
+          pan: compMeta?.pan || 'PANNOTSET',
+          state: compMeta?.state || 'Delhi',
+          stateCode: compMeta?.stateCode || '07',
+          city: compMeta?.city || 'New Delhi',
+          address: compMeta?.address || 'Plot No. 1, Industrial Area',
+          pincode: compMeta?.pincode || '110001',
+          phone: compMeta?.phone || '+91 98000 00000',
+          email: compMeta?.email || 'accounts@mycompany.in',
+        };
+      }
     } else {
       const compMeta = companies.find(c => c.id === targetCompId);
       loadedBusiness = {
@@ -1425,7 +1451,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const defaultAdminUser = loadedUsers.find(u => u.role === 'ADMIN' && u.isActive) || loadedUsers[0] || cleanDefaultAdminUser;
-    const defaultUserId = rawUserId ? JSON.parse(rawUserId) : defaultAdminUser.id;
+    let defaultUserId = defaultAdminUser.id;
+    if (rawUserId) {
+      try {
+        const parsed = JSON.parse(rawUserId);
+        defaultUserId = typeof parsed === 'string' && parsed.trim() ? parsed.trim() : (rawUserId.trim() || defaultAdminUser.id);
+      } catch {
+        // rawUserId is a raw unquoted string (e.g. "usr-1787424329279")
+        defaultUserId = rawUserId.trim() || defaultAdminUser.id;
+      }
+    }
+    // Ensure defaultUserId is a valid user in this partition, otherwise fallback to defaultAdminUser
+    const matchedUser = loadedUsers.find(u => u.id === defaultUserId);
+    if (!matchedUser) {
+      defaultUserId = defaultAdminUser.id;
+    }
 
     return {
       business: normalizeBusinessProfile(loadedBusiness),
