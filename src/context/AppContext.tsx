@@ -73,6 +73,7 @@ import {
 import { cloudDb, defaultStandardAccountHeads } from '../services/cloudDb';
 import { applyThemeCssVariables } from '../utils/themeColors';
 import { DEFAULT_PLATFORM_CONFIG, normalizePlatformConfig } from '../utils/platformDefaults';
+import { safeStorageSet, safeStorageGet, hasCollectionChanged } from '../utils/storageHelpers';
 
 export type ActiveTab = 
   | 'dashboard'
@@ -437,6 +438,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [lastCloudSyncTime, setLastCloudSyncTime] = useState<Date | null>(null);
   const isCloudInitializedRef = useRef<boolean>(false);
+  const [isCloudReady, setIsCloudReady] = useState<boolean>(false);
 
   // Multi-Company State (Clean default single company)
   const [companies, setCompanies] = useState<Company[]>(() => {
@@ -868,6 +870,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (isMounted) {
           isCloudInitializedRef.current = true;
+          setIsCloudReady(true);
           setCloudSyncStatus('online');
           setLastCloudSyncTime(new Date());
         }
@@ -875,6 +878,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Firestore initial sync encountered error, running in local-cached mode:', err);
         if (isMounted) {
           isCloudInitializedRef.current = true;
+          setIsCloudReady(true);
           setCloudSyncStatus('error');
         }
       } finally {
@@ -907,7 +911,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time Firestore onSnapshot Subscriptions for Active Company Data
   useEffect(() => {
-    if (!isCloudInitializedRef.current || !currentCompanyId) return;
+    if (!isCloudReady || !currentCompanyId) return;
 
     const unsubscribe = cloudDb.subscribeToCompanyData(currentCompanyId, {
       onBusinessProfile: (remoteBus) => {
@@ -920,7 +924,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onInvoices: (remoteInvoices) => {
         setInvoices(prev => {
-          if (prev.length !== remoteInvoices.length || JSON.stringify(prev) !== JSON.stringify(remoteInvoices)) {
+          if (hasCollectionChanged(prev, remoteInvoices)) {
             return remoteInvoices;
           }
           return prev;
@@ -928,7 +932,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onProducts: (remoteProducts) => {
         setProducts(prev => {
-          if (prev.length !== remoteProducts.length || JSON.stringify(prev) !== JSON.stringify(remoteProducts)) {
+          if (hasCollectionChanged(prev, remoteProducts)) {
             return remoteProducts;
           }
           return prev;
@@ -936,7 +940,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onParties: (remoteParties) => {
         setParties(prev => {
-          if (prev.length !== remoteParties.length || JSON.stringify(prev) !== JSON.stringify(remoteParties)) {
+          if (hasCollectionChanged(prev, remoteParties)) {
             return remoteParties;
           }
           return prev;
@@ -944,7 +948,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onPurchaseBills: (remoteBills) => {
         setPurchaseBills(prev => {
-          if (prev.length !== remoteBills.length || JSON.stringify(prev) !== JSON.stringify(remoteBills)) {
+          if (hasCollectionChanged(prev, remoteBills)) {
             return remoteBills;
           }
           return prev;
@@ -952,7 +956,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onPayments: (remotePayments) => {
         setPayments(prev => {
-          if (prev.length !== remotePayments.length || JSON.stringify(prev) !== JSON.stringify(remotePayments)) {
+          if (hasCollectionChanged(prev, remotePayments)) {
             return remotePayments;
           }
           return prev;
@@ -960,7 +964,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onExpenses: (remoteExpenses) => {
         setExpenses(prev => {
-          if (prev.length !== remoteExpenses.length || JSON.stringify(prev) !== JSON.stringify(remoteExpenses)) {
+          if (hasCollectionChanged(prev, remoteExpenses)) {
             return remoteExpenses;
           }
           return prev;
@@ -969,7 +973,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onAccountHeads: (remoteHeads) => {
         if (remoteHeads && remoteHeads.length > 0) {
           setAccountHeads(prev => {
-            if (prev.length !== remoteHeads.length || JSON.stringify(prev) !== JSON.stringify(remoteHeads)) {
+            if (hasCollectionChanged(prev, remoteHeads)) {
               return remoteHeads;
             }
             return prev;
@@ -978,7 +982,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onJournalEntries: (remoteJournals) => {
         setJournalEntries(prev => {
-          if (prev.length !== remoteJournals.length || JSON.stringify(prev) !== JSON.stringify(remoteJournals)) {
+          if (hasCollectionChanged(prev, remoteJournals)) {
             return remoteJournals;
           }
           return prev;
@@ -987,7 +991,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onUsers: (remoteUsers) => {
         if (remoteUsers && remoteUsers.length > 0) {
           setUsers(prev => {
-            if (prev.length !== remoteUsers.length || JSON.stringify(prev) !== JSON.stringify(remoteUsers)) {
+            if (hasCollectionChanged(prev, remoteUsers)) {
               return remoteUsers;
             }
             return prev;
@@ -996,7 +1000,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onAuditLogs: (remoteLogs) => {
         setAuditLogs(prev => {
-          if (prev.length !== remoteLogs.length || JSON.stringify(prev) !== JSON.stringify(remoteLogs)) {
+          if (hasCollectionChanged(prev, remoteLogs)) {
             return remoteLogs;
           }
           return prev;
@@ -1005,7 +1009,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onCustomHsnCodes: (remoteHsn) => {
         if (remoteHsn) {
           setCustomHsnCodes(prev => {
-            if (prev.length !== remoteHsn.length || JSON.stringify(prev) !== JSON.stringify(remoteHsn)) {
+            if (hasCollectionChanged(prev, remoteHsn)) {
               return remoteHsn;
             }
             return prev;
@@ -1015,7 +1019,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onCheques: (remoteCheques) => {
         if (remoteCheques) {
           setCheques(prev => {
-            if (prev.length !== remoteCheques.length || JSON.stringify(prev) !== JSON.stringify(remoteCheques)) {
+            if (hasCollectionChanged(prev, remoteCheques)) {
               return remoteCheques;
             }
             return prev;
@@ -1025,7 +1029,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onChequeBooks: (remoteBooks) => {
         if (remoteBooks) {
           setChequeBooks(prev => {
-            if (prev.length !== remoteBooks.length || JSON.stringify(prev) !== JSON.stringify(remoteBooks)) {
+            if (hasCollectionChanged(prev, remoteBooks)) {
               return remoteBooks;
             }
             return prev;
@@ -1035,7 +1039,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onChequeTemplates: (remoteTemplates) => {
         if (remoteTemplates && remoteTemplates.length > 0) {
           setChequeTemplates(prev => {
-            if (prev.length !== remoteTemplates.length || JSON.stringify(prev) !== JSON.stringify(remoteTemplates)) {
+            if (hasCollectionChanged(prev, remoteTemplates)) {
               return remoteTemplates;
             }
             return prev;
@@ -1045,7 +1049,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onLetterheadDocuments: (remoteDocs) => {
         if (remoteDocs) {
           setLetterheadDocuments(prev => {
-            if (prev.length !== remoteDocs.length || JSON.stringify(prev) !== JSON.stringify(remoteDocs)) {
+            if (hasCollectionChanged(prev, remoteDocs)) {
               return remoteDocs;
             }
             return prev;
@@ -1055,7 +1059,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onLetterheadTemplates: (remoteTemplates) => {
         if (remoteTemplates && remoteTemplates.length > 0) {
           setLetterheadTemplates(prev => {
-            if (prev.length !== remoteTemplates.length || JSON.stringify(prev) !== JSON.stringify(remoteTemplates)) {
+            if (hasCollectionChanged(prev, remoteTemplates)) {
               return remoteTemplates;
             }
             return prev;
@@ -1070,15 +1074,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       unsubscribe();
     };
-  }, [currentCompanyId]);
+  }, [isCloudReady, currentCompanyId]);
 
   // Realtime listener for Companies list
   useEffect(() => {
-    if (!isCloudInitializedRef.current) return;
+    if (!isCloudReady) return;
     const unsub = cloudDb.subscribeToCompanies((remoteCompanies) => {
       if (remoteCompanies && remoteCompanies.length > 0) {
         setCompanies(prev => {
-          if (prev.length !== remoteCompanies.length || JSON.stringify(prev) !== JSON.stringify(remoteCompanies)) {
+          if (hasCollectionChanged(prev, remoteCompanies)) {
             return remoteCompanies;
           }
           return prev;
@@ -1086,23 +1090,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
     return () => unsub();
-  }, []);
+  }, [isCloudReady]);
 
   // Realtime listener for Platform Branding & Broadcast Announcements
   useEffect(() => {
-    if (!isCloudInitializedRef.current) return;
+    if (!isCloudReady) return;
     const unsub = cloudDb.subscribeToPlatformConfig((cloudCfg) => {
       if (cloudCfg) {
         const normalized = normalizePlatformConfig(cloudCfg);
         setPlatformConfig(normalized);
-        try {
-          localStorage.setItem('zooka_platform_config', JSON.stringify(normalized));
-          localStorage.setItem('vyapar_platform_config', JSON.stringify(normalized));
-        } catch (e) {}
+        safeStorageSet('zooka_platform_config', normalized);
+        safeStorageSet('vyapar_platform_config', normalized);
       }
     });
     return () => unsub();
-  }, []);
+  }, [isCloudReady]);
 
   // Force Push Sync All Current Data to Firestore
   const triggerCloudSync = async (showToastNotification: boolean = true) => {
@@ -1209,7 +1211,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Continuous Auto-Save to Firestore Cloud DB on background state changes
   useEffect(() => {
-    if (!isCloudInitializedRef.current || !currentCompanyId) return;
+    if (!isCloudReady || !currentCompanyId) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -1226,7 +1228,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [business, currentCompany, currentCompanyId]);
+  }, [isCloudReady, business, currentCompany, currentCompanyId]);
 
   // Theme application to root DOM element and dynamic theme variables
   useEffect(() => {
@@ -1259,98 +1261,98 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Sync general lists to Local Storage Cache
-  useEffect(() => { localStorage.setItem(STORAGE_PREFIX + 'companies', JSON.stringify(companies)); }, [companies]);
-  useEffect(() => { localStorage.setItem(STORAGE_PREFIX + 'currentCompanyId', JSON.stringify(currentCompanyId)); }, [currentCompanyId]);
+  useEffect(() => { safeStorageSet(STORAGE_PREFIX + 'companies', companies); }, [companies]);
+  useEffect(() => { safeStorageSet(STORAGE_PREFIX + 'currentCompanyId', currentCompanyId); }, [currentCompanyId]);
 
   // Sync active company's data partition to Local Storage Cache
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'business', JSON.stringify(business)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_business`, JSON.stringify(business));
+    safeStorageSet(STORAGE_PREFIX + 'business', business); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_business`, business);
   }, [business, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'invoices', JSON.stringify(invoices)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_invoices`, JSON.stringify(invoices));
+    safeStorageSet(STORAGE_PREFIX + 'invoices', invoices); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_invoices`, invoices);
   }, [invoices, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'products', JSON.stringify(products)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_products`, JSON.stringify(products));
+    safeStorageSet(STORAGE_PREFIX + 'products', products); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_products`, products);
   }, [products, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'parties', JSON.stringify(parties)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_parties`, JSON.stringify(parties));
+    safeStorageSet(STORAGE_PREFIX + 'parties', parties); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_parties`, parties);
   }, [parties, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'purchaseBills', JSON.stringify(purchaseBills)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_purchaseBills`, JSON.stringify(purchaseBills));
+    safeStorageSet(STORAGE_PREFIX + 'purchaseBills', purchaseBills); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_purchaseBills`, purchaseBills);
   }, [purchaseBills, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'payments', JSON.stringify(payments)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_payments`, JSON.stringify(payments));
+    safeStorageSet(STORAGE_PREFIX + 'payments', payments); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_payments`, payments);
   }, [payments, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'expenses', JSON.stringify(expenses)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_expenses`, JSON.stringify(expenses));
+    safeStorageSet(STORAGE_PREFIX + 'expenses', expenses); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_expenses`, expenses);
   }, [expenses, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'accountHeads', JSON.stringify(accountHeads)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_accountHeads`, JSON.stringify(accountHeads));
+    safeStorageSet(STORAGE_PREFIX + 'accountHeads', accountHeads); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_accountHeads`, accountHeads);
   }, [accountHeads, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'journalEntries', JSON.stringify(journalEntries)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_journalEntries`, JSON.stringify(journalEntries));
+    safeStorageSet(STORAGE_PREFIX + 'journalEntries', journalEntries); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_journalEntries`, journalEntries);
   }, [journalEntries, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_users`, JSON.stringify(users));
+    safeStorageSet(STORAGE_PREFIX + 'users', users); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_users`, users);
   }, [users, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'currentUserId', JSON.stringify(currentUserId)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_currentUserId`, JSON.stringify(currentUserId));
+    safeStorageSet(STORAGE_PREFIX + 'currentUserId', currentUserId); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_currentUserId`, currentUserId);
   }, [currentUserId, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'auditLogs', JSON.stringify(auditLogs)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_auditLogs`, JSON.stringify(auditLogs));
+    safeStorageSet(STORAGE_PREFIX + 'auditLogs', auditLogs); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_auditLogs`, auditLogs);
   }, [auditLogs, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'customHsnCodes', JSON.stringify(customHsnCodes)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_customHsnCodes`, JSON.stringify(customHsnCodes));
+    safeStorageSet(STORAGE_PREFIX + 'customHsnCodes', customHsnCodes); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_customHsnCodes`, customHsnCodes);
   }, [customHsnCodes, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'cheques', JSON.stringify(cheques)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_cheques`, JSON.stringify(cheques));
+    safeStorageSet(STORAGE_PREFIX + 'cheques', cheques); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_cheques`, cheques);
   }, [cheques, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'chequeBooks', JSON.stringify(chequeBooks)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_chequeBooks`, JSON.stringify(chequeBooks));
+    safeStorageSet(STORAGE_PREFIX + 'chequeBooks', chequeBooks); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_chequeBooks`, chequeBooks);
   }, [chequeBooks, currentCompanyId]);
 
   useEffect(() => { 
-    localStorage.setItem(STORAGE_PREFIX + 'chequeTemplates', JSON.stringify(chequeTemplates)); 
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_chequeTemplates`, JSON.stringify(chequeTemplates));
+    safeStorageSet(STORAGE_PREFIX + 'chequeTemplates', chequeTemplates); 
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_chequeTemplates`, chequeTemplates);
   }, [chequeTemplates, currentCompanyId]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'letterheadDocuments', JSON.stringify(letterheadDocuments));
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_letterheadDocuments`, JSON.stringify(letterheadDocuments));
+    safeStorageSet(STORAGE_PREFIX + 'letterheadDocuments', letterheadDocuments);
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_letterheadDocuments`, letterheadDocuments);
   }, [letterheadDocuments, currentCompanyId]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'letterheadTemplates', JSON.stringify(letterheadTemplates));
-    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_letterheadTemplates`, JSON.stringify(letterheadTemplates));
+    safeStorageSet(STORAGE_PREFIX + 'letterheadTemplates', letterheadTemplates);
+    safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_letterheadTemplates`, letterheadTemplates);
   }, [letterheadTemplates, currentCompanyId]);
 
   // Load company partition helper
@@ -2830,19 +2832,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // Deduct stock for invoiced items
-    newInvoice.items.forEach(item => {
-      if (item.productId) {
-        setProducts(prev => prev.map(prod => {
-          if (prod.id === item.productId && !prod.isService) {
-            const updatedProd = { ...prod, currentStock: Math.max(0, prod.currentStock - item.quantity) };
-            cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
-            return updatedProd;
-          }
-          return prod;
-        }));
+    // Deduct stock for invoiced items (batched single state update)
+    if (newInvoice.items && newInvoice.items.length > 0) {
+      const deductionMap = new Map<string, number>();
+      newInvoice.items.forEach(item => {
+        if (item.productId && item.quantity > 0) {
+          deductionMap.set(item.productId, (deductionMap.get(item.productId) || 0) + item.quantity);
+        }
+      });
+
+      if (deductionMap.size > 0) {
+        setProducts(prev => {
+          return prev.map(prod => {
+            const deductQty = deductionMap.get(prod.id);
+            if (deductQty && !prod.isService) {
+              const updatedProd = { 
+                ...prod, 
+                currentStock: Math.max(0, Math.round(((prod.currentStock || 0) - deductQty) * 1000) / 1000) 
+              };
+              cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
+              return updatedProd;
+            }
+            return prod;
+          });
+        });
       }
-    });
+    }
 
     showToast('success', 'Invoice Generated', `${newInvoice.invoiceNumber} created for ${business.currencySymbol}${newInvoice.grandTotal.toLocaleString('en-IN')}`);
     return newInvoice;
@@ -2967,9 +2982,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteInvoice = (id: string) => {
     const target = invoices.find(i => i.id === id);
+    if (!target) return;
+
+    // 1. Restore inventory stock for invoiced physical items
+    if (target.items && target.items.length > 0) {
+      const stockRestoreMap = new Map<string, number>();
+      target.items.forEach(item => {
+        if (item.productId && item.quantity > 0) {
+          stockRestoreMap.set(item.productId, (stockRestoreMap.get(item.productId) || 0) + item.quantity);
+        }
+      });
+
+      if (stockRestoreMap.size > 0) {
+        setProducts(prev => {
+          return prev.map(prod => {
+            const addQty = stockRestoreMap.get(prod.id);
+            if (addQty && !prod.isService) {
+              const updatedProd = {
+                ...prod,
+                currentStock: Math.round(((prod.currentStock || 0) + addQty) * 1000) / 1000
+              };
+              cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
+              return updatedProd;
+            }
+            return prod;
+          });
+        });
+      }
+    }
+
+    // 2. Revert customer party balance if invoice had outstanding balance
+    if (target.customerId && target.amountDue > 0) {
+      setParties(prev => prev.map(p => {
+        if (p.id === target.customerId) {
+          const updatedParty = {
+            ...p,
+            currentBalance: Math.max(0, p.currentBalance - target.amountDue)
+          };
+          cloudDb.syncEntityDoc('parties', currentCompanyId, updatedParty).catch(console.warn);
+          return updatedParty;
+        }
+        return p;
+      }));
+    }
+
+    // 3. Remove invoice record
     setInvoices(prev => prev.filter(i => i.id !== id));
     cloudDb.deleteEntityDoc('invoices', currentCompanyId, id).catch(console.warn);
-    showToast('info', 'Invoice Deleted', `${target?.invoiceNumber || 'Invoice'} was deleted.`);
+    showToast('info', 'Invoice Deleted', `${target.invoiceNumber || 'Invoice'} deleted. Stock and balances updated.`);
   };
 
   const getInvoice = (id: string) => {
@@ -3414,28 +3474,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPurchaseBills(prev => [newBill, ...prev]);
     cloudDb.syncEntityDoc('purchaseBills', currentCompanyId, newBill).catch(console.warn);
 
-    // Increase stock for purchase inward items
-    newBill.items.forEach(item => {
-      const qty = Number(item.quantity) || 0;
-      if (qty <= 0) return;
-      const rate = Number(item.rate) || 0;
-
-      setProducts(prev => prev.map(prod => {
-        const isMatch = (item.productId && prod.id === item.productId) ||
-          (!item.productId && prod.name.trim().toLowerCase() === item.name.trim().toLowerCase());
-
-        if (isMatch && !prod.isService) {
-          const updatedProd = {
-            ...prod,
-            currentStock: Math.round(((prod.currentStock || 0) + qty) * 1000) / 1000,
-            purchasePrice: rate > 0 ? rate : prod.purchasePrice
-          };
-          cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
-          return updatedProd;
+    // Increase stock for purchase inward items (batched single state update)
+    if (newBill.items && newBill.items.length > 0) {
+      const inwardMap = new Map<string, { qty: number; rate: number; name: string }>();
+      newBill.items.forEach(item => {
+        const qty = Number(item.quantity) || 0;
+        if (qty <= 0) return;
+        const rate = Number(item.rate) || 0;
+        const key = item.productId || item.name.trim().toLowerCase();
+        const existing = inwardMap.get(key);
+        if (existing) {
+          existing.qty += qty;
+          if (rate > 0) existing.rate = rate;
+        } else {
+          inwardMap.set(key, { qty, rate, name: item.name.trim().toLowerCase() });
         }
-        return prod;
-      }));
-    });
+      });
+
+      if (inwardMap.size > 0) {
+        setProducts(prev => {
+          return prev.map(prod => {
+            const entry = inwardMap.get(prod.id) || inwardMap.get(prod.name.trim().toLowerCase());
+            if (entry && !prod.isService) {
+              const updatedProd = {
+                ...prod,
+                currentStock: Math.round(((prod.currentStock || 0) + entry.qty) * 1000) / 1000,
+                purchasePrice: entry.rate > 0 ? entry.rate : prod.purchasePrice
+              };
+              cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
+              return updatedProd;
+            }
+            return prod;
+          });
+        });
+      }
+    }
 
     showToast('success', 'Purchase Bill Logged', `Bill ${newBill.billNumber} recorded.`);
     return newBill;
@@ -3545,29 +3618,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deletePurchaseBill = (id: string) => {
     const target = purchaseBills.find(b => b.id === id);
-    if (target?.items) {
+    if (!target) return;
+
+    // 1. Batch deduct inward stock for deleted purchase bill
+    if (target.items && target.items.length > 0) {
+      const rollbackMap = new Map<string, { qty: number; name: string }>();
       target.items.forEach(item => {
         const qty = Number(item.quantity) || 0;
         if (qty <= 0) return;
-        setProducts(prev => prev.map(prod => {
-          const isMatch = (item.productId && prod.id === item.productId) ||
-            (!item.productId && prod.name.trim().toLowerCase() === item.name.trim().toLowerCase());
-
-          if (isMatch && !prod.isService) {
-            const updatedProd = {
-              ...prod,
-              currentStock: Math.max(0, Math.round(((prod.currentStock || 0) - qty) * 1000) / 1000)
-            };
-            cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
-            return updatedProd;
-          }
-          return prod;
-        }));
+        const key = item.productId || item.name.trim().toLowerCase();
+        const existing = rollbackMap.get(key);
+        if (existing) {
+          existing.qty += qty;
+        } else {
+          rollbackMap.set(key, { qty, name: item.name.trim().toLowerCase() });
+        }
       });
+
+      if (rollbackMap.size > 0) {
+        setProducts(prev => {
+          return prev.map(prod => {
+            const entry = rollbackMap.get(prod.id) || rollbackMap.get(prod.name.trim().toLowerCase());
+            if (entry && !prod.isService) {
+              const updatedProd = {
+                ...prod,
+                currentStock: Math.max(0, Math.round(((prod.currentStock || 0) - entry.qty) * 1000) / 1000)
+              };
+              cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
+              return updatedProd;
+            }
+            return prod;
+          });
+        });
+      }
     }
+
+    // 2. Revert vendor payable balance if bill had unpaid balance
+    if (target.vendorId && target.amountDue > 0) {
+      setParties(prev => prev.map(p => {
+        if (p.id === target.vendorId) {
+          const updatedParty = {
+            ...p,
+            currentBalance: p.currentBalance + target.amountDue
+          };
+          cloudDb.syncEntityDoc('parties', currentCompanyId, updatedParty).catch(console.warn);
+          return updatedParty;
+        }
+        return p;
+      }));
+    }
+
+    // 3. Remove purchase bill record
     setPurchaseBills(prev => prev.filter(b => b.id !== id));
     cloudDb.deleteEntityDoc('purchaseBills', currentCompanyId, id).catch(console.warn);
-    showToast('info', 'Purchase Bill Removed', `Bill ${target?.billNumber || ''} deleted.`);
+    showToast('info', 'Purchase Bill Removed', `Bill ${target.billNumber || ''} deleted. Stock and payables updated.`);
   };
 
   const recordPurchasePayment = (id: string, amount: number, method: PaymentMethod) => {
@@ -4245,6 +4349,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
+    const partyBalanceChanges = new Map<string, number>(); // partyId -> net delta
+    const invoiceSettlements = new Map<string, number>(); // invoiceId/number -> amount paid
+    const billSettlements = new Map<string, number>(); // billId/number -> amount paid
+
     validEntries.forEach((entry, idx) => {
       importedCount++;
       const amount = entry.depositAmount > 0 ? entry.depositAmount : entry.withdrawalAmount;
@@ -4275,32 +4383,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cloudDb.syncEntityDoc('payments', currentCompanyId, pRec).catch(console.warn);
 
         if (entry.partyId) {
-          setParties(prev => prev.map(p => {
-            if (p.id === entry.partyId) {
-              const updatedP = { ...p, currentBalance: Math.max(0, p.currentBalance - amount) };
-              cloudDb.syncEntityDoc('parties', currentCompanyId, updatedP).catch(console.warn);
-              return updatedP;
-            }
-            return p;
-          }));
+          partyBalanceChanges.set(entry.partyId, (partyBalanceChanges.get(entry.partyId) || 0) - amount);
         }
 
         if (autoSettleInvoices && (entry.linkedInvoiceId || entry.linkedInvoiceNumber)) {
-          setInvoices(prev => prev.map(inv => {
-            if (inv.id === entry.linkedInvoiceId || inv.invoiceNumber === entry.linkedInvoiceNumber) {
-              const newPaid = (inv.amountPaid || 0) + amount;
-              const newDue = Math.max(0, inv.grandTotal - newPaid);
-              const updatedInv: Invoice = {
-                ...inv,
-                amountPaid: newPaid,
-                amountDue: newDue,
-                status: newDue === 0 ? 'PAID' : 'PARTIALLY_PAID'
-              };
-              cloudDb.syncEntityDoc('invoices', currentCompanyId, updatedInv).catch(console.warn);
-              return updatedInv;
-            }
-            return inv;
-          }));
+          const invKey = entry.linkedInvoiceId || entry.linkedInvoiceNumber!;
+          invoiceSettlements.set(invKey, (invoiceSettlements.get(invKey) || 0) + amount);
         }
       } else if (entry.entryType === 'PAYMENT_OUT') {
         paymentsOutCreated++;
@@ -4326,32 +4414,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cloudDb.syncEntityDoc('payments', currentCompanyId, pRec).catch(console.warn);
 
         if (entry.partyId) {
-          setParties(prev => prev.map(p => {
-            if (p.id === entry.partyId) {
-              const updatedP = { ...p, currentBalance: p.currentBalance + amount };
-              cloudDb.syncEntityDoc('parties', currentCompanyId, updatedP).catch(console.warn);
-              return updatedP;
-            }
-            return p;
-          }));
+          partyBalanceChanges.set(entry.partyId, (partyBalanceChanges.get(entry.partyId) || 0) + amount);
         }
 
         if (autoSettleBills && (entry.linkedBillId || entry.linkedBillNumber)) {
-          setPurchaseBills(prev => prev.map(bill => {
-            if (bill.id === entry.linkedBillId || bill.billNumber === entry.linkedBillNumber) {
-              const newPaid = (bill.amountPaid || 0) + amount;
-              const newDue = Math.max(0, bill.grandTotal - newPaid);
-              const updatedB: PurchaseBill = {
-                ...bill,
-                amountPaid: newPaid,
-                amountDue: newDue,
-                status: newDue === 0 ? 'PAID' : 'PARTIALLY_PAID'
-              };
-              cloudDb.syncEntityDoc('purchaseBills', currentCompanyId, updatedB).catch(console.warn);
-              return updatedB;
-            }
-            return bill;
-          }));
+          const billKey = entry.linkedBillId || entry.linkedBillNumber!;
+          billSettlements.set(billKey, (billSettlements.get(billKey) || 0) + amount);
         }
       } else if (entry.entryType === 'EXPENSE') {
         expensesCreated++;
@@ -4423,6 +4491,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // Apply batched party balance updates
+    if (partyBalanceChanges.size > 0) {
+      setParties(prev => prev.map(p => {
+        const delta = partyBalanceChanges.get(p.id);
+        if (delta !== undefined) {
+          const updatedP = { ...p, currentBalance: Math.max(0, p.currentBalance + delta) };
+          cloudDb.syncEntityDoc('parties', currentCompanyId, updatedP).catch(console.warn);
+          return updatedP;
+        }
+        return p;
+      }));
+    }
+
+    // Apply batched invoice settlements
+    if (invoiceSettlements.size > 0) {
+      setInvoices(prev => prev.map(inv => {
+        const addPaid = invoiceSettlements.get(inv.id) || (inv.invoiceNumber ? invoiceSettlements.get(inv.invoiceNumber) : undefined);
+        if (addPaid !== undefined) {
+          const newPaid = (inv.amountPaid || 0) + addPaid;
+          const newDue = Math.max(0, inv.grandTotal - newPaid);
+          const updatedInv: Invoice = {
+            ...inv,
+            amountPaid: newPaid,
+            amountDue: newDue,
+            status: newDue === 0 ? 'PAID' : 'PARTIALLY_PAID'
+          };
+          cloudDb.syncEntityDoc('invoices', currentCompanyId, updatedInv).catch(console.warn);
+          return updatedInv;
+        }
+        return inv;
+      }));
+    }
+
+    // Apply batched bill settlements
+    if (billSettlements.size > 0) {
+      setPurchaseBills(prev => prev.map(bill => {
+        const addPaid = billSettlements.get(bill.id) || (bill.billNumber ? billSettlements.get(bill.billNumber) : undefined);
+        if (addPaid !== undefined) {
+          const newPaid = (bill.amountPaid || 0) + addPaid;
+          const newDue = Math.max(0, bill.grandTotal - newPaid);
+          const updatedB: PurchaseBill = {
+            ...bill,
+            amountPaid: newPaid,
+            amountDue: newDue,
+            status: newDue === 0 ? 'PAID' : 'PARTIALLY_PAID'
+          };
+          cloudDb.syncEntityDoc('purchaseBills', currentCompanyId, updatedB).catch(console.warn);
+          return updatedB;
+        }
+        return bill;
+      }));
+    }
+
     if (newPaymentsToAdd.length > 0) {
       setPayments(prev => [...newPaymentsToAdd, ...prev]);
     }
@@ -4471,13 +4592,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('info', 'System Reset', 'Clean database initialized. All records cleared.');
   };
 
-  // System Snapshot Engine & Vault Storage
-  const createSystemSnapshot = async (
-    triggerType: SystemSnapshotTrigger = 'MANUAL_EXPORT',
-    customLabel?: string,
-    downloadFile: boolean = false
-  ): Promise<SystemSnapshotPayload> => {
-    const rawPayload: Omit<SystemSnapshotPayload, 'metadata'> = {
+  // Keep mutable ref of snapshot dataset to avoid thrashing scheduler timers on state change
+  const latestSnapshotDataRef = useRef({
+    companies,
+    business,
+    invoices,
+    products,
+    parties,
+    purchaseBills,
+    payments,
+    expenses,
+    accountHeads,
+    journalEntries,
+    users,
+    cheques,
+    chequeBooks,
+    chequeTemplates,
+    customHsnCodes,
+    letterheadDocuments,
+    letterheadTemplates
+  });
+
+  useEffect(() => {
+    latestSnapshotDataRef.current = {
       companies,
       business,
       invoices,
@@ -4494,7 +4631,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       chequeTemplates,
       customHsnCodes,
       letterheadDocuments,
-      letterheadTemplates,
+      letterheadTemplates
+    };
+  });
+
+  // System Snapshot Engine & Vault Storage
+  const createSystemSnapshot = async (
+    triggerType: SystemSnapshotTrigger = 'MANUAL_EXPORT',
+    customLabel?: string,
+    downloadFile: boolean = false
+  ): Promise<SystemSnapshotPayload> => {
+    const d = latestSnapshotDataRef.current;
+    const rawPayload: Omit<SystemSnapshotPayload, 'metadata'> = {
+      companies: d.companies,
+      business: d.business,
+      invoices: d.invoices,
+      products: d.products,
+      parties: d.parties,
+      purchaseBills: d.purchaseBills,
+      payments: d.payments,
+      expenses: d.expenses,
+      accountHeads: d.accountHeads,
+      journalEntries: d.journalEntries,
+      users: d.users,
+      cheques: d.cheques,
+      chequeBooks: d.chequeBooks,
+      chequeTemplates: d.chequeTemplates,
+      customHsnCodes: d.customHsnCodes,
+      letterheadDocuments: d.letterheadDocuments,
+      letterheadTemplates: d.letterheadTemplates,
       exportedAt: new Date().toISOString(),
       appName: 'Zooka Business',
       version: '2.5.0'
@@ -4721,22 +4886,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [
     autoSnapshotConfig.enabled, 
     autoSnapshotConfig.intervalHours, 
-    autoSnapshotConfig.autoDownloadJson,
-    companies, 
-    business, 
-    invoices, 
-    products, 
-    parties, 
-    purchaseBills, 
-    payments, 
-    expenses, 
-    accountHeads, 
-    journalEntries, 
-    users, 
-    cheques, 
-    chequeBooks, 
-    chequeTemplates, 
-    customHsnCodes
+    autoSnapshotConfig.autoDownloadJson
   ]);
 
   return (
