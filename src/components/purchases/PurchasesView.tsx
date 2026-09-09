@@ -3,15 +3,9 @@ import { useApp } from '../../context/AppContext';
 import { PurchaseBill, PurchaseBillItem, Expense, GstTaxRate, PaymentMethod } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { STANDARD_UNITS, COMMON_HSN_CODES } from '../../utils/constants';
-import { 
-  calculateBaseRateFromInclusive,
-  calculateExcludeRateFromIncludeRate,
-  calculateIncludeRateFromExcludeRate,
-  calculateItemFromInclusiveTotal
-} from '../../utils/gstCalculations';
+import { calculateBaseRateFromInclusive } from '../../utils/gstCalculations';
 import { CustomHsnModal } from '../common/CustomHsnModal';
 import { HsnLookupDialog } from '../common/HsnLookupDialog';
-import { GstRateCalculatorModal } from '../common/GstRateCalculatorModal';
 import { 
   Truck, 
   Search, 
@@ -21,7 +15,6 @@ import {
   CheckCircle2, 
   Trash2, 
   X,
-  Minus,
   Building2,
   DollarSign,
   TrendingDown,
@@ -33,9 +26,7 @@ import {
   Calendar,
   Layers,
   Sparkles,
-  Tag,
-  Calculator,
-  ArrowRightLeft
+  Tag
 } from 'lucide-react';
 
 export const PurchasesView: React.FC = () => {
@@ -73,322 +64,10 @@ export const PurchasesView: React.FC = () => {
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
   const [itcEligibility, setItcEligibility] = useState<PurchaseBill['itcEligibility']>('ELIGIBLE_ALL');
   const [isInterState, setIsInterState] = useState(false);
-  // Flexible Entry Modes: 'EXCLUSIVE' (Base Cost Rate) vs 'INCLUSIVE_RATE' (Unit Rate Incl. Tax) vs 'INCLUSIVE' (Line Total Incl. Tax)
-  const [purchasePriceMode, setPurchasePriceMode] = useState<'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE'>('EXCLUSIVE');
-  const [showGstCalculator, setShowGstCalculator] = useState(false);
-  const [calculatorTargetIndex, setCalculatorTargetIndex] = useState<number | null>(null);
-  // Optional Round-off to nearest rupee (disabled by default so purchase bill matches vendor's exact invoice paise)
-  const [enableRoundOff, setEnableRoundOff] = useState(false);
+  // Two Flexible Entry Modes: Base Cost Rate (Tax Exclusive) vs Total Line Amount (Tax Inclusive)
+  const [purchasePriceMode, setPurchasePriceMode] = useState<'EXCLUSIVE' | 'INCLUSIVE'>('EXCLUSIVE');
 
   const round2 = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
-
-  // Exact GST & Tax Calculation Helpers for Purchase Inward Bills
-  const calculateItemTaxes = (
-    taxableAmount: number,
-    gstRate: GstTaxRate,
-    interState: boolean
-  ) => {
-    const taxable = Math.max(0, round2(taxableAmount));
-    const gstRateVal = Number(gstRate) || 0;
-    const totalTax = round2((taxable * gstRateVal) / 100);
-
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
-
-    if (interState) {
-      igst = totalTax;
-    } else {
-      cgst = round2(totalTax / 2);
-      sgst = round2(totalTax - cgst);
-    }
-
-    const total = round2(taxable + totalTax);
-
-    return {
-      taxableAmount: taxable,
-      cgstAmount: cgst,
-      sgstAmount: sgst,
-      igstAmount: igst,
-      totalAmount: total
-    };
-  };
-
-  // 1. When Quantity changes:
-  // If in inclusive mode or item has rateIncl, calculate from unit inclusive rate so total = rateIncl * qty (no rounding drift)
-  // If in exclusive mode, calculate from rate so taxable = rate * qty
-  const updateItemByQuantity = (
-    item: PurchaseBillItem,
-    quantity: number,
-    interState: boolean,
-    priceMode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
-  ): PurchaseBillItem => {
-    const qty = Math.max(0, quantity);
-    const gstRateVal = Number(item.gstRate) || 0;
-    const taxFactor = 1 + gstRateVal / 100;
-
-    if (priceMode === 'INCLUSIVE' || priceMode === 'INCLUSIVE_RATE' || (item.rateIncl && item.rateIncl > 0)) {
-      const unitRateIncl = item.rateIncl && item.rateIncl > 0 
-        ? item.rateIncl 
-        : (qty > 0 && item.totalAmount > 0 ? Number((item.totalAmount / (item.quantity || 1)).toFixed(2)) : round2((Number(item.rate) || 0) * taxFactor));
-      
-      const total = round2(unitRateIncl * qty);
-      const taxable = round2(total / taxFactor);
-      const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : round2(unitRateIncl / taxFactor);
-      const totalTax = round2(total - taxable);
-
-      let cgst = 0;
-      let sgst = 0;
-      let igst = 0;
-
-      if (interState) {
-        igst = totalTax;
-      } else {
-        cgst = round2(totalTax / 2);
-        sgst = round2(totalTax - cgst);
-      }
-
-      return {
-        ...item,
-        quantity: qty,
-        rate,
-        rateIncl: unitRateIncl,
-        taxableAmount: taxable,
-        cgstAmount: cgst,
-        sgstAmount: sgst,
-        igstAmount: igst,
-        totalAmount: total
-      };
-    }
-
-    const rate = Math.max(0, Number(item.rate) || 0);
-    const taxable = round2(qty * rate);
-    const taxes = calculateItemTaxes(taxable, item.gstRate, interState);
-    const rateIncl = round2(rate * taxFactor);
-
-    return {
-      ...item,
-      quantity: qty,
-      rate,
-      rateIncl,
-      ...taxes
-    };
-  };
-
-  // 2. When Rate (Tax Exclusive) changes: quantity stays fixed, taxable = qty * rate, taxes recomputed
-  const updateItemByRate = (
-    item: PurchaseBillItem,
-    rate: number,
-    interState: boolean
-  ): PurchaseBillItem => {
-    const qty = Math.max(0, Number(item.quantity) || 0);
-    const cleanRate = Math.max(0, round2(rate));
-    const gstRateVal = Number(item.gstRate) || 0;
-    const taxFactor = 1 + gstRateVal / 100;
-    const taxable = round2(qty * cleanRate);
-    const taxes = calculateItemTaxes(taxable, item.gstRate, interState);
-    const rateIncl = round2(cleanRate * taxFactor);
-
-    return {
-      ...item,
-      quantity: qty,
-      rate: cleanRate,
-      rateIncl,
-      ...taxes
-    };
-  };
-
-  // 2b. When Unit Rate (Tax Inclusive) changes:
-  const updateItemByUnitInclusiveRate = (
-    item: PurchaseBillItem,
-    unitRateIncl: number,
-    interState: boolean
-  ): PurchaseBillItem => {
-    const qty = Math.max(0, Number(item.quantity) || 0);
-    const cleanUnitRateIncl = Math.max(0, round2(unitRateIncl));
-    const gstRateVal = Number(item.gstRate) || 0;
-    const taxFactor = 1 + gstRateVal / 100;
-
-    const total = round2(cleanUnitRateIncl * (qty || 1));
-    const taxable = round2(total / taxFactor);
-    const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : round2(cleanUnitRateIncl / taxFactor);
-    const totalTax = round2(total - taxable);
-
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
-
-    if (interState) {
-      igst = totalTax;
-    } else {
-      cgst = round2(totalTax / 2);
-      sgst = round2(totalTax - cgst);
-    }
-
-    return {
-      ...item,
-      quantity: qty,
-      rate,
-      rateIncl: cleanUnitRateIncl,
-      taxableAmount: taxable,
-      cgstAmount: cgst,
-      sgstAmount: sgst,
-      igstAmount: igst,
-      totalAmount: total
-    };
-  };
-
-  // 3. When Taxable Amount is edited directly: rate back-calculated = taxable / qty, taxes recomputed
-  const updateItemByTaxable = (
-    item: PurchaseBillItem,
-    taxable: number,
-    interState: boolean
-  ): PurchaseBillItem => {
-    const qty = Math.max(0, Number(item.quantity) || 0);
-    const cleanTaxable = Math.max(0, round2(taxable));
-    const rate = qty > 0 ? Number((cleanTaxable / qty).toFixed(2)) : 0;
-    const taxes = calculateItemTaxes(cleanTaxable, item.gstRate, interState);
-    const gstRateVal = Number(item.gstRate) || 0;
-    const rateIncl = round2(rate * (1 + gstRateVal / 100));
-
-    return {
-      ...item,
-      rate,
-      rateIncl,
-      ...taxes
-    };
-  };
-
-  // 4. When Total Amount (Tax-Inclusive) is edited directly:
-  // taxable = total / (1 + gst%), rate = taxable / qty, taxes recomputed
-  const updateItemByTotal = (
-    item: PurchaseBillItem,
-    totalInclusive: number,
-    interState: boolean
-  ): PurchaseBillItem => {
-    const qty = Math.max(0, Number(item.quantity) || 0);
-    const total = Math.max(0, round2(totalInclusive));
-    const gstRateVal = Number(item.gstRate) || 0;
-    const taxFactor = 1 + gstRateVal / 100;
-    const taxable = round2(total / taxFactor);
-    const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : 0;
-    const unitRateIncl = qty > 0 ? Number((total / qty).toFixed(2)) : round2(rate * taxFactor);
-    const totalTax = round2(total - taxable);
-
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
-
-    if (interState) {
-      igst = totalTax;
-    } else {
-      cgst = round2(totalTax / 2);
-      sgst = round2(totalTax - cgst);
-    }
-
-    return {
-      ...item,
-      quantity: qty,
-      rate,
-      rateIncl: unitRateIncl,
-      taxableAmount: taxable,
-      cgstAmount: cgst,
-      sgstAmount: sgst,
-      igstAmount: igst,
-      totalAmount: total
-    };
-  };
-
-  // 5. When GST Rate changes:
-  const updateItemByGstRate = (
-    item: PurchaseBillItem,
-    gstRate: GstTaxRate,
-    interState: boolean,
-    priceMode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
-  ): PurchaseBillItem => {
-    const gstRateVal = Number(gstRate) || 0;
-    const taxFactor = 1 + gstRateVal / 100;
-    const qty = Math.max(0, Number(item.quantity) || 0);
-
-    if ((priceMode === 'INCLUSIVE' || priceMode === 'INCLUSIVE_RATE') && item.totalAmount > 0) {
-      const total = item.totalAmount;
-      const taxable = round2(total / taxFactor);
-      const rate = qty > 0 ? Number((taxable / qty).toFixed(2)) : round2((item.rateIncl || 0) / taxFactor);
-      const unitRateIncl = qty > 0 ? Number((total / qty).toFixed(2)) : (item.rateIncl || round2(rate * taxFactor));
-      const totalTax = round2(total - taxable);
-
-      let cgst = 0;
-      let sgst = 0;
-      let igst = 0;
-
-      if (interState) {
-        igst = totalTax;
-      } else {
-        cgst = round2(totalTax / 2);
-        sgst = round2(totalTax - cgst);
-      }
-
-      return {
-        ...item,
-        gstRate,
-        rate,
-        rateIncl: unitRateIncl,
-        taxableAmount: taxable,
-        cgstAmount: cgst,
-        sgstAmount: sgst,
-        igstAmount: igst,
-        totalAmount: total
-      };
-    }
-
-    const taxable = Math.max(
-      0,
-      Number(item.taxableAmount) || round2((Number(item.quantity) || 0) * (Number(item.rate) || 0))
-    );
-    const taxes = calculateItemTaxes(taxable, gstRate, interState);
-    const cleanRate = Number(item.rate) || 0;
-    const rateIncl = round2(cleanRate * taxFactor);
-
-    return {
-      ...item,
-      gstRate,
-      rateIncl,
-      ...taxes
-    };
-  };
-
-  // 6. When Inter-State changes: re-split taxes between IGST and CGST+SGST
-  const updateItemInterState = (
-    item: PurchaseBillItem,
-    interState: boolean
-  ): PurchaseBillItem => {
-    const taxes = calculateItemTaxes(item.taxableAmount, item.gstRate, interState);
-    return {
-      ...item,
-      ...taxes
-    };
-  };
-
-  // Legacy compatibility wrappers
-  const recalculateItem = (
-    item: PurchaseBillItem,
-    interState: boolean,
-    mode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
-  ): PurchaseBillItem => {
-    if ((mode === 'INCLUSIVE' || mode === 'INCLUSIVE_RATE') && item.totalAmount !== undefined && item.totalAmount > 0) {
-      return updateItemByTotal(item, item.totalAmount, interState);
-    }
-    return updateItemByRate(item, item.rate, interState);
-  };
-
-  const recalculateAllItems = (
-    items: PurchaseBillItem[],
-    interState: boolean,
-    mode: 'EXCLUSIVE' | 'INCLUSIVE_RATE' | 'INCLUSIVE' = purchasePriceMode
-  ) => {
-    const updated = items.map(item => updateItemInterState(item, interState));
-    setPItems(updated);
-  };
 
   // Purchase items state
   const [pItems, setPItems] = useState<PurchaseBillItem[]>([
@@ -427,6 +106,74 @@ export const PurchasesView: React.FC = () => {
     .reduce((s, b) => s + b.totalTax, 0);
 
   const totalExpensesAmount = expenses.reduce((s, e) => s + e.amount, 0);
+
+  const recalculateItem = (
+    item: PurchaseBillItem,
+    interState: boolean,
+    mode: 'EXCLUSIVE' | 'INCLUSIVE' = purchasePriceMode
+  ): PurchaseBillItem => {
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    const gstRateVal = Number(item.gstRate) || 0;
+
+    let rate = Math.max(0, Number(item.rate) || 0);
+    let taxable = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+    let total = 0;
+
+    if (mode === 'INCLUSIVE' && (item.totalAmount !== undefined && item.totalAmount > 0)) {
+      total = round2(item.totalAmount);
+      const taxFactor = 1 + gstRateVal / 100;
+      taxable = round2(total / taxFactor);
+      rate = qty > 0 ? round2(taxable / qty) : 0;
+      const totalTax = round2(total - taxable);
+
+      if (interState) {
+        igst = totalTax;
+        cgst = 0;
+        sgst = 0;
+      } else {
+        cgst = round2(totalTax / 2);
+        sgst = round2(totalTax - cgst);
+        igst = 0;
+      }
+    } else {
+      taxable = round2(qty * rate);
+
+      if (interState) {
+        igst = round2((taxable * gstRateVal) / 100);
+        cgst = 0;
+        sgst = 0;
+      } else {
+        cgst = round2((taxable * (gstRateVal / 2)) / 100);
+        sgst = round2((taxable * (gstRateVal / 2)) / 100);
+        igst = 0;
+      }
+
+      total = round2(taxable + cgst + sgst + igst);
+    }
+
+    return {
+      ...item,
+      quantity: qty,
+      rate,
+      taxableAmount: taxable,
+      cgstAmount: cgst,
+      sgstAmount: sgst,
+      igstAmount: igst,
+      totalAmount: total
+    };
+  };
+
+  const recalculateAllItems = (
+    items: PurchaseBillItem[],
+    interState: boolean,
+    mode: 'EXCLUSIVE' | 'INCLUSIVE' = purchasePriceMode
+  ) => {
+    const updated = items.map(item => recalculateItem(item, interState, mode));
+    setPItems(updated);
+  };
 
   const handleVendorSelect = (vId: string) => {
     setVendorId(vId);
@@ -504,7 +251,7 @@ export const PurchasesView: React.FC = () => {
         batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
         expiryDate: '2028-12-31'
       };
-      setPItems([updateItemByRate(initialItem, pPrice, isInter)]);
+      setPItems([recalculateItem(initialItem, isInter, 'EXCLUSIVE')]);
     } else {
       const initialItem: PurchaseBillItem = {
         id: 'pbi-' + Date.now(),
@@ -523,7 +270,7 @@ export const PurchasesView: React.FC = () => {
         batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
         expiryDate: ''
       };
-      setPItems([updateItemByRate(initialItem, 0, isInter)]);
+      setPItems([initialItem]);
     }
 
     setIsPurchaseModalOpen(true);
@@ -551,7 +298,6 @@ export const PurchasesView: React.FC = () => {
       const purchasePrice = (prod.purchasePrice !== undefined && prod.purchasePrice > 0)
         ? prod.purchasePrice
         : (prod.sellingPrice ? round2(prod.sellingPrice * 0.7) : 0);
-      const gstRate = (prod.gstRate !== undefined ? prod.gstRate : 18) as GstTaxRate;
 
       const updatedItem: PurchaseBillItem = {
         ...next[index],
@@ -560,159 +306,14 @@ export const PurchasesView: React.FC = () => {
         hsnCode: prod.hsnCode || next[index].hsnCode || '',
         unit: prod.unit || next[index].unit || 'PCS',
         rate: purchasePrice,
-        gstRate
+        gstRate: (prod.gstRate !== undefined ? prod.gstRate : 18) as GstTaxRate
       };
-      next[index] = updateItemByRate(updatedItem, purchasePrice, isInterState);
-      return next;
-    });
-  };
-
-  // Dedicated handlers for each calculation field to prevent any value drift:
-  const handleItemQuantityChange = (index: number, val: number) => {
-    const cleanQty = Math.max(0, val);
-    setPItems(prev => {
-      const next = [...prev];
-      if (!next[index]) return prev;
-      next[index] = updateItemByQuantity(next[index], cleanQty, isInterState);
-      return next;
-    });
-  };
-
-  const handleItemQtyStep = (index: number, delta: number) => {
-    setPItems(prev => {
-      const next = [...prev];
-      const item = next[index];
-      if (!item) return prev;
-      const currentQty = Number(item.quantity) || 0;
-      const newQty = Math.max(0.01, round2(currentQty + delta));
-      next[index] = updateItemByQuantity(item, newQty, isInterState);
-      return next;
-    });
-  };
-
-  const handleItemRateChange = (index: number, val: number) => {
-    const cleanRate = Math.max(0, val);
-    setPItems(prev => {
-      const next = [...prev];
-      if (!next[index]) return prev;
-      next[index] = updateItemByRate(next[index], cleanRate, isInterState);
-      return next;
-    });
-  };
-
-  const handleItemTaxableChange = (index: number, val: number) => {
-    const cleanTaxable = Math.max(0, val);
-    setPItems(prev => {
-      const next = [...prev];
-      if (!next[index]) return prev;
-      next[index] = updateItemByTaxable(next[index], cleanTaxable, isInterState);
-      return next;
-    });
-  };
-
-  const handleItemTotalChange = (index: number, val: number) => {
-    const cleanTotal = Math.max(0, val);
-    setPItems(prev => {
-      const next = [...prev];
-      if (!next[index]) return prev;
-      next[index] = updateItemByTotal(next[index], cleanTotal, isInterState);
-      return next;
-    });
-  };
-
-  const handleItemUnitInclusiveRateChange = (index: number, val: number) => {
-    const cleanRateIncl = Math.max(0, val);
-    setPItems(prev => {
-      const next = [...prev];
-      if (!next[index]) return prev;
-      next[index] = updateItemByUnitInclusiveRate(next[index], cleanRateIncl, isInterState);
-      return next;
-    });
-  };
-
-  const handleApplyCalculatedGst = (result: {
-    rateExcl: number;
-    rateIncl: number;
-    taxableAmount: number;
-    gstAmount: number;
-    cgstAmount: number;
-    sgstAmount: number;
-    igstAmount: number;
-    totalAmount: number;
-    gstRate: GstTaxRate;
-    quantity: number;
-  }) => {
-    if (calculatorTargetIndex === null) return;
-    const idx = calculatorTargetIndex;
-    setPItems(prev => {
-      const next = [...prev];
-      if (!next[idx]) return prev;
-      const current = next[idx];
-      const qty = result.quantity || current.quantity || 1;
-      
-      let cgst = 0;
-      let sgst = 0;
-      let igst = 0;
-      if (isInterState) {
-        igst = result.gstAmount;
-      } else {
-        cgst = round2(result.gstAmount / 2);
-        sgst = round2(result.gstAmount - cgst);
-      }
-
-      next[idx] = {
-        ...current,
-        quantity: qty,
-        rate: result.rateExcl,
-        rateIncl: result.rateIncl,
-        gstRate: result.gstRate,
-        taxableAmount: result.taxableAmount,
-        cgstAmount: cgst,
-        sgstAmount: sgst,
-        igstAmount: igst,
-        totalAmount: result.totalAmount
-      };
-      return next;
-    });
-    setShowGstCalculator(false);
-    setCalculatorTargetIndex(null);
-  };
-
-  const handleItemGstRateChange = (index: number, gstRate: GstTaxRate) => {
-    setPItems(prev => {
-      const next = [...prev];
-      if (!next[index]) return prev;
-      next[index] = updateItemByGstRate(next[index], gstRate, isInterState, purchasePriceMode);
+      next[index] = recalculateItem(updatedItem, isInterState, 'EXCLUSIVE');
       return next;
     });
   };
 
   const handleItemFieldChange = (index: number, field: keyof PurchaseBillItem, value: any) => {
-    if (field === 'quantity') {
-      handleItemQuantityChange(index, Number(value) || 0);
-      return;
-    }
-    if (field === 'rate') {
-      handleItemRateChange(index, Number(value) || 0);
-      return;
-    }
-    if (field === 'rateIncl') {
-      handleItemUnitInclusiveRateChange(index, Number(value) || 0);
-      return;
-    }
-    if (field === 'taxableAmount') {
-      handleItemTaxableChange(index, Number(value) || 0);
-      return;
-    }
-    if (field === 'totalAmount') {
-      handleItemTotalChange(index, Number(value) || 0);
-      return;
-    }
-    if (field === 'gstRate') {
-      handleItemGstRateChange(index, value as GstTaxRate);
-      return;
-    }
-
     setPItems(prev => {
       const next = [...prev];
       const updatedItem = {
@@ -728,32 +329,45 @@ export const PurchasesView: React.FC = () => {
           if (matchCustom.uqc && matchCustom.uqc !== 'OTH' && (!updatedItem.unit || updatedItem.unit === 'PCS')) {
             updatedItem.unit = matchCustom.uqc;
           }
-          next[index] = updateItemByGstRate(updatedItem, matchCustom.gstRate, isInterState, purchasePriceMode);
-          return next;
         } else {
           const matchStandard = COMMON_HSN_CODES.find(c => c.code === valStr);
           if (matchStandard) {
-            const stdGst = matchStandard.defaultGst as GstTaxRate;
-            updatedItem.gstRate = stdGst;
-            next[index] = updateItemByGstRate(updatedItem, stdGst, isInterState, purchasePriceMode);
-            return next;
+            updatedItem.gstRate = matchStandard.defaultGst as GstTaxRate;
           }
         }
       }
 
-      next[index] = updatedItem;
+      // If user edits rate directly, use EXCLUSIVE mode to calculate total
+      const modeToUse = (field === 'rate') ? 'EXCLUSIVE' : purchasePriceMode;
+      next[index] = recalculateItem(updatedItem, isInterState, modeToUse);
       return next;
     });
   };
 
   // Direct Total Line Purchase Amount (Tax Inclusive) Change Handler
+  // Back-calculates Base Unit Cost Rate, Taxable Value, and item-wise CGST/SGST/IGST breakdown
   const handleItemInclusiveTotalChange = (index: number, val: number) => {
-    handleItemTotalChange(index, val);
+    const totalInclusive = Math.max(0, val || 0);
+    setPItems(prev => {
+      const next = [...prev];
+      const target = next[index];
+      if (!target) return prev;
+
+      const updatedItem: PurchaseBillItem = {
+        ...target,
+        totalAmount: totalInclusive
+      };
+      next[index] = recalculateItem(updatedItem, isInterState, 'INCLUSIVE');
+      return next;
+    });
   };
 
   const applyGstRateToAllPurchaseItems = (rate: GstTaxRate) => {
     setPItems(prev => {
-      return prev.map(item => updateItemByGstRate(item, rate, isInterState, purchasePriceMode));
+      return prev.map(item => {
+        const updated = { ...item, gstRate: rate };
+        return recalculateItem(updated, isInterState, purchasePriceMode);
+      });
     });
     showToast('info', 'Tax Rate Applied', `Applied ${rate}% GST (${isInterState ? 'IGST' : 'CGST+SGST'}) to all purchase bill items.`);
   };
@@ -780,7 +394,7 @@ export const PurchasesView: React.FC = () => {
       batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
       expiryDate: ''
     };
-    setPItems(prev => [...prev, updateItemByRate(rawItem, defaultRate, isInterState)]);
+    setPItems(prev => [...prev, recalculateItem(rawItem, isInterState, 'EXCLUSIVE')]);
   };
 
   // Allow removing any item row freely without blocking constraint
@@ -812,8 +426,8 @@ export const PurchasesView: React.FC = () => {
     const totalIgst = round2(pItems.reduce((s, it) => s + (it.igstAmount || 0), 0));
     const totalTax = round2(totalCgst + totalSgst + totalIgst);
     const rawGrandTotal = round2(subTotalTaxable + totalTax);
-    const grandTotal = enableRoundOff ? Math.round(rawGrandTotal) : rawGrandTotal;
-    const roundOff = enableRoundOff ? round2(grandTotal - rawGrandTotal) : 0;
+    const grandTotal = Math.round(rawGrandTotal);
+    const roundOff = round2(grandTotal - rawGrandTotal);
 
     createPurchaseBill({
       billNumber: `PB/2026/${String(purchaseBills.length + 1).padStart(3, '0')}`,
@@ -1287,7 +901,7 @@ export const PurchasesView: React.FC = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Three Flexible Entry Modes Selector */}
+                    {/* Two Flexible Entry Modes Selector */}
                     <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
                       <span className="px-2 text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Mode:</span>
                       <button
@@ -1304,42 +918,17 @@ export const PurchasesView: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPurchasePriceMode('INCLUSIVE_RATE')}
-                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                          purchasePriceMode === 'INCLUSIVE_RATE'
-                            ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs border border-indigo-200 dark:border-indigo-600'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                        title="Enter unit rate including GST (e.g. ₹118/pc)"
-                      >
-                        Unit Rate (Incl.)
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => setPurchasePriceMode('INCLUSIVE')}
                         className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                           purchasePriceMode === 'INCLUSIVE'
                             ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs border border-indigo-200 dark:border-indigo-600'
                             : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                         }`}
-                        title="Enter total purchase bill line amount inclusive of GST"
+                        title="Enter total purchase bill line amount inclusive of GST (Tax Inclusive)"
                       >
                         Line Total (Incl.)
                       </button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCalculatorTargetIndex(0);
-                        setShowGstCalculator(true);
-                      }}
-                      className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
-                      title="Open GST Rate Calculator & Converter"
-                    >
-                      <Calculator className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <span>GST Calculator</span>
-                    </button>
 
                     <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px]">
                       <span className="px-2 text-slate-500 dark:text-slate-400 font-medium">Quick GST:</span>
@@ -1384,19 +973,16 @@ export const PurchasesView: React.FC = () => {
                             </button>
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 text-center w-24">Batch / Exp</th>
-                        <th className="py-2.5 px-2 text-center w-32">Qty</th>
-                        <th className="py-2.5 px-2 text-center w-16">Unit</th>
-                        <th className={`py-2.5 px-2 w-32 ${purchasePriceMode !== 'INCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
+                        <th className="py-2.5 px-2 text-center w-28">Batch / Exp</th>
+                        <th className="py-2.5 px-2 text-center w-18">Qty</th>
+                        <th className="py-2.5 px-2 text-center w-18">Unit</th>
+                        <th className={`py-2.5 px-2 w-28 ${purchasePriceMode === 'EXCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
                           <div className="flex items-center gap-1">
-                            <span>{purchasePriceMode === 'INCLUSIVE_RATE' ? 'Rate (₹ Incl.)' : 'Rate (₹ Excl.)'}</span>
-                            {purchasePriceMode !== 'INCLUSIVE' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>}
+                            <span>Cost Rate (₹ Excl.)</span>
+                            {purchasePriceMode === 'EXCLUSIVE' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>}
                           </div>
                         </th>
-                        <th className="py-2.5 px-2 w-28">
-                          <span>Taxable (₹)</span>
-                        </th>
-                        <th className="py-2.5 px-2 w-32">
+                        <th className="py-2.5 px-2 w-36">
                           Item GST ({isInterState ? 'IGST' : 'CGST+SGST'})
                         </th>
                         <th className={`py-2.5 px-3 text-right w-32 ${purchasePriceMode === 'INCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
@@ -1411,7 +997,7 @@ export const PurchasesView: React.FC = () => {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {pItems.length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="py-8 text-center bg-slate-50/50 dark:bg-slate-800/30">
+                          <td colSpan={9} className="py-8 text-center bg-slate-50/50 dark:bg-slate-800/30">
                             <div className="flex flex-col items-center justify-center gap-2">
                               <Package className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                               <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No items added to this purchase bill</p>
@@ -1469,7 +1055,7 @@ export const PurchasesView: React.FC = () => {
                                 </div>
                               </td>
 
-                              {/* HSN */}
+                               {/* HSN */}
                               <td className="py-2.5 px-2 text-center align-top">
                                 <div className="relative">
                                   <input
@@ -1521,35 +1107,17 @@ export const PurchasesView: React.FC = () => {
                                 />
                               </td>
 
-                              {/* Quantity with Stepper */}
-                              <td className="py-2.5 px-2 align-top">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleItemQtyStep(idx, -1)}
-                                    className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded border border-slate-200 dark:border-slate-700 cursor-pointer"
-                                    title="Decrease quantity by 1"
-                                  >
-                                    <Minus className="w-3 h-3" />
-                                  </button>
-                                  <input
-                                    type="number"
-                                    min="0.01"
-                                    step="any"
-                                    value={item.quantity || ''}
-                                    onChange={(e) => handleItemQuantityChange(idx, parseFloat(e.target.value) || 0)}
-                                    className="w-full px-1.5 py-1 text-xs font-bold text-center border border-slate-200 dark:border-slate-700 rounded-lg bg-emerald-50/40 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                    required
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleItemQtyStep(idx, 1)}
-                                    className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded border border-slate-200 dark:border-slate-700 cursor-pointer"
-                                    title="Increase quantity by 1"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </button>
-                                </div>
+                              {/* Quantity */}
+                              <td className="py-2.5 px-2 text-center align-top">
+                                <input
+                                  type="number"
+                                  min="0.01"
+                                  step="any"
+                                  value={item.quantity || ''}
+                                  onChange={(e) => handleItemFieldChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                                  className="w-full px-2 py-1 text-xs font-bold text-center border border-slate-200 dark:border-slate-700 rounded-lg bg-emerald-50/40 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200"
+                                  required
+                                />
                               </td>
 
                               {/* Unit */}
@@ -1565,73 +1133,26 @@ export const PurchasesView: React.FC = () => {
                                 </select>
                               </td>
 
-                              {/* Cost Rate (Tax Exclusive or Tax Inclusive Unit Rate) Column */}
-                              <td className="py-2.5 px-2 text-right align-top">
-                                <div className="relative">
-                                  {purchasePriceMode === 'INCLUSIVE_RATE' ? (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="any"
-                                      value={item.rateIncl !== undefined ? (item.rateIncl || '') : (round2(item.rate * (1 + (item.gstRate || 0) / 100)) || '')}
-                                      onChange={(e) => handleItemUnitInclusiveRateChange(idx, parseFloat(e.target.value) || 0)}
-                                      className="w-full px-2 py-1 text-xs font-mono font-bold text-right rounded-lg bg-white dark:bg-slate-800 border-2 border-indigo-500 dark:border-indigo-400 text-indigo-950 dark:text-indigo-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                      placeholder="0.00"
-                                      required
-                                    />
-                                  ) : (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="any"
-                                      value={item.rate || ''}
-                                      onChange={(e) => handleItemRateChange(idx, parseFloat(e.target.value) || 0)}
-                                      className={`w-full px-2 py-1 text-xs font-mono font-semibold text-right rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
-                                        purchasePriceMode === 'EXCLUSIVE'
-                                          ? 'bg-white dark:bg-slate-800 border-2 border-indigo-400 dark:border-indigo-500 text-indigo-950 dark:text-indigo-200 shadow-2xs font-bold'
-                                          : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
-                                      }`}
-                                      placeholder="0.00"
-                                      required
-                                    />
-                                  )}
-                                </div>
-                                <div className="flex items-center justify-between text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-                                  {purchasePriceMode === 'INCLUSIVE_RATE' ? (
-                                    <span>Excl: ₹{item.rate.toFixed(2)}</span>
-                                  ) : (
-                                    <span>Incl: ₹{(item.rateIncl || round2(item.rate * (1 + (item.gstRate || 0) / 100))).toFixed(2)}</span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCalculatorTargetIndex(idx);
-                                      setShowGstCalculator(true);
-                                    }}
-                                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer flex items-center gap-0.5 ml-1"
-                                    title="Open GST converter for this item"
-                                  >
-                                    <Calculator className="w-2.5 h-2.5" />
-                                    <span>Calc</span>
-                                  </button>
-                                </div>
-                              </td>
-
-                              {/* Taxable Amount Column (Editable & Synchronized) */}
+                              {/* Base Cost Rate (Tax Exclusive) Column */}
                               <td className="py-2.5 px-2 text-right align-top">
                                 <div className="relative">
                                   <input
                                     type="number"
                                     min="0"
                                     step="any"
-                                    value={item.taxableAmount || ''}
-                                    onChange={(e) => handleItemTaxableChange(idx, parseFloat(e.target.value) || 0)}
-                                    className="w-full px-2 py-1 text-xs font-mono font-medium text-right rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    value={item.rate || ''}
+                                    onChange={(e) => handleItemFieldChange(idx, 'rate', parseFloat(e.target.value) || 0)}
+                                    className={`w-full px-2 py-1 text-xs font-mono font-semibold text-right rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
+                                      purchasePriceMode === 'EXCLUSIVE'
+                                        ? 'bg-white dark:bg-slate-800 border-2 border-indigo-400 dark:border-indigo-500 text-indigo-950 dark:text-indigo-200 shadow-2xs font-bold'
+                                        : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
+                                    }`}
                                     placeholder="0.00"
+                                    required
                                   />
                                 </div>
                                 <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 text-right">
-                                  Taxable Val
+                                  Cost Excl.
                                 </div>
                               </td>
 
@@ -1640,7 +1161,7 @@ export const PurchasesView: React.FC = () => {
                                 <div className="space-y-1">
                                   <select
                                     value={item.gstRate}
-                                    onChange={(e) => handleItemGstRateChange(idx, parseInt(e.target.value) as GstTaxRate)}
+                                    onChange={(e) => handleItemFieldChange(idx, 'gstRate', parseInt(e.target.value) as GstTaxRate)}
                                     className="w-full px-1 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium cursor-pointer"
                                   >
                                     <option value="0">0% (Nil / Exempt)</option>
@@ -1671,7 +1192,7 @@ export const PurchasesView: React.FC = () => {
                                     min="0"
                                     step="any"
                                     value={item.totalAmount || ''}
-                                    onChange={(e) => handleItemTotalChange(idx, parseFloat(e.target.value) || 0)}
+                                    onChange={(e) => handleItemInclusiveTotalChange(idx, parseFloat(e.target.value) || 0)}
                                     className={`w-full px-2 py-1 text-xs font-mono font-bold text-right rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
                                       purchasePriceMode === 'INCLUSIVE'
                                         ? 'bg-white dark:bg-slate-800 border-2 border-indigo-500 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300 font-extrabold shadow-2xs'
@@ -1680,11 +1201,8 @@ export const PurchasesView: React.FC = () => {
                                     placeholder="0.00"
                                   />
                                 </div>
-                                <div className="flex items-center justify-between text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">
-                                  <span>Tax: {formatCurrency(item.cgstAmount + item.sgstAmount + item.igstAmount, '')}</span>
-                                  {item.quantity > 0 && (
-                                    <span className="text-indigo-600 dark:text-indigo-400 font-medium">₹{round2(item.totalAmount / item.quantity).toFixed(2)}/u</span>
-                                  )}
+                                <div className="text-[10px] font-normal text-slate-400 dark:text-slate-500 mt-0.5">
+                                  Taxable: {formatCurrency(item.taxableAmount, '')}
                                 </div>
                               </td>
 
@@ -1726,8 +1244,8 @@ export const PurchasesView: React.FC = () => {
                   const totalIgst = round2(pItems.reduce((s, it) => s + (it.igstAmount || 0), 0));
                   const totalTax = round2(totalCgst + totalSgst + totalIgst);
                   const rawGrandTotal = round2(subTotalTaxable + totalTax);
-                  const grandTotal = enableRoundOff ? Math.round(rawGrandTotal) : rawGrandTotal;
-                  const roundOff = enableRoundOff ? round2(grandTotal - rawGrandTotal) : 0;
+                  const grandTotal = Math.round(rawGrandTotal);
+                  const roundOff = round2(grandTotal - rawGrandTotal);
 
                   return (
                     <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5 text-xs">
@@ -1760,31 +1278,14 @@ export const PurchasesView: React.FC = () => {
                           </span>
                         </div>
                       )}
-                      <div className="flex justify-between text-slate-600 dark:text-slate-300 font-semibold border-t border-dashed border-slate-200 dark:border-slate-700 pt-1">
-                        <span>Total Tax (GST):</span>
-                        <span className="font-mono">
-                          {formatCurrency(totalTax, business.currencySymbol)}
-                        </span>
-                      </div>
-
-                      {/* Round-off option */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/80 dark:border-slate-700/80">
-                        <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 dark:text-slate-300">
-                          <input
-                            type="checkbox"
-                            checked={enableRoundOff}
-                            onChange={(e) => setEnableRoundOff(e.target.checked)}
-                            className="w-3.5 h-3.5 rounded text-indigo-600 cursor-pointer"
-                          />
-                          <span>Round off to nearest ₹</span>
-                        </label>
-                        {roundOff !== 0 && (
-                          <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                      {roundOff !== 0 && (
+                        <div className="flex justify-between text-slate-500 dark:text-slate-400 text-[11px]">
+                          <span>Round Off:</span>
+                          <span className="font-mono">
                             {roundOff > 0 ? `+${roundOff.toFixed(2)}` : roundOff.toFixed(2)}
                           </span>
-                        )}
-                      </div>
-
+                        </div>
+                      )}
                       <div className="flex justify-between font-extrabold text-sm text-slate-900 dark:text-white pt-1.5 border-t border-slate-200 dark:border-slate-700">
                         <span>Grand Total Bill Amount:</span>
                         <span className="font-mono text-indigo-600 dark:text-indigo-400">
@@ -1869,7 +1370,6 @@ export const PurchasesView: React.FC = () => {
                         <th className="py-2 px-2 text-center">Qty Added</th>
                         <th className="py-2 px-2 text-right">Rate</th>
                         <th className="py-2 px-2 text-right">Taxable</th>
-                        <th className="py-2 px-2 text-center">GST %</th>
                         <th className="py-2 px-3 text-right">Total</th>
                       </tr>
                     </thead>
@@ -1888,11 +1388,6 @@ export const PurchasesView: React.FC = () => {
                           <td className="py-2 px-2 text-center font-bold text-emerald-700 dark:text-emerald-300">+{it.quantity} {it.unit}</td>
                           <td className="py-2 px-2 text-right font-mono text-slate-700 dark:text-slate-300">{formatCurrency(it.rate, '')}</td>
                           <td className="py-2 px-2 text-right font-mono text-slate-700 dark:text-slate-300">{formatCurrency(it.taxableAmount, '')}</td>
-                          <td className="py-2 px-2 text-center">
-                            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
-                              {it.gstRate}%
-                            </span>
-                          </td>
                           <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{formatCurrency(it.totalAmount, '')}</td>
                         </tr>
                       ))}
@@ -1903,40 +1398,15 @@ export const PurchasesView: React.FC = () => {
 
               {/* Totals */}
               <div className="flex justify-end pt-2">
-                <div className="w-full sm:w-72 space-y-1 text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="w-full sm:w-64 space-y-1 text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-300">Taxable Value:</span>
                     <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.subTotalTaxable, business.currencySymbol)}</span>
                   </div>
-                  {!selectedBillForView.isInterState ? (
-                    <>
-                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                        <span>CGST Input:</span>
-                        <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalCgst, business.currencySymbol)}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                        <span>SGST Input:</span>
-                        <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalSgst, business.currencySymbol)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                      <span>IGST Input:</span>
-                      <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalIgst, business.currencySymbol)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 border-t border-dashed border-slate-200 dark:border-slate-700 pt-1">
-                    <span>Total Tax:</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-300">Total Tax:</span>
                     <span className="font-mono text-slate-900 dark:text-white">{formatCurrency(selectedBillForView.totalTax, business.currencySymbol)}</span>
                   </div>
-                  {selectedBillForView.roundOff !== 0 && (
-                    <div className="flex justify-between text-slate-500 dark:text-slate-400 text-[11px]">
-                      <span>Round Off:</span>
-                      <span className="font-mono text-slate-700 dark:text-slate-300">
-                        {selectedBillForView.roundOff > 0 ? `+${selectedBillForView.roundOff.toFixed(2)}` : selectedBillForView.roundOff.toFixed(2)}
-                      </span>
-                    </div>
-                  )}
                   <div className="flex justify-between font-bold text-sm pt-1 border-t border-slate-200 dark:border-slate-700">
                     <span className="text-slate-900 dark:text-white">Grand Total:</span>
                     <span className="font-mono text-indigo-700 dark:text-indigo-400">{formatCurrency(selectedBillForView.grandTotal, business.currencySymbol)}</span>
@@ -2129,33 +1599,6 @@ export const PurchasesView: React.FC = () => {
             if (item.uqc && item.uqc !== 'OTH') handleItemFieldChange(targetIdx, 'unit', item.uqc);
           }
         }}
-      />
-
-      {/* GST Rate Calculator & Inclusive/Exclusive Converter Modal */}
-      <GstRateCalculatorModal
-        isOpen={showGstCalculator}
-        onClose={() => {
-          setShowGstCalculator(false);
-          setCalculatorTargetIndex(null);
-        }}
-        initialAmount={
-          calculatorTargetIndex !== null && pItems[calculatorTargetIndex]
-            ? (purchasePriceMode === 'EXCLUSIVE'
-                ? pItems[calculatorTargetIndex].rate
-                : (pItems[calculatorTargetIndex].rateIncl || round2(pItems[calculatorTargetIndex].rate * (1 + (pItems[calculatorTargetIndex].gstRate || 0) / 100))))
-            : (pItems[0]?.rate || 100)
-        }
-        initialGstRate={
-          calculatorTargetIndex !== null && pItems[calculatorTargetIndex]
-            ? pItems[calculatorTargetIndex].gstRate
-            : (pItems[0]?.gstRate || 18)
-        }
-        initialMode={
-          purchasePriceMode === 'EXCLUSIVE'
-            ? 'EXCLUSIVE_TO_INCLUSIVE'
-            : 'INCLUSIVE_TO_EXCLUSIVE'
-        }
-        onApply={handleApplyCalculatedGst}
       />
     </div>
   );

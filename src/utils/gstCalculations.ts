@@ -123,105 +123,6 @@ export const calculateBaseRateFromInclusive = (
   return Number(baseRate.toFixed(2));
 };
 
-/**
- * Accurately calculate Taxable Base Rate from a GST-inclusive unit rate.
- * Formula: Exclude Rate = Include Rate / (1 + (GstRate + CessRate) / 100)
- */
-export const calculateExcludeRateFromIncludeRate = (
-  includeRate: number,
-  gstRate: number = 0,
-  cessRate: number = 0
-): number => {
-  if (!includeRate || includeRate <= 0) return 0;
-  const taxFactor = 1 + ((gstRate + cessRate) / 100);
-  const baseRate = includeRate / taxFactor;
-  return Number(baseRate.toFixed(2));
-};
-
-/**
- * Accurately calculate GST-inclusive unit rate from a GST-exclusive base rate.
- * Formula: Include Rate = Exclude Rate * (1 + (GstRate + CessRate) / 100)
- */
-export const calculateIncludeRateFromExcludeRate = (
-  excludeRate: number,
-  gstRate: number = 0,
-  cessRate: number = 0
-): number => {
-  if (!excludeRate || excludeRate <= 0) return 0;
-  const taxFactor = 1 + ((gstRate + cessRate) / 100);
-  return Number((excludeRate * taxFactor).toFixed(2));
-};
-
-/**
- * Accurately calculate full GST line item breakdown from a total inclusive amount.
- * Guarantees zero-penny error: Taxable + CGST + SGST + IGST + Cess === Total Inclusive!
- */
-export const calculateItemFromInclusiveTotal = (
-  totalInclusive: number,
-  quantity: number,
-  discountPercent: number = 0,
-  gstRate: GstTaxRate = 0,
-  isInterState: boolean = false,
-  cessRate: number = 0
-): Omit<InvoiceItem, 'id' | 'name' | 'hsnCode' | 'unit'> => {
-  const qty = Math.max(0.0001, quantity);
-  const total = Math.max(0, Number(totalInclusive.toFixed(2)));
-  const totalTaxFactor = 1 + ((gstRate + cessRate) / 100);
-
-  // Exact taxable amount after discount
-  const taxableAmount = Number((total / totalTaxFactor).toFixed(2));
-  const totalTax = Number((total - taxableAmount).toFixed(2));
-
-  // Cess amount if applicable
-  let cessAmount = 0;
-  if (cessRate > 0) {
-    cessAmount = Number(((taxableAmount * cessRate) / 100).toFixed(2));
-  }
-  const gstTax = Math.max(0, Number((totalTax - cessAmount).toFixed(2)));
-
-  let cgstRate = 0;
-  let cgstAmount = 0;
-  let sgstRate = 0;
-  let sgstAmount = 0;
-  let igstRate = 0;
-  let igstAmount = 0;
-
-  if (isInterState) {
-    igstRate = gstRate;
-    igstAmount = gstTax;
-  } else {
-    cgstRate = gstRate / 2;
-    sgstRate = gstRate / 2;
-    // Split GST equally, guaranteeing cgst + sgst === gstTax exactly!
-    cgstAmount = Number((gstTax / 2).toFixed(2));
-    sgstAmount = Number((gstTax - cgstAmount).toFixed(2));
-  }
-
-  // Base rate before discount
-  const discountFactor = Math.max(0.0001, 1 - (discountPercent / 100));
-  const grossAmount = taxableAmount / discountFactor;
-  const discountAmount = Number((grossAmount - taxableAmount).toFixed(2));
-  const rate = Number((grossAmount / qty).toFixed(2));
-
-  return {
-    quantity,
-    rate,
-    discountPercent,
-    discountAmount,
-    taxableAmount,
-    gstRate,
-    cgstRate,
-    cgstAmount,
-    sgstRate,
-    sgstAmount,
-    igstRate,
-    igstAmount,
-    cessRate,
-    cessAmount,
-    totalAmount: total // Exactly matches inclusive input
-  };
-};
-
 export const calculateItemGst = (
   rate: number,
   quantity: number,
@@ -231,8 +132,8 @@ export const calculateItemGst = (
   cessRate: number = 0
 ): Omit<InvoiceItem, 'id' | 'name' | 'hsnCode' | 'unit'> => {
   const grossAmount = rate * quantity;
-  const discountAmount = Number(((grossAmount * discountPercent) / 100).toFixed(2));
-  const taxableAmount = Number(Math.max(0, grossAmount - discountAmount).toFixed(2));
+  const discountAmount = (grossAmount * discountPercent) / 100;
+  const taxableAmount = Math.max(0, grossAmount - discountAmount);
 
   let cgstRate = 0;
   let cgstAmount = 0;
@@ -243,36 +144,34 @@ export const calculateItemGst = (
 
   if (isInterState) {
     igstRate = gstRate;
-    igstAmount = Number(((taxableAmount * igstRate) / 100).toFixed(2));
+    igstAmount = (taxableAmount * igstRate) / 100;
   } else {
     cgstRate = gstRate / 2;
+    cgstAmount = (taxableAmount * cgstRate) / 100;
     sgstRate = gstRate / 2;
-    // Calculate total GST first, then split to ensure equal sum without rounding 1-paisa errors
-    const totalGst = Number(((taxableAmount * gstRate) / 100).toFixed(2));
-    cgstAmount = Number((totalGst / 2).toFixed(2));
-    sgstAmount = Number((totalGst - cgstAmount).toFixed(2));
+    sgstAmount = (taxableAmount * sgstRate) / 100;
   }
 
-  const cessAmount = cessRate > 0 ? Number(((taxableAmount * cessRate) / 100).toFixed(2)) : 0;
-  const totalTax = Number((cgstAmount + sgstAmount + igstAmount + cessAmount).toFixed(2));
-  const totalAmount = Number((taxableAmount + totalTax).toFixed(2));
+  const cessAmount = cessRate > 0 ? (taxableAmount * cessRate) / 100 : 0;
+  const totalTax = cgstAmount + sgstAmount + igstAmount + cessAmount;
+  const totalAmount = taxableAmount + totalTax;
 
   return {
     quantity,
     rate,
     discountPercent,
-    discountAmount,
-    taxableAmount,
+    discountAmount: Number(discountAmount.toFixed(2)),
+    taxableAmount: Number(taxableAmount.toFixed(2)),
     gstRate,
     cgstRate,
-    cgstAmount,
+    cgstAmount: Number(cgstAmount.toFixed(2)),
     sgstRate,
-    sgstAmount,
+    sgstAmount: Number(sgstAmount.toFixed(2)),
     igstRate,
-    igstAmount,
+    igstAmount: Number(igstAmount.toFixed(2)),
     cessRate,
-    cessAmount,
-    totalAmount,
+    cessAmount: Number(cessAmount.toFixed(2)),
+    totalAmount: Number(totalAmount.toFixed(2)),
   };
 };
 
@@ -303,19 +202,10 @@ export const recalculateInvoiceTotals = (
     totalCess += item.cessAmount || 0;
 
     if (isInterState) {
-      totalIgst += (item.igstAmount !== undefined && item.igstAmount !== null)
-        ? item.igstAmount
-        : Number(((item.taxableAmount * item.gstRate) / 100).toFixed(2));
+      totalIgst += (item.taxableAmount * item.gstRate) / 100;
     } else {
-      if (item.cgstAmount !== undefined && item.sgstAmount !== undefined) {
-        totalCgst += item.cgstAmount;
-        totalSgst += item.sgstAmount;
-      } else {
-        const itemGst = Number(((item.taxableAmount * item.gstRate) / 100).toFixed(2));
-        const half = Number((itemGst / 2).toFixed(2));
-        totalCgst += half;
-        totalSgst += Number((itemGst - half).toFixed(2));
-      }
+      totalCgst += (item.taxableAmount * (item.gstRate / 2)) / 100;
+      totalSgst += (item.taxableAmount * (item.gstRate / 2)) / 100;
     }
   });
 
