@@ -636,6 +636,7 @@ export const InvoiceTemplateManager: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Header Style</label>
                   <div className="grid grid-cols-2 gap-2">
                     {[
+                      { id: 'CENTERED', label: 'Centered Company Details', desc: 'Centered branding, logo, GSTIN, phone, email & tagline' },
                       { id: 'TRADE_CLASSIC', label: 'Classic Trade / Retail (TM Style)', desc: 'Indian hardware, electrical & consumer trade format' },
                       { id: 'BANNER', label: 'Solid Banner', desc: 'Colored full-width top banner' },
                       { id: 'MODERN_SPLIT', label: 'Modern Split Bar', desc: 'Two-column clean top bar' },
@@ -781,6 +782,36 @@ export const InvoiceTemplateManager: React.FC = () => {
                         className="rounded text-indigo-600 cursor-pointer"
                       />
                       <span>Authorized Signature</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingTemplate.plainTextPayment ?? (editingTemplate.headerStyle === 'CENTERED')}
+                        onChange={(e) => setEditingTemplate(prev => ({ ...prev, plainTextPayment: e.target.checked }))}
+                        className="rounded text-indigo-600 cursor-pointer"
+                      />
+                      <span>Plain Text Payment Mode & Status</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingTemplate.cleanTableHeaders ?? (editingTemplate.headerStyle === 'CENTERED')}
+                        onChange={(e) => setEditingTemplate(prev => ({ ...prev, cleanTableHeaders: e.target.checked }))}
+                        className="rounded text-indigo-600 cursor-pointer"
+                      />
+                      <span>Clean Table Headers (No Fills)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingTemplate.allBlackTypography ?? (editingTemplate.headerStyle === 'CENTERED')}
+                        onChange={(e) => setEditingTemplate(prev => ({ ...prev, allBlackTypography: e.target.checked }))}
+                        className="rounded text-indigo-600 cursor-pointer"
+                      />
+                      <span>All-Black Invoice Typography (#000000)</span>
                     </label>
                   </div>
                 </div>

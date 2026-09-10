@@ -46,9 +46,19 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
       : 'font-sans';
 
   // Customizable Theme and Text Colors with Intelligent Fallbacks
-  const themeHex = template.themeColor || '#1e293b';
   const isTrade = template.headerStyle === 'TRADE_CLASSIC' || template.id === 'TRADE_CLASSIC_TM';
   const isThermal = template.headerStyle === 'THERMAL' || template.id === 'THERMAL_POS';
+  const isCentered = template.headerStyle === 'CENTERED' || template.id === 'CENTERED_CLEAN_BLACK';
+  const isPlainTextPayment = template.plainTextPayment !== undefined ? template.plainTextPayment : isCentered;
+  const isCleanTableHeaders = template.cleanTableHeaders !== undefined ? template.cleanTableHeaders : (isCentered || (template.tableHeaderTextColor === '#000000' && (template.headerColor === '#ffffff' || template.themeColor === '#000000')));
+  const isAllBlack = isCentered || template.allBlackTypography || (template.textColor === '#000000' && template.headingTextColor === '#000000' && template.accentTextColor === '#000000');
+
+  const themeHex = isAllBlack ? '#000000' : (template.themeColor || '#1e293b');
+  const bodyTextColor = isAllBlack ? '#000000' : (template.textColor || (isTrade ? '#000000' : '#0f172a'));
+  const headingTextColor = isAllBlack ? '#000000' : (template.headingTextColor || (template.headerStyle === 'BANNER' ? '#ffffff' : (isTrade ? '#000000' : '#0f172a')));
+  const tableHeaderTextColor = isAllBlack ? '#000000' : (template.tableHeaderTextColor || '#ffffff');
+  const accentTextColor = isAllBlack ? '#000000' : (template.accentTextColor || template.themeColor || '#4f46e5');
+  const mutedTextColor = isAllBlack ? '#000000' : (template.mutedTextColor || (isTrade ? '#334155' : '#64748b'));
   
   const isLogoVisible = (template.showLogo !== false) && (business.showLogoOnInvoice !== false);
   const effectiveLogoShape: 'square' | 'circle' | 'rounded' = business.logoShape || template.logoShape || 'rounded';
@@ -65,11 +75,40 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
     }
   };
 
-  const bodyTextColor = template.textColor || (isTrade ? '#000000' : '#0f172a');
-  const headingTextColor = template.headingTextColor || (template.headerStyle === 'BANNER' ? '#ffffff' : (isTrade ? '#000000' : '#0f172a'));
-  const tableHeaderTextColor = template.tableHeaderTextColor || '#ffffff';
-  const accentTextColor = template.accentTextColor || template.themeColor || '#4f46e5';
-  const mutedTextColor = template.mutedTextColor || (isTrade ? '#334155' : '#64748b');
+  // Plain Text Payment Mode (no badge pills, no icons)
+  const plainPaymentModeText = (() => {
+    switch (invoice.paymentMethod) {
+      case 'CASH':
+        return 'CASH';
+      case 'UPI':
+        return 'UPI / QR CODE';
+      case 'BANK_TRANSFER':
+        return 'BANK TRANSFER';
+      case 'CREDIT_CARD':
+        return 'CREDIT / DEBIT CARD';
+      case 'CHEQUE':
+        return 'CHEQUE';
+      case 'OTHER':
+        return 'OTHER';
+      default:
+        return 'CASH / UPI / BANK TRANSFER';
+    }
+  })();
+
+  // Plain Text Payment Status (no badge pills, no icons)
+  const plainPaymentStatusText = (() => {
+    switch (invoice.status) {
+      case 'PAID':
+        return 'FULLY PAID';
+      case 'PARTIALLY_PAID':
+        return 'PARTIALLY PAID';
+      case 'OVERDUE':
+        return 'OVERDUE';
+      case 'UNPAID':
+      default:
+        return 'UNPAID';
+    }
+  })();
 
   // Payment Method Info Helper
   const paymentInfo = (() => {
@@ -847,6 +886,70 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               </div>
             </div>
           </div>
+        ) : (template.headerStyle === 'CENTERED' || isCentered) ? (
+          /* Centered Company Details Header */
+          <div className="text-center pb-3 border-b-2 border-black space-y-2">
+            {/* Centered Company Logo */}
+            {isLogoVisible && (
+              <div className="flex justify-center mb-1.5">
+                {business.logoUrl ? (
+                  <img
+                    src={business.logoUrl}
+                    alt="Company Logo"
+                    className={`max-h-16 max-w-[220px] ${getLogoShapeClasses(effectiveLogoShape)} p-0.5 object-contain`}
+                  />
+                ) : (
+                  <div className={`w-14 h-14 ${getLogoShapeClasses(effectiveLogoShape)} border-2 border-black bg-white flex items-center justify-center text-black font-black text-xl tracking-tight shadow-xs`}>
+                    {(business.tradeName || business.name).slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Business Trade / Legal Name */}
+            <h1 className={`${fitToOnePage ? 'text-2xl' : 'text-3xl'} font-black tracking-tight uppercase text-black leading-tight`}>
+              {business.tradeName || business.name}
+            </h1>
+
+            {/* Tagline */}
+            {(business.tagline || template.headerTagline) && (
+              <p className="text-xs text-black font-semibold italic -mt-0.5">
+                {business.tagline || template.headerTagline}
+              </p>
+            )}
+
+            {/* Registered Address */}
+            <p className="text-[11.5px] leading-relaxed text-black max-w-2xl mx-auto">
+              {business.address}, {business.city}, {business.state} - {business.pincode}
+            </p>
+
+            {/* Centered GSTIN, State Code, Phone, Email */}
+            <div className="flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1 text-[11px] font-medium text-black pt-0.5">
+              <span>GSTIN: <strong className="font-mono font-bold text-black">{business.gstin}</strong></span>
+              <span>•</span>
+              <span>State Code: <strong className="font-mono font-bold text-black">{business.stateCode} ({business.state})</strong></span>
+              <span>•</span>
+              <span>Phone: <strong className="font-mono font-bold text-black">{business.phone}</strong></span>
+              {business.email && (
+                <>
+                  <span>•</span>
+                  <span>Email: <strong className="font-bold text-black">{business.email}</strong></span>
+                </>
+              )}
+            </div>
+
+            {/* Centered Document Title and Copy Type */}
+            <div className="pt-2 flex flex-col items-center justify-center gap-1">
+              <span className="inline-block border-y-2 border-black px-6 py-1 text-xs font-black uppercase tracking-widest text-black">
+                {invoice.invoiceType ? invoice.invoiceType.replace(/_/g, ' ') : 'TAX INVOICE'}
+              </span>
+              {template.showCopyTypeBadge && (
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-black">
+                  ({copyLabel})
+                </span>
+              )}
+            </div>
+          </div>
         ) : (
           /* Official Minimal / Bordered Header */
           <div className="border border-slate-300 rounded-lg p-3.5 bg-slate-50/50">
@@ -914,7 +1017,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
         {/* CUSTOMER BILL TO & METADATA CARDS */}
         <div className={`grid grid-cols-2 gap-3.5 ${template.tableStyle === 'BOXED' ? 'p-3 bg-slate-50/80 rounded-xl border border-slate-200' : ''}`}>
           {/* Bill To */}
-          <div className="border border-slate-200 rounded-lg p-3 bg-white shadow-2xs">
+          <div className={`border ${isAllBlack ? 'border-black' : 'border-slate-200'} rounded-lg p-3 bg-white shadow-2xs`}>
             <div 
               className="text-[9.5px] font-extrabold uppercase tracking-wider mb-1"
               style={{ color: accentTextColor }}
@@ -923,40 +1026,74 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
             </div>
             <div className="font-bold text-xs" style={{ color: headingTextColor }}>{invoice.customerName}</div>
             <div className="text-[11px] leading-snug mt-0.5" style={{ color: bodyTextColor }}>{invoice.customerAddress}</div>
-            <div className="mt-2 pt-1.5 border-t border-slate-100 space-y-0.5 text-[10px]" style={{ color: mutedTextColor }}>
+            <div className={`mt-2 pt-1.5 border-t ${isAllBlack ? 'border-black/20' : 'border-slate-100'} space-y-0.5 text-[10px]`} style={{ color: mutedTextColor }}>
               {invoice.customerGstin ? (
                 <div>GSTIN / UIN: <strong className="font-mono" style={{ color: bodyTextColor }}>{invoice.customerGstin}</strong></div>
               ) : (
-                <div className="text-slate-400 italic">Unregistered Consumer</div>
+                <div className={isAllBlack ? 'text-black italic' : 'text-slate-400 italic'}>Unregistered Consumer</div>
               )}
-              {invoice.customerPhone && <div>Phone: {invoice.customerPhone}</div>}
-              <div>State: <strong>{invoice.customerState} ({invoice.customerStateCode})</strong></div>
+              {invoice.customerPhone && <div>Phone: <strong style={{ color: bodyTextColor }}>{invoice.customerPhone}</strong></div>}
+              <div>State: <strong style={{ color: bodyTextColor }}>{invoice.customerState} ({invoice.customerStateCode})</strong></div>
             </div>
           </div>
 
-          {/* Shipping / Meta */}
-          <div className="border border-slate-200 rounded-lg p-3 bg-white shadow-2xs space-y-1.5">
+          {/* Shipping / Payment Details */}
+          <div className={`border ${isAllBlack ? 'border-black' : 'border-slate-200'} rounded-lg p-3 bg-white shadow-2xs space-y-1.5`}>
             <div 
               className="text-[9.5px] font-extrabold uppercase tracking-wider mb-1 flex justify-between"
               style={{ color: accentTextColor }}
             >
-              <span>{invoice.hasDifferentShippingAddress ? 'Shipped To (Delivery):' : 'Invoice & Payment Details:'}</span>
+              <span>{invoice.hasDifferentShippingAddress ? 'Shipped To & Payment Details:' : 'Invoice & Payment Details:'}</span>
               <span className="text-[9px] font-semibold" style={{ color: mutedTextColor }}>POS: {invoice.placeOfSupplyStateCode}</span>
             </div>
+
+            {/* Direct Invoice No. & Invoice Date in Payment Section */}
+            {(isCentered || isPlainTextPayment) && (
+              <div className={`space-y-0.5 pb-1.5 border-b ${isAllBlack ? 'border-black/20' : 'border-slate-100'} text-[11px]`}>
+                <div className="flex justify-between items-center">
+                  <span className={isAllBlack ? 'font-semibold text-black' : ''} style={!isAllBlack ? { color: mutedTextColor } : undefined}>Invoice No.:</span>
+                  <span className="font-mono font-bold" style={{ color: headingTextColor }}>{invoice.invoiceNumber}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className={isAllBlack ? 'font-semibold text-black' : ''} style={!isAllBlack ? { color: mutedTextColor } : undefined}>Invoice Date:</span>
+                  <span className="font-bold" style={{ color: bodyTextColor }}>{formatDate(invoice.invoiceDate)}</span>
+                </div>
+                {invoice.dueDate && (
+                  <div className="flex justify-between items-center">
+                    <span className={isAllBlack ? 'font-semibold text-black' : ''} style={!isAllBlack ? { color: mutedTextColor } : undefined}>Due Date:</span>
+                    <span className="font-bold" style={{ color: bodyTextColor }}>{formatDate(invoice.dueDate)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {invoice.hasDifferentShippingAddress ? (
               <>
                 <div className="font-bold text-xs" style={{ color: headingTextColor }}>{invoice.shippingName || invoice.customerName}</div>
                 <div className="text-[11px] leading-snug" style={{ color: bodyTextColor }}>{invoice.shippingAddress}</div>
                 <div className="text-[10px]" style={{ color: mutedTextColor }}>State: {invoice.shippingState} ({invoice.shippingStateCode})</div>
-                <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px]">
-                  <span style={{ color: mutedTextColor }}>Payment:</span>
-                  <span className="font-bold flex items-center gap-1" style={{ color: bodyTextColor }}>
-                    <span>{paymentInfo.icon}</span>
-                    <span>{paymentInfo.short}</span>
-                    <span className={`ml-1 px-1.5 py-0.2 rounded text-[9px] ${invoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {invoice.status}
-                    </span>
-                  </span>
+                <div className={`pt-1 border-t ${isAllBlack ? 'border-black/20' : 'border-slate-100'} space-y-1 text-[10.5px]`}>
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: mutedTextColor }}>Mode of Payment:</span>
+                    {isPlainTextPayment ? (
+                      <span className="font-bold uppercase text-black">{plainPaymentModeText}</span>
+                    ) : (
+                      <span className="font-bold flex items-center gap-1" style={{ color: bodyTextColor }}>
+                        <span>{paymentInfo.icon}</span>
+                        <span>{paymentInfo.short}</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: mutedTextColor }}>Payment Status:</span>
+                    {isPlainTextPayment ? (
+                      <span className="font-bold uppercase text-black">{plainPaymentStatusText}</span>
+                    ) : (
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${invoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {invoice.status}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </>
             ) : (
@@ -971,18 +1108,30 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                 </div>
                 <div className="flex justify-between items-center">
                   <span style={{ color: mutedTextColor }}>Mode of Payment:</span>
-                  <span className="font-bold flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-[10px]" style={{ color: bodyTextColor }}>
-                    <span>{paymentInfo.icon}</span>
-                    <span>{paymentInfo.label}</span>
-                  </span>
+                  {isPlainTextPayment ? (
+                    <span className="font-bold uppercase text-black">
+                      {plainPaymentModeText}
+                    </span>
+                  ) : (
+                    <span className="font-bold flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-[10px]" style={{ color: bodyTextColor }}>
+                      <span>{paymentInfo.icon}</span>
+                      <span>{paymentInfo.label}</span>
+                    </span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
                   <span style={{ color: mutedTextColor }}>Payment Status:</span>
-                  <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                    invoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
-                  }`}>
-                    {invoice.status === 'PAID' ? '✅ FULLY PAID' : (invoice.status === 'PARTIALLY_PAID' ? '⚠️ PARTIALLY PAID' : '⏳ UNPAID / CREDIT')}
-                  </span>
+                  {isPlainTextPayment ? (
+                    <span className="font-bold uppercase text-black">
+                      {plainPaymentStatusText}
+                    </span>
+                  ) : (
+                    <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${
+                      invoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}>
+                      {invoice.status === 'PAID' ? '✅ FULLY PAID' : (invoice.status === 'PARTIALLY_PAID' ? '⚠️ PARTIALLY PAID' : '⏳ UNPAID / CREDIT')}
+                    </span>
+                  )}
                 </div>
                 {invoice.paymentReference && (
                   <div className="flex justify-between text-[10px]" style={{ color: mutedTextColor }}>
@@ -996,12 +1145,16 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
         </div>
 
         {/* LINE ITEMS TABLE */}
-        <div className="overflow-hidden border border-slate-200 rounded-lg shadow-2xs">
+        <div className={`overflow-hidden rounded-lg shadow-2xs ${isCleanTableHeaders ? 'border-0 shadow-none' : 'border border-slate-200'}`}>
           <table className="w-full text-left text-[11px] border-collapse">
             <thead>
               <tr 
-                className="font-bold text-[10px] uppercase tracking-wider"
-                style={{ backgroundColor: themeHex, color: tableHeaderTextColor }}
+                className={`font-bold uppercase tracking-wider ${
+                  isCleanTableHeaders 
+                    ? 'bg-transparent text-black border-y-2 border-black text-[10.5px]' 
+                    : 'text-[10px]'
+                }`}
+                style={!isCleanTableHeaders ? { backgroundColor: themeHex, color: tableHeaderTextColor } : { color: '#000000' }}
               >
                 <th className="py-2 px-2 text-center w-8">#</th>
                 <th className="py-2 px-3">Item Description & Particulars</th>
@@ -1082,7 +1235,9 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
 
             {/* Bank Details & UPI QR */}
             {(template.showBankDetails || template.showUpiQr) && (
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-3">
+              <div className={`p-3 rounded-lg border flex items-center justify-between gap-3 ${
+                isAllBlack ? 'bg-white border-black' : 'bg-slate-50 border-slate-200'
+              }`}>
                 {template.showBankDetails && (
                   <div className="space-y-0.5 text-[10px]">
                     <div 
@@ -1091,6 +1246,12 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                     >
                       Bank Remittance Details:
                     </div>
+                    {(isCentered || isPlainTextPayment) && (
+                      <div className={`space-y-0.5 pb-1 mb-1 border-b ${isAllBlack ? 'border-black/20' : 'border-slate-200'}`}>
+                        <div style={{ color: bodyTextColor }}>Invoice No.: <strong className="font-mono" style={{ color: headingTextColor }}>{invoice.invoiceNumber}</strong></div>
+                        <div style={{ color: bodyTextColor }}>Invoice Date: <strong style={{ color: bodyTextColor }}>{formatDate(invoice.invoiceDate)}</strong></div>
+                      </div>
+                    )}
                     <div style={{ color: bodyTextColor }}>Bank Name: <strong style={{ color: headingTextColor }}>{business.bankName}</strong></div>
                     <div style={{ color: bodyTextColor }}>A/c No: <strong className="font-mono" style={{ color: headingTextColor }}>{business.accountNumber}</strong></div>
                     <div style={{ color: bodyTextColor }}>IFSC Code: <strong className="font-mono" style={{ color: headingTextColor }}>{business.ifscCode}</strong></div>
@@ -1120,8 +1281,10 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
           </div>
 
           {/* Right Column: Financial Summary Table */}
-          <div className="col-span-5 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-            <div className="p-2.5 space-y-1.5 text-[11px] divide-y divide-slate-100">
+          <div className={`col-span-5 border rounded-lg overflow-hidden bg-white shadow-2xs ${
+            isAllBlack ? 'border-black' : 'border-slate-200'
+          }`}>
+            <div className={`p-2.5 space-y-1.5 text-[11px] divide-y ${isAllBlack ? 'divide-black/15' : 'divide-slate-100'}`}>
               <div className="flex justify-between pt-0.5" style={{ color: mutedTextColor }}>
                 <span>Total Taxable Amount:</span>
                 <span className="font-mono font-semibold" style={{ color: bodyTextColor }}>{formatCurrency(invoice.subTotalTaxable, business.currencySymbol)}</span>
@@ -1130,7 +1293,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               {invoice.isInterState ? (
                 <div className="flex justify-between pt-1" style={{ color: mutedTextColor }}>
                   <span>Integrated GST (IGST):</span>
-                  <span className="font-mono font-semibold text-indigo-700">{formatCurrency(invoice.totalIgst, business.currencySymbol)}</span>
+                  <span className={`font-mono font-semibold ${isAllBlack ? 'text-black' : 'text-indigo-700'}`}>{formatCurrency(invoice.totalIgst, business.currencySymbol)}</span>
                 </div>
               ) : (
                 <>
@@ -1146,7 +1309,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               )}
 
               {invoice.totalDiscount > 0 && (
-                <div className="flex justify-between text-emerald-600 pt-1">
+                <div className={`flex justify-between pt-1 ${isAllBlack ? 'text-black font-semibold' : 'text-emerald-600'}`}>
                   <span>Total Discount:</span>
                   <span className="font-mono font-semibold">-{formatCurrency(invoice.totalDiscount, business.currencySymbol)}</span>
                 </div>
@@ -1160,27 +1323,53 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               )}
 
               <div 
-                className="flex justify-between items-center pt-2 font-black text-sm px-2 py-1.5 rounded"
-                style={{ backgroundColor: themeHex, color: tableHeaderTextColor }}
+                className={`flex justify-between items-center py-2 px-2 font-black text-sm rounded ${
+                  isCleanTableHeaders 
+                    ? 'bg-transparent text-black border-y-2 border-black rounded-none' 
+                    : 'pt-2 px-2 py-1.5'
+                }`}
+                style={!isCleanTableHeaders ? { backgroundColor: themeHex, color: tableHeaderTextColor } : { color: '#000000' }}
               >
                 <span>Grand Total (₹):</span>
                 <span className="font-mono">{formatCurrency(invoice.grandTotal, business.currencySymbol)}</span>
               </div>
 
               {/* Payment Summary */}
-              <div className="pt-1.5 space-y-1 text-[10px]">
-                <div className="flex justify-between items-center" style={{ color: bodyTextColor }}>
+              <div className="pt-1.5 space-y-1 text-[10px]" style={{ color: bodyTextColor }}>
+                {(isCentered || isPlainTextPayment) && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold">Invoice No.:</span>
+                      <span className="font-mono font-bold" style={{ color: headingTextColor }}>{invoice.invoiceNumber}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold">Invoice Date:</span>
+                      <span className="font-bold">{formatDate(invoice.invoiceDate)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between items-center">
                   <span className="font-medium">Mode of Payment:</span>
-                  <span className="font-bold flex items-center gap-1">
-                    <span>{paymentInfo.icon}</span>
-                    <span>{paymentInfo.short}</span>
-                  </span>
+                  {isPlainTextPayment ? (
+                    <span className="font-bold uppercase text-black">{plainPaymentModeText}</span>
+                  ) : (
+                    <span className="font-bold flex items-center gap-1">
+                      <span>{paymentInfo.icon}</span>
+                      <span>{paymentInfo.short}</span>
+                    </span>
+                  )}
                 </div>
-                <div className="flex justify-between text-emerald-700 font-medium">
+                {isPlainTextPayment && (
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Payment Status:</span>
+                    <span className="font-bold uppercase text-black">{plainPaymentStatusText}</span>
+                  </div>
+                )}
+                <div className={`flex justify-between font-medium ${isAllBlack ? 'text-black' : 'text-emerald-700'}`}>
                   <span>Amount Paid:</span>
                   <span className="font-mono font-bold">{formatCurrency(invoice.amountPaid || 0, business.currencySymbol)}</span>
                 </div>
-                <div className="flex justify-between text-rose-600 font-bold">
+                <div className={`flex justify-between font-bold ${isAllBlack ? 'text-black' : 'text-rose-600'}`}>
                   <span>Balance Due:</span>
                   <span className="font-mono">{formatCurrency(invoice.amountDue || 0, business.currencySymbol)}</span>
                 </div>
@@ -1191,16 +1380,25 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
 
         {/* HSN/SAC TAX SUMMARY SUB-TABLE (If enabled in template) */}
         {template.showHsnSummaryTable && hsnSummaryList.length > 0 && (
-          <div className="border border-slate-200 rounded-lg overflow-hidden text-[10px]">
+          <div className={`rounded-lg overflow-hidden text-[10px] ${
+            isCleanTableHeaders ? 'border-0' : 'border border-slate-200'
+          }`}>
             <div 
-              className="px-2.5 py-1 font-extrabold uppercase text-[9px] tracking-wider bg-slate-100 border-b border-slate-200"
-              style={{ color: accentTextColor }}
+              className={`px-2.5 py-1 font-extrabold uppercase text-[9px] tracking-wider ${
+                isCleanTableHeaders 
+                  ? 'bg-transparent border-b-2 border-black text-black' 
+                  : 'bg-slate-100 border-b border-slate-200'
+              }`}
+              style={!isCleanTableHeaders ? { color: accentTextColor } : undefined}
             >
               GST Tax Slab Summary (HSN/SAC Breakdown)
             </div>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200" style={{ color: mutedTextColor }}>
+                <tr 
+                  className={isCleanTableHeaders ? 'bg-transparent border-b border-black text-black font-bold' : 'bg-slate-50 border-b border-slate-200'} 
+                  style={!isCleanTableHeaders ? { color: mutedTextColor } : undefined}
+                >
                   <th className="py-1 px-2 font-semibold">HSN / SAC</th>
                   <th className="py-1 px-2 text-right font-semibold">Taxable Val (₹)</th>
                   <th className="py-1 px-2 text-center font-semibold">Rate</th>
@@ -1215,18 +1413,18 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                   <th className="py-1 px-2 text-right font-semibold">Total Tax (₹)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-mono text-[9.5px]">
+              <tbody className={`divide-y font-mono text-[9.5px] ${isAllBlack ? 'divide-black/15' : 'divide-slate-100'}`}>
                 {hsnSummaryList.map((hsn, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50">
+                  <tr key={idx} className={isCleanTableHeaders ? 'hover:bg-slate-50/20' : 'hover:bg-slate-50/50'}>
                     <td className="py-1 px-2 font-semibold" style={{ color: bodyTextColor }}>{hsn.hsnCode}</td>
                     <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.taxableAmount.toFixed(2)}</td>
                     <td className="py-1 px-2 text-center" style={{ color: bodyTextColor }}>{hsn.gstRate}%</td>
                     {invoice.isInterState ? (
-                      <td className="py-1 px-2 text-right">{hsn.igstAmount.toFixed(2)}</td>
+                      <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.igstAmount.toFixed(2)}</td>
                     ) : (
                       <>
-                        <td className="py-1 px-2 text-right">{hsn.cgstAmount.toFixed(2)}</td>
-                        <td className="py-1 px-2 text-right">{hsn.sgstAmount.toFixed(2)}</td>
+                        <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.cgstAmount.toFixed(2)}</td>
+                        <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.sgstAmount.toFixed(2)}</td>
                       </>
                     )}
                     <td className="py-1 px-2 text-right font-bold" style={{ color: headingTextColor }}>{hsn.totalTax.toFixed(2)}</td>
@@ -1239,7 +1437,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
       </div>
 
       {/* FOOTER & AUTHORIZED SIGNATORY */}
-      <div className="relative z-10 pt-3 border-t border-slate-200 mt-2">
+      <div className={`relative z-10 pt-3 border-t mt-2 ${isAllBlack ? 'border-black' : 'border-slate-200'}`}>
         <div className="flex items-end justify-between gap-4">
           <div className="max-w-xs space-y-1 text-[9.5px]" style={{ color: mutedTextColor }}>
             <p className="font-semibold" style={{ color: headingTextColor }}>Declaration & Undertaking:</p>
@@ -1262,7 +1460,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                     className="max-h-12 max-w-[170px] object-contain"
                   />
                 ) : (
-                  <div className="h-10 border-b border-dashed border-slate-400 w-36"></div>
+                  <div className={`h-10 border-b border-dashed w-36 ${isAllBlack ? 'border-black' : 'border-slate-400'}`}></div>
                 )}
               </div>
               <span className="font-bold text-[10px]" style={{ color: headingTextColor }}>

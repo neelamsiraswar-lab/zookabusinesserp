@@ -770,6 +770,20 @@ export const SettingsView: React.FC = () => {
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  Business Tagline / Slogan (Printed on Invoices & Headers)
+                </label>
+                <input
+                  type="text"
+                  name="tagline"
+                  placeholder="e.g. Authorized Wholesaler & Service Provider • Since 2012"
+                  value={formData.tagline || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
             </div>
 
             {/* Company Brand Logo & Shape Selector */}

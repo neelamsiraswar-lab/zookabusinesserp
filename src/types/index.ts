@@ -539,6 +539,8 @@ export interface InvoiceLineSettings {
 }
 
 export type StandardTemplateId = 
+  | 'CENTERED_CLEAN_BLACK'
+  | 'TRADE_CLASSIC_TM'
   | 'OFFICIAL_GST' 
   | 'MODERN_CLEAN' 
   | 'CLASSIC_TALLY'
@@ -585,6 +587,9 @@ export interface InvoiceTemplateConfig {
   showWarranty: boolean;
   showDescription: boolean;
   showBatchNumber: boolean;
+  plainTextPayment?: boolean;
+  cleanTableHeaders?: boolean;
+  allBlackTypography?: boolean;
   watermarkText?: string;
   headerTagline?: string;
   footerDeclaration?: string;
@@ -744,6 +749,7 @@ export interface BusinessProfile {
   state: string;
   stateCode: string;
   pincode: string;
+  tagline?: string;
   website?: string;
   logoUrl?: string;
   showLogoOnInvoice?: boolean;
