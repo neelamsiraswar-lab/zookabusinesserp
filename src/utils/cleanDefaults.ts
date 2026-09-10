@@ -1,4 +1,4 @@
-import { Company, BusinessProfile, AppUser, AccountHead } from '../types';
+import { Company, BusinessProfile, AppUser, AccountHead, PosSettings } from '../types';
 import { DEFAULT_SIGNATURE_DATA_URL, normalizeSignatureUrl } from './formatters';
 import { DEFAULT_BOTTOM_NAV_CONFIG } from './bottomNavDefaults';
 import { DEFAULT_HEADER_CONFIG, normalizeHeaderConfig } from './headerDefaults';
@@ -41,6 +41,13 @@ export const cleanDefaultCompany: Company = {
   biometricSettings: DEFAULT_BIOMETRIC_CONFIG,
   dispatchSettings: DEFAULT_DISPATCH_SETTINGS,
   createdAt: '2026-01-01T00:00:00Z',
+};
+
+export const DEFAULT_POS_SETTINGS: PosSettings = {
+  autoPrintReceipt: true, // Enable or disable automatic printing of receipts upon successful completion of a sale
+  receiptPaperSize: '80mm',
+  soundEffects: true,
+  fastCheckoutMode: false
 };
 
 export const cleanDefaultBusinessProfile: BusinessProfile = {
@@ -109,7 +116,8 @@ export const cleanDefaultBusinessProfile: BusinessProfile = {
       warranty: true,
       batchNumber: true,
     }
-  }
+  },
+  posSettings: DEFAULT_POS_SETTINGS
 };
 
 export const cleanDefaultAdminUser: AppUser = {
@@ -205,7 +213,14 @@ export const normalizeBusinessProfile = (profile?: Partial<BusinessProfile> | nu
     lowStockSettings: normalizeLowStockSettings(profile.lowStockSettings || base.lowStockSettings),
     sessionTimeoutSettings: normalizeSessionTimeoutConfig(profile.sessionTimeoutSettings || base.sessionTimeoutSettings),
     biometricSettings: normalizeBiometricConfig(profile.biometricSettings || base.biometricSettings),
-    dispatchSettings: normalizeDispatchSettings(profile.dispatchSettings || base.dispatchSettings)
+    dispatchSettings: normalizeDispatchSettings(profile.dispatchSettings || base.dispatchSettings),
+    posSettings: {
+      ...DEFAULT_POS_SETTINGS,
+      ...(profile.posSettings || base.posSettings || {}),
+      autoPrintReceipt: typeof (profile.posSettings?.autoPrintReceipt ?? base.posSettings?.autoPrintReceipt) === 'boolean'
+        ? (profile.posSettings?.autoPrintReceipt ?? base.posSettings?.autoPrintReceipt ?? true)
+        : true
+    }
   };
 };
 

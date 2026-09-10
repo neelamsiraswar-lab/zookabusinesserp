@@ -41,7 +41,8 @@ import {
   ExternalLink,
   Fingerprint,
   Send,
-  Hash
+  Hash,
+  Printer
 } from 'lucide-react';
 import { QrCodeSvg } from '../common/QrCodeSvg';
 import { AutoUpdateInvoiceNumbersModal } from '../invoices/AutoUpdateInvoiceNumbersModal';
@@ -62,6 +63,7 @@ import { PwaSettingsTab } from './PwaSettingsTab';
 import { BiometricSettingsTab } from './BiometricSettingsTab';
 import { DispatchSettingsTab } from './DispatchSettingsTab';
 import { SnapshotRestoreSettingsTab } from './SnapshotRestoreSettingsTab';
+import { PosSettingsTab } from './PosSettingsTab';
 import { CloudSyncStatusBadge } from '../common/CloudSyncStatusBadge';
 import { getThemePalette } from '../../utils/themeColors';
 
@@ -79,7 +81,7 @@ export const SettingsView: React.FC = () => {
 
   const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'header' | 'footer' | 'bottom_nav' | 'signature' | 'banking' | 'invoicing' | 'templates' | 'dispatch' | 'item_lines' | 'low_stock' | 'security' | 'biometrics' | 'pwa' | 'backup'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'header' | 'footer' | 'bottom_nav' | 'signature' | 'banking' | 'invoicing' | 'pos' | 'templates' | 'dispatch' | 'item_lines' | 'low_stock' | 'security' | 'biometrics' | 'pwa' | 'backup'>('profile');
   const [formData, setFormData] = useState({ ...business });
   const [isFixingSequence, setIsFixingSequence] = useState(false);
   const [isAutoUpdateModalOpen, setIsAutoUpdateModalOpen] = useState(false);
@@ -519,6 +521,17 @@ export const SettingsView: React.FC = () => {
           }`}
         >
           Invoice Numbering & Terms
+        </button>
+        <button
+          onClick={() => setActiveTab('pos')}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === 'pos'
+              ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/40 rounded-t-lg'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Printer className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <span>POS & Receipt Settings</span>
         </button>
         <button
           onClick={() => setActiveTab('templates')}
@@ -1587,6 +1600,11 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB: POS & Receipt Settings */}
+        {activeTab === 'pos' && (
+          <PosSettingsTab />
         )}
 
         {/* TAB: Invoice Templates (10+ GST Designs & Custom Designer) */}

@@ -162,7 +162,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
   const stockSettings = normalizeLowStockSettings(business.lowStockSettings);
   const health = computeInventoryHealth(products, stockSettings);
   const lowStockProducts = products.filter(p => isProductLowStock(p, stockSettings));
-  const recentInvoices = invoices.slice(0, 6);
+  
+  // Recent invoices sorted latest first (by invoiceDate descending, then createdAt descending, then invoiceNumber descending)
+  const recentInvoices = useMemo(() => {
+    return [...invoices]
+      .sort((a, b) => {
+        const timeA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0;
+        const timeB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0;
+        const validTimeA = Number.isNaN(timeA) ? 0 : timeA;
+        const validTimeB = Number.isNaN(timeB) ? 0 : timeB;
+
+        if (validTimeB !== validTimeA) {
+          return validTimeB - validTimeA;
+        }
+
+        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        const validCreatedA = Number.isNaN(createdA) ? 0 : createdA;
+        const validCreatedB = Number.isNaN(createdB) ? 0 : createdB;
+
+        if (validCreatedB !== validCreatedA) {
+          return validCreatedB - validCreatedA;
+        }
+
+        return (b.invoiceNumber || '').localeCompare(a.invoiceNumber || '', undefined, { numeric: true, sensitivity: 'base' });
+      })
+      .slice(0, 6);
+  }, [invoices]);
 
   return (
     <div className="space-y-6">
@@ -683,8 +709,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {recentInvoices.map(inv => {
-                const isPaid = inv.status === 'PAID';
+              {recentInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                    No sales invoices recorded yet.
+                  </td>
+                </tr>
+              ) : (
+                recentInvoices.map(inv => {
+                  const isPaid = inv.status === 'PAID';
                 return (
                   <tr key={inv.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors">
                     <td className="py-3 px-3 font-medium text-slate-900 dark:text-white">
@@ -769,7 +802,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Product, PaymentMethod, InvoiceItem, Party, InvoiceStatus, GstTaxRate } from '../../types';
+import { Product, PaymentMethod, InvoiceItem, Party, InvoiceStatus, GstTaxRate, Invoice, PosSettings } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { calculateItemGst, recalculateInvoiceTotals } from '../../utils/gstCalculations';
+import { DEFAULT_POS_SETTINGS } from '../../utils/cleanDefaults';
 import confetti from 'canvas-confetti';
 import { 
   Search, 
@@ -44,7 +45,12 @@ import {
   AlignLeft,
   ArrowLeft,
   ArrowRight,
-  Package
+  Package,
+  Sliders,
+  Zap,
+  Volume2,
+  VolumeX,
+  CheckCircle
 } from 'lucide-react';
 import { 
   normalizeLowStockSettings, 
@@ -65,12 +71,40 @@ export const PosBillingView: React.FC = () => {
     products, 
     parties, 
     business, 
+    updateBusiness,
     createInvoice, 
     createParty, 
     getNextSequentialInvoiceNumber,
     setSelectedInvoiceIdForPrint, 
     showToast 
   } = useApp();
+
+  const posSettings: PosSettings = {
+    ...DEFAULT_POS_SETTINGS,
+    ...(business.posSettings || {})
+  };
+
+  const [showPosSettingsModal, setShowPosSettingsModal] = useState(false);
+  const [lastCompletedInvoice, setLastCompletedInvoice] = useState<Invoice | null>(null);
+  const [showFastSaleCompletedModal, setShowFastSaleCompletedModal] = useState(false);
+
+  const handleToggleAutoPrint = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nextVal = !posSettings.autoPrintReceipt;
+    const updated: PosSettings = {
+      ...posSettings,
+      autoPrintReceipt: nextVal
+    };
+    updateBusiness({
+      ...business,
+      posSettings: updated
+    });
+    if (nextVal) {
+      showToast('success', 'Auto-Print Enabled', 'Receipt preview will automatically open when a POS sale is completed.');
+    } else {
+      showToast('info', 'Auto-Print Disabled (Fast Checkout)', 'Sale will complete instantly without opening receipt printer, speeding up counter workflow.');
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -488,7 +522,19 @@ export const PosBillingView: React.FC = () => {
     setPartialAmount(0);
     setShowSettlementModal(false);
     setMobileTab('products');
-    setSelectedInvoiceIdForPrint(invoice.id);
+
+    // Check automatic receipt print preference
+    if (posSettings.autoPrintReceipt) {
+      setSelectedInvoiceIdForPrint(invoice.id);
+    } else {
+      setLastCompletedInvoice(invoice);
+      setShowFastSaleCompletedModal(true);
+      showToast(
+        'success', 
+        'Sale Completed (Fast Checkout)', 
+        `Invoice #${invoice.invoiceNumber} recorded. Terminal is ready for the next customer.`
+      );
+    }
   };
 
   const currentNextInfo = getNextSequentialInvoiceNumber();
@@ -508,8 +554,47 @@ export const PosBillingView: React.FC = () => {
           <p className="text-xs text-slate-500 dark:text-slate-400">Fast barcode lookup, tap-to-add POS cart and thermal receipt printer</p>
         </div>
 
-        {/* Unified Continuous Series Indicator */}
-        <div className="flex items-center gap-2">
+        {/* Unified Continuous Series Indicator & Quick POS Settings */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick-Access Auto-Print Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleAutoPrint}
+            id="pos-quick-autoprint-header-btn"
+            title={
+              posSettings.autoPrintReceipt
+                ? 'Automatic receipt printing is ON. Click to disable for faster checkout without opening receipt.'
+                : 'Automatic receipt printing is OFF (Fast Checkout). Click to enable automatic receipt printing.'
+            }
+            className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 shadow-2xs text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 ${
+              posSettings.autoPrintReceipt
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/60'
+                : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-750'
+            }`}
+          >
+            <Printer className={`w-3.5 h-3.5 ${posSettings.autoPrintReceipt ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+            <span className="text-[11px] font-medium hidden sm:inline">Auto-Print:</span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+              posSettings.autoPrintReceipt
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-400 text-white dark:bg-slate-600'
+            }`}>
+              {posSettings.autoPrintReceipt ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          {/* POS Settings Dialog Button */}
+          <button
+            type="button"
+            onClick={() => setShowPosSettingsModal(true)}
+            id="pos-terminal-settings-header-btn"
+            title="Configure POS Terminal & Receipt Settings"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+          >
+            <Sliders className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+            <span className="hidden md:inline text-[11px]">POS Settings</span>
+          </button>
+
           <div className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/80 flex items-center gap-2 shadow-2xs">
             <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase">
               Next Invoice No:
@@ -1401,15 +1486,50 @@ export const PosBillingView: React.FC = () => {
                 </div>
               )}
 
+              {/* Quick-Access Auto-Print Toggle in Cart Footer */}
+              <div className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Printer className={`w-3.5 h-3.5 ${posSettings.autoPrintReceipt ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    Auto-print receipt:
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold ${posSettings.autoPrintReceipt ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                    {posSettings.autoPrintReceipt ? 'ON' : 'OFF'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoPrint}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      posSettings.autoPrintReceipt ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                    role="switch"
+                    aria-checked={posSettings.autoPrintReceipt}
+                    title="Toggle automatic receipt printing"
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        posSettings.autoPrintReceipt ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
               {/* Checkout CTA */}
               <button
                 onClick={handleCompleteSale}
                 disabled={cart.length === 0}
                 className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Printer className="w-4 h-4" />
+                {posSettings.autoPrintReceipt ? (
+                  <Printer className="w-4 h-4" />
+                ) : (
+                  <Zap className="w-4 h-4 text-amber-300" />
+                )}
                 <span>
-                  Complete Sale & Print Receipt (
+                  {posSettings.autoPrintReceipt ? 'Complete Sale & Print Receipt' : 'Complete Fast Sale'} (
                   {formatCurrency(
                     settlementType === 'FULL' ? totals.grandTotal : (settlementType === 'CREDIT' ? 0 : partialAmount),
                     business.currencySymbol
@@ -1604,6 +1724,37 @@ export const PosBillingView: React.FC = () => {
                 </select>
               </div>
 
+              {/* Quick-Access Auto-Print Toggle inside Settlement Modal */}
+              <div className="flex items-center justify-between p-2.5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2">
+                  <Printer className={`w-3.5 h-3.5 ${posSettings.autoPrintReceipt ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Auto-print receipt upon completion
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold ${posSettings.autoPrintReceipt ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                    {posSettings.autoPrintReceipt ? 'ON' : 'OFF'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoPrint}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      posSettings.autoPrintReceipt ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
+                    }`}
+                    role="switch"
+                    aria-checked={posSettings.autoPrintReceipt}
+                    title="Toggle automatic receipt printing"
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        posSettings.autoPrintReceipt ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
               <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
                 <button
                   type="button"
@@ -1620,8 +1771,17 @@ export const PosBillingView: React.FC = () => {
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-white shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Confirm & Print</span>
+                  {posSettings.autoPrintReceipt ? (
+                    <>
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Confirm & Print</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Confirm Fast Sale</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -2187,6 +2347,251 @@ export const PosBillingView: React.FC = () => {
                   <span>Add to Sale Cart</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK-ACCESS POS TERMINAL SETTINGS MODAL */}
+      {showPosSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+                  <Printer className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-white">POS Terminal Settings</h3>
+                  <p className="text-[11px] text-slate-300">Configure receipt printing and checkout workflow</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPosSettingsModal(false)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* FEATURE FOCUS: Automatic Receipt Printing Toggle */}
+              <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border-2 border-emerald-200 dark:border-emerald-800 flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                      <Printer className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-emerald-950 dark:text-emerald-100">
+                          Auto-Print Receipts on Sale Completion
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          posSettings.autoPrintReceipt 
+                            ? 'bg-emerald-600 text-white' 
+                            : 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}>
+                          {posSettings.autoPrintReceipt ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                        When enabled, completing a sale automatically triggers the receipt print dialog. When disabled, sales finalize immediately without printer dialogs for maximum queue throughput.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoPrint}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      posSettings.autoPrintReceipt ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                    role="switch"
+                    aria-checked={posSettings.autoPrintReceipt}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        posSettings.autoPrintReceipt ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-emerald-200/80 dark:border-emerald-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>Current Mode:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {posSettings.autoPrintReceipt ? 'Standard Receipt Printing' : 'Express Rapid Checkout'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Receipt Paper Size Selector */}
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 space-y-2">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Thermal Receipt Format:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: '80mm', label: '80mm Thermal', desc: 'Standard POS' },
+                    { id: '58mm', label: '58mm Mini', desc: 'Compact' },
+                    { id: 'A4', label: 'A4 Standard', desc: 'Full Page' },
+                  ].map((size) => (
+                    <button
+                      key={size.id}
+                      type="button"
+                      onClick={() => {
+                        updateBusiness({
+                          ...business,
+                          posSettings: {
+                            ...posSettings,
+                            receiptPaperSize: size.id as '80mm' | '58mm' | 'A4'
+                          }
+                        });
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        posSettings.receiptPaperSize === size.id
+                          ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-950 dark:text-indigo-200 ring-1 ring-indigo-600'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{size.label}</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">{size.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fast Checkout & Sound Toggles */}
+              <div className="space-y-2.5">
+                <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Express Checkout Bar</div>
+                      <div className="text-[10px] text-slate-500">Show single-click settlement buttons on the billing screen</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateBusiness({
+                        ...business,
+                        posSettings: {
+                          ...posSettings,
+                          fastCheckoutMode: !posSettings.fastCheckoutMode
+                        }
+                      });
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      posSettings.fastCheckoutMode ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        posSettings.fastCheckoutMode ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    {posSettings.soundEffects ? (
+                      <Volume2 className="w-4 h-4 text-indigo-500" />
+                    ) : (
+                      <VolumeX className="w-4 h-4 text-slate-400" />
+                    )}
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Terminal Sound Effects</div>
+                      <div className="text-[10px] text-slate-500">Play confirmation tone when items or barcode scans are detected</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateBusiness({
+                        ...business,
+                        posSettings: {
+                          ...posSettings,
+                          soundEffects: !posSettings.soundEffects
+                        }
+                      });
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      posSettings.soundEffects ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        posSettings.soundEffects ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPosSettingsModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FAST SALE COMPLETED NOTIFICATION MODAL (When Auto-Print is Disabled) */}
+      {showFastSaleCompletedModal && lastCompletedInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs animate-in fade-in modal-overlay">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden p-5 text-center space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
+              <CheckCircle className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                Sale Finalized!
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Invoice <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">#{lastCompletedInvoice.invoiceNumber}</span> recorded.
+              </p>
+              <div className="text-lg font-mono font-black text-emerald-600 dark:text-emerald-400 pt-1">
+                {formatCurrency(lastCompletedInvoice.amountPaid, business.currencySymbol)}
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400">
+              ⚡ Auto-print is disabled for fast queue flow. Click below if this customer requested a printed receipt.
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFastSaleCompletedModal(false);
+                  setSelectedInvoiceIdForPrint(lastCompletedInvoice.id);
+                }}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print Receipt Now</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowFastSaleCompletedModal(false)}
+                className="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl cursor-pointer transition-all"
+              >
+                Next Customer (Ready)
+              </button>
             </div>
           </div>
         </div>

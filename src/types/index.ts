@@ -738,6 +738,13 @@ export interface BottomNavConfig {
   color?: string; // 'auto' | 'indigo' | 'emerald' | 'blue' | 'amber' | 'purple' | 'rose' | 'cyan' | 'slate'
 }
 
+export interface PosSettings {
+  autoPrintReceipt: boolean; // Enable or disable automatic printing of receipts upon successful completion of a sale
+  receiptPaperSize?: '80mm' | '58mm' | 'A4';
+  soundEffects?: boolean;
+  fastCheckoutMode?: boolean;
+}
+
 export interface BusinessProfile {
   name: string;
   tradeName: string;
@@ -790,6 +797,7 @@ export interface BusinessProfile {
   sessionTimeoutSettings?: SessionTimeoutConfig;
   biometricSettings?: BiometricSecurityConfig;
   dispatchSettings?: any;
+  posSettings?: PosSettings;
   themeColor?: string;
 }
 

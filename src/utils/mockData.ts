@@ -61,6 +61,12 @@ export const initialBusinessProfile: BusinessProfile = {
       warranty: true,
       batchNumber: true,
     }
+  },
+  posSettings: {
+    autoPrintReceipt: true,
+    receiptPaperSize: '80mm',
+    soundEffects: true,
+    fastCheckoutMode: false
   }
 };
 
