@@ -68,6 +68,7 @@ export interface EWayBillDetails {
 
 export interface Invoice {
   id: string;
+  companyId?: string;
   invoiceNumber: string;
   invoiceType: InvoiceType;
   invoiceDate: string;

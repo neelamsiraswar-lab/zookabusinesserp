@@ -44,8 +44,16 @@ export function sanitizeForFirestore<T>(obj: T): T {
   if (obj === null || obj === undefined) {
     return obj;
   }
+  if (typeof obj === 'number') {
+    if (Number.isNaN(obj) || !Number.isFinite(obj)) {
+      return 0 as unknown as T;
+    }
+    return obj;
+  }
   if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeForFirestore(item)) as unknown as T;
+    return obj
+      .filter(item => item !== undefined)
+      .map(item => sanitizeForFirestore(item)) as unknown as T;
   }
   if (typeof obj === 'object' && !(obj instanceof Date)) {
     const cleanObj: Record<string, any> = {};
@@ -309,14 +317,16 @@ class CloudDbService {
     );
   }
 
-  async saveCompany(company: Company): Promise<void> {
+  async saveCompany(company: Company): Promise<{ success: boolean; error?: any }> {
     try {
       const docRef = doc(db, 'companies', company.id);
-      const cleanData = sanitizeForFirestore({ ...company, updatedAt: new Date().toISOString() });
+      const cleanData = sanitizeForFirestore({ ...company, updatedAt: company.updatedAt || new Date().toISOString() });
       await setDoc(docRef, cleanData, { merge: true });
+      return { success: true };
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `companies/${company.id}`);
       console.warn('CloudDb: Note saving company to Firestore:', e);
+      return { success: false, error: e };
     }
   }
 
@@ -371,14 +381,16 @@ class CloudDbService {
     return null;
   }
 
-  async saveBusinessProfile(companyId: string, profile: BusinessProfile): Promise<void> {
+  async saveBusinessProfile(companyId: string, profile: BusinessProfile): Promise<{ success: boolean; error?: any }> {
     try {
       const docRef = doc(db, 'businessProfiles', companyId);
-      const cleanData = sanitizeForFirestore({ ...profile, updatedAt: new Date().toISOString() });
+      const cleanData = sanitizeForFirestore({ ...profile, companyId, updatedAt: new Date().toISOString() });
       await setDoc(docRef, cleanData, { merge: true });
+      return { success: true };
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `businessProfiles/${companyId}`);
       console.warn('CloudDb: Note saving business profile:', e);
+      return { success: false, error: e };
     }
   }
 
@@ -601,26 +613,30 @@ class CloudDbService {
   // -------------------------------------------------------------
   // Real-time Cloud Syncer for an active Entity
   // -------------------------------------------------------------
-  async syncEntityDoc<T extends { id: string }>(collectionName: string, companyId: string, item: T): Promise<void> {
+  async syncEntityDoc<T extends { id: string; updatedAt?: string }>(collectionName: string, companyId: string, item: T): Promise<{ success: boolean; error?: any }> {
     try {
-      if (!item || !item.id || !companyId) return;
+      if (!item || !item.id || !companyId) return { success: false, error: 'Missing item id or company id' };
       const docRef = doc(db, collectionName, `${companyId}_${item.id}`);
-      const cleanData = sanitizeForFirestore({ ...item, companyId, updatedAt: new Date().toISOString() });
+      const cleanData = sanitizeForFirestore({ ...item, companyId, updatedAt: item.updatedAt || new Date().toISOString() });
       await setDoc(docRef, cleanData, { merge: true });
-    } catch (e) {
+      return { success: true };
+    } catch (e: any) {
       handleFirestoreError(e, OperationType.WRITE, `${collectionName}/${companyId}_${item.id}`);
-      console.warn(`CloudDb: Note syncing ${collectionName}/${item.id}:`, e);
+      console.warn(`CloudDb: Error syncing ${collectionName}/${item.id}:`, e);
+      return { success: false, error: e };
     }
   }
 
-  async deleteEntityDoc(collectionName: string, companyId: string, itemId: string): Promise<void> {
+  async deleteEntityDoc(collectionName: string, companyId: string, itemId: string): Promise<{ success: boolean; error?: any }> {
     try {
-      if (!itemId || !companyId) return;
+      if (!itemId || !companyId) return { success: false, error: 'Missing item id or company id' };
       const docRef = doc(db, collectionName, `${companyId}_${itemId}`);
       await deleteDoc(docRef);
-    } catch (e) {
+      return { success: true };
+    } catch (e: any) {
       handleFirestoreError(e, OperationType.DELETE, `${collectionName}/${companyId}_${itemId}`);
-      console.warn(`CloudDb: Note deleting ${collectionName}/${itemId}:`, e);
+      console.warn(`CloudDb: Error deleting ${collectionName}/${itemId}:`, e);
+      return { success: false, error: e };
     }
   }
 
@@ -644,23 +660,27 @@ class CloudDbService {
     }
   }
 
-  async syncEntireCollection<T extends { id: string }>(collectionName: string, companyId: string, items: T[]): Promise<void> {
+  async syncEntireCollection<T extends { id: string; updatedAt?: string }>(collectionName: string, companyId: string, items: T[]): Promise<{ success: boolean; count: number; error?: any }> {
     try {
-      if (!items || items.length === 0 || !companyId) return;
+      if (!items || items.length === 0 || !companyId) return { success: true, count: 0 };
       const BATCH_LIMIT = 450;
+      let count = 0;
       for (let i = 0; i < items.length; i += BATCH_LIMIT) {
         const batch = writeBatch(db);
         const chunk = items.slice(i, i + BATCH_LIMIT);
         for (const item of chunk) {
           const docRef = doc(db, collectionName, `${companyId}_${item.id}`);
-          const cleanData = sanitizeForFirestore({ ...item, companyId, updatedAt: new Date().toISOString() });
+          const cleanData = sanitizeForFirestore({ ...item, companyId, updatedAt: item.updatedAt || new Date().toISOString() });
           batch.set(docRef, cleanData, { merge: true });
+          count++;
         }
         await batch.commit();
       }
-    } catch (e) {
+      return { success: true, count };
+    } catch (e: any) {
       handleFirestoreError(e, OperationType.WRITE, collectionName);
-      console.warn(`CloudDb: Note syncing entire collection ${collectionName}:`, e);
+      console.warn(`CloudDb: Error syncing entire collection ${collectionName}:`, e);
+      return { success: false, count: 0, error: e };
     }
   }
 }

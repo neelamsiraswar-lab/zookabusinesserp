@@ -75,6 +75,28 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   return errInfo;
 }
 
+/**
+ * Detects if a Firestore error was caused by daily free-tier usage quota exhaustion
+ */
+export function isQuotaExceededError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error);
+  return (
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.toLowerCase().includes('quota exceeded') ||
+    msg.toLowerCase().includes('quota limit exceeded') ||
+    msg.toLowerCase().includes('free daily write units') ||
+    msg.toLowerCase().includes('free daily read units')
+  );
+}
+
+/**
+ * Direct link to Firebase console for Firestore database upgrade dialog per Firebase Skill
+ */
+export function getFirestoreUpgradeUrl(): string {
+  return `https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/databases/${firebaseConfig.firestoreDatabaseId}/data?openUpgradeDialog=true`;
+}
+
 // Connection test helper with offline resilience and server ping
 export async function testFirestoreConnection(): Promise<boolean> {
   try {

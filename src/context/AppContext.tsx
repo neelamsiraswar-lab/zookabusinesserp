@@ -71,9 +71,10 @@ import {
   formatInvoiceSequence
 } from '../utils/invoiceNumberUtils';
 import { cloudDb, defaultStandardAccountHeads } from '../services/cloudDb';
+import { isQuotaExceededError, getFirestoreUpgradeUrl } from '../services/firebase';
 import { applyThemeCssVariables } from '../utils/themeColors';
 import { DEFAULT_PLATFORM_CONFIG, normalizePlatformConfig } from '../utils/platformDefaults';
-import { safeStorageSet, safeStorageGet, hasCollectionChanged } from '../utils/storageHelpers';
+import { safeStorageSet, safeStorageGet, hasCollectionChanged, mergeEntities } from '../utils/storageHelpers';
 
 export type ActiveTab = 
   | 'dashboard'
@@ -276,6 +277,9 @@ interface AppContextType {
   cloudSyncStatus: 'online' | 'offline' | 'error';
   isCloudSyncing: boolean;
   lastCloudSyncTime: Date | null;
+  isCloudQuotaExceeded: boolean;
+  cloudSyncErrorMessage: string | null;
+  firestoreUpgradeUrl: string;
   triggerCloudSync: (showToastNotification?: boolean) => Promise<void>;
   refreshData: (showToastNotification?: boolean) => Promise<void>;
 
@@ -444,6 +448,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'online' | 'offline' | 'error'>('online');
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
   const [lastCloudSyncTime, setLastCloudSyncTime] = useState<Date | null>(null);
+  const [isCloudQuotaExceeded, setIsCloudQuotaExceeded] = useState<boolean>(false);
+  const [cloudSyncErrorMessage, setCloudSyncErrorMessage] = useState<string | null>(null);
+  const firestoreUpgradeUrl = useMemo(() => getFirestoreUpgradeUrl(), []);
   const isCloudInitializedRef = useRef<boolean>(false);
   const [isCloudReady, setIsCloudReady] = useState<boolean>(false);
 
@@ -833,16 +840,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const partition = await cloudDb.fetchCompanyDataPartition(targetId);
           if (partition && isMounted) {
             setBusiness(normalizeBusinessProfile(partition.business));
-            setInvoices(partition.invoices);
-            setProducts(partition.products);
-            setParties(partition.parties);
-            setPurchaseBills(partition.purchaseBills);
-            setPayments(partition.payments);
-            setExpenses(partition.expenses);
-            setAccountHeads(partition.accountHeads.length > 0 ? partition.accountHeads : cleanDefaultAccountHeads);
-            setJournalEntries(partition.journalEntries);
+            setInvoices(prev => mergeEntities(prev, partition.invoices));
+            setProducts(prev => mergeEntities(prev, partition.products));
+            setParties(prev => mergeEntities(prev, partition.parties));
+            setPurchaseBills(prev => mergeEntities(prev, partition.purchaseBills));
+            setPayments(prev => mergeEntities(prev, partition.payments));
+            setExpenses(prev => mergeEntities(prev, partition.expenses));
+            setAccountHeads(prev => partition.accountHeads.length > 0 ? mergeEntities(prev, partition.accountHeads) : (prev.length > 0 ? prev : cleanDefaultAccountHeads));
+            setJournalEntries(prev => mergeEntities(prev, partition.journalEntries));
             if (partition.users && partition.users.length > 0) {
-              setUsers(partition.users);
+              setUsers(prev => mergeEntities(prev, partition.users));
               // Only adjust currentUserId if current selection is invalid or not found in new partition
               if (!isUrlAdminRoute() && currentUserId !== DEFAULT_SUPER_ADMIN.id) {
                 setCurrentUserId(prevId => {
@@ -853,7 +860,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 });
               }
             }
-            setAuditLogs(partition.auditLogs);
+            setAuditLogs(prev => mergeEntities(prev, partition.auditLogs));
           }
         } else if (isMounted) {
           // Initialize Clean Baseline to Firestore on first run
@@ -931,48 +938,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onInvoices: (remoteInvoices) => {
         setInvoices(prev => {
-          if (hasCollectionChanged(prev, remoteInvoices)) {
-            return remoteInvoices;
+          if (!remoteInvoices || remoteInvoices.length === 0) return prev;
+          const merged = mergeEntities(prev, remoteInvoices);
+          if (hasCollectionChanged(prev, merged)) {
+            return merged;
           }
           return prev;
         });
       },
       onProducts: (remoteProducts) => {
         setProducts(prev => {
-          if (hasCollectionChanged(prev, remoteProducts)) {
-            return remoteProducts;
+          if (!remoteProducts || remoteProducts.length === 0) return prev;
+          const merged = mergeEntities(prev, remoteProducts);
+          if (hasCollectionChanged(prev, merged)) {
+            return merged;
           }
           return prev;
         });
       },
       onParties: (remoteParties) => {
         setParties(prev => {
-          if (hasCollectionChanged(prev, remoteParties)) {
-            return remoteParties;
+          if (!remoteParties || remoteParties.length === 0) return prev;
+          const merged = mergeEntities(prev, remoteParties);
+          if (hasCollectionChanged(prev, merged)) {
+            return merged;
           }
           return prev;
         });
       },
       onPurchaseBills: (remoteBills) => {
         setPurchaseBills(prev => {
-          if (hasCollectionChanged(prev, remoteBills)) {
-            return remoteBills;
+          if (!remoteBills || remoteBills.length === 0) return prev;
+          const merged = mergeEntities(prev, remoteBills);
+          if (hasCollectionChanged(prev, merged)) {
+            return merged;
           }
           return prev;
         });
       },
       onPayments: (remotePayments) => {
         setPayments(prev => {
-          if (hasCollectionChanged(prev, remotePayments)) {
-            return remotePayments;
+          if (!remotePayments || remotePayments.length === 0) return prev;
+          const merged = mergeEntities(prev, remotePayments);
+          if (hasCollectionChanged(prev, merged)) {
+            return merged;
           }
           return prev;
         });
       },
       onExpenses: (remoteExpenses) => {
         setExpenses(prev => {
-          if (hasCollectionChanged(prev, remoteExpenses)) {
-            return remoteExpenses;
+          if (!remoteExpenses || remoteExpenses.length === 0) return prev;
+          const merged = mergeEntities(prev, remoteExpenses);
+          if (hasCollectionChanged(prev, merged)) {
+            return merged;
           }
           return prev;
         });
@@ -980,8 +999,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       onAccountHeads: (remoteHeads) => {
         if (remoteHeads && remoteHeads.length > 0) {
           setAccountHeads(prev => {
-            if (hasCollectionChanged(prev, remoteHeads)) {
-              return remoteHeads;
+            const merged = mergeEntities(prev, remoteHeads);
+            if (hasCollectionChanged(prev, merged)) {
+              return merged;
             }
             return prev;
           });
@@ -989,8 +1009,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onJournalEntries: (remoteJournals) => {
         setJournalEntries(prev => {
-          if (hasCollectionChanged(prev, remoteJournals)) {
-            return remoteJournals;
+          if (!remoteJournals || remoteJournals.length === 0) return prev;
+          const merged = mergeEntities(prev, remoteJournals);
+          if (hasCollectionChanged(prev, merged)) {
+            return merged;
           }
           return prev;
         });
@@ -1117,41 +1139,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const triggerCloudSync = async (showToastNotification: boolean = true) => {
     try {
       setIsCloudSyncing(true);
+      let anyError: any = null;
+
       if (platformConfig) {
-        await cloudDb.savePlatformConfig(platformConfig);
+        await cloudDb.savePlatformConfig(platformConfig).catch(e => { anyError = e; });
       }
       if (currentCompany) {
-        await cloudDb.saveCompany(currentCompany);
+        await cloudDb.saveCompany(currentCompany).catch(e => { anyError = e; });
       }
       if (currentCompanyId) {
-        await cloudDb.saveBusinessProfile(currentCompanyId, business);
-        await cloudDb.syncEntireCollection('invoices', currentCompanyId, invoices);
-        await cloudDb.syncEntireCollection('products', currentCompanyId, products);
-        await cloudDb.syncEntireCollection('parties', currentCompanyId, parties);
-        await cloudDb.syncEntireCollection('purchaseBills', currentCompanyId, purchaseBills);
-        await cloudDb.syncEntireCollection('payments', currentCompanyId, payments);
-        await cloudDb.syncEntireCollection('expenses', currentCompanyId, expenses);
-        await cloudDb.syncEntireCollection('accountHeads', currentCompanyId, accountHeads);
-        await cloudDb.syncEntireCollection('journalEntries', currentCompanyId, journalEntries);
-        await cloudDb.syncEntireCollection('users', currentCompanyId, users);
-        await cloudDb.syncEntireCollection('auditLogs', currentCompanyId, auditLogs);
-        await cloudDb.syncEntireCollection('customHsnCodes', currentCompanyId, customHsnCodes);
-        await cloudDb.syncEntireCollection('cheques', currentCompanyId, cheques);
-        await cloudDb.syncEntireCollection('chequeBooks', currentCompanyId, chequeBooks);
-        await cloudDb.syncEntireCollection('chequeTemplates', currentCompanyId, chequeTemplates);
-        await cloudDb.syncEntireCollection('letterheadDocuments', currentCompanyId, letterheadDocuments);
-        await cloudDb.syncEntireCollection('letterheadTemplates', currentCompanyId, letterheadTemplates);
-        await cloudDb.saveSystemState({ activeCompanyId: currentCompanyId });
+        await cloudDb.saveBusinessProfile(currentCompanyId, business).catch(e => { anyError = e; });
+        const invRes = await cloudDb.syncEntireCollection('invoices', currentCompanyId, invoices);
+        if (!invRes.success && invRes.error) anyError = invRes.error;
+
+        await cloudDb.syncEntireCollection('products', currentCompanyId, products).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('parties', currentCompanyId, parties).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('purchaseBills', currentCompanyId, purchaseBills).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('payments', currentCompanyId, payments).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('expenses', currentCompanyId, expenses).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('accountHeads', currentCompanyId, accountHeads).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('journalEntries', currentCompanyId, journalEntries).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('users', currentCompanyId, users).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('auditLogs', currentCompanyId, auditLogs).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('customHsnCodes', currentCompanyId, customHsnCodes).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('cheques', currentCompanyId, cheques).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('chequeBooks', currentCompanyId, chequeBooks).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('chequeTemplates', currentCompanyId, chequeTemplates).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('letterheadDocuments', currentCompanyId, letterheadDocuments).catch(e => { anyError = e; });
+        await cloudDb.syncEntireCollection('letterheadTemplates', currentCompanyId, letterheadTemplates).catch(e => { anyError = e; });
+        await cloudDb.saveSystemState({ activeCompanyId: currentCompanyId }).catch(e => { anyError = e; });
       }
 
-      setCloudSyncStatus('online');
-      setLastCloudSyncTime(new Date());
-      if (showToastNotification) {
-        showToast('success', 'Cloud DB Synchronized', 'All records and configuration synced with Google Cloud Firestore.');
+      if (anyError) {
+        setCloudSyncStatus('error');
+        if (isQuotaExceededError(anyError)) {
+          setIsCloudQuotaExceeded(true);
+          setCloudSyncErrorMessage('Free daily write units quota exceeded on Google Cloud Firestore.');
+          if (showToastNotification) {
+            showToast(
+              'warning',
+              'Cloud Write Quota Exceeded',
+              `All ${invoices.length} invoices are 100% saved locally on this device. Google Cloud Firestore free daily write units limit reached. Quota resets daily, or you can upgrade database.`
+            );
+          }
+        } else {
+          if (showToastNotification) {
+            showToast('error', 'Cloud Push Incomplete', 'Could not complete push sync to Firestore. Local cache preserved.');
+          }
+        }
+      } else {
+        setIsCloudQuotaExceeded(false);
+        setCloudSyncErrorMessage(null);
+        setCloudSyncStatus('online');
+        setLastCloudSyncTime(new Date());
+        if (showToastNotification) {
+          showToast(
+            'success',
+            'Cloud DB Synchronized',
+            `All records (${invoices.length} invoices, ${products.length} products) pushed successfully to Google Cloud Firestore.`
+          );
+        }
       }
     } catch (e: any) {
       console.warn('Error during manual cloud sync:', e);
       setCloudSyncStatus('error');
+      if (isQuotaExceededError(e)) {
+        setIsCloudQuotaExceeded(true);
+        setCloudSyncErrorMessage('Free daily write units quota exceeded on Google Cloud Firestore.');
+      }
       if (showToastNotification) {
         showToast('error', 'Cloud Sync Error', 'Could not complete push sync to Firestore. Local cache preserved.');
       }
@@ -1177,24 +1232,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (partition) {
         setBusiness(normalizeBusinessProfile(partition.business));
-        setInvoices(partition.invoices);
-        setProducts(partition.products);
-        setParties(partition.parties);
-        setPurchaseBills(partition.purchaseBills);
-        setPayments(partition.payments);
-        setExpenses(partition.expenses);
-        setAccountHeads(partition.accountHeads.length > 0 ? partition.accountHeads : cleanDefaultAccountHeads);
-        setJournalEntries(partition.journalEntries);
+        setInvoices(prev => mergeEntities(prev, partition.invoices));
+        setProducts(prev => mergeEntities(prev, partition.products));
+        setParties(prev => mergeEntities(prev, partition.parties));
+        setPurchaseBills(prev => mergeEntities(prev, partition.purchaseBills));
+        setPayments(prev => mergeEntities(prev, partition.payments));
+        setExpenses(prev => mergeEntities(prev, partition.expenses));
+        setAccountHeads(prev => partition.accountHeads.length > 0 ? mergeEntities(prev, partition.accountHeads) : (prev.length > 0 ? prev : cleanDefaultAccountHeads));
+        setJournalEntries(prev => mergeEntities(prev, partition.journalEntries));
         if (partition.users && partition.users.length > 0) {
-          setUsers(partition.users);
+          setUsers(prev => mergeEntities(prev, partition.users));
         }
-        setAuditLogs(partition.auditLogs);
-        if (partition.customHsnCodes) setCustomHsnCodes(partition.customHsnCodes);
-        if (partition.cheques) setCheques(partition.cheques);
-        if (partition.chequeBooks) setChequeBooks(partition.chequeBooks);
-        if (partition.chequeTemplates) setChequeTemplates(partition.chequeTemplates);
+        setAuditLogs(prev => mergeEntities(prev, partition.auditLogs));
+        if (partition.customHsnCodes) setCustomHsnCodes(prev => mergeEntities(prev, partition.customHsnCodes));
+        if (partition.cheques) setCheques(prev => mergeEntities(prev, partition.cheques));
+        if (partition.chequeBooks) setChequeBooks(prev => mergeEntities(prev, partition.chequeBooks));
+        if (partition.chequeTemplates) setChequeTemplates(prev => mergeEntities(prev, partition.chequeTemplates));
       }
 
+      setIsCloudQuotaExceeded(false);
+      setCloudSyncErrorMessage(null);
       setCloudSyncStatus('online');
       setLastCloudSyncTime(new Date());
 
@@ -1208,6 +1265,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       console.warn('Error refreshing data from cloud:', err);
       setCloudSyncStatus('error');
+      if (isQuotaExceededError(err)) {
+        setIsCloudQuotaExceeded(true);
+        setCloudSyncErrorMessage('Free daily write units quota exceeded on Google Cloud Firestore.');
+      }
       if (showToastNotification) {
         showToast('error', 'Refresh Failed', 'Unable to fetch latest updates from Firestore.');
       }
@@ -1215,27 +1276,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsCloudSyncing(false);
     }
   };
-
-  // Continuous Auto-Save to Firestore Cloud DB on background state changes
-  useEffect(() => {
-    if (!isCloudReady || !currentCompanyId) return;
-
-    const timer = setTimeout(async () => {
-      try {
-        if (currentCompany) {
-          await cloudDb.saveCompany(currentCompany);
-        }
-        await cloudDb.saveBusinessProfile(currentCompanyId, business);
-        await cloudDb.saveSystemState({ activeCompanyId: currentCompanyId });
-        setCloudSyncStatus('online');
-        setLastCloudSyncTime(new Date());
-      } catch (err) {
-        console.warn('Firestore automatic background save warning:', err);
-      }
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [isCloudReady, business, currentCompany, currentCompanyId]);
 
   // Theme application to root DOM element and dynamic theme variables
   useEffect(() => {
@@ -2815,6 +2855,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const newInvoice: Invoice = {
       ...invoiceData,
+      companyId: currentCompanyId,
       customerId: finalCustomerId || invoiceData.customerId,
       id: 'inv-' + Date.now(),
       invoiceNumber,
@@ -2823,7 +2864,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setInvoices(prev => [newInvoice, ...prev]);
-    cloudDb.syncEntityDoc('invoices', currentCompanyId, newInvoice).catch(console.warn);
+
+    // Immediately persist to company localStorage partition so user data is 100% safe
+    try {
+      const existingPartitionInvoices = safeStorageGet<Invoice[]>(`${STORAGE_PREFIX}c_${currentCompanyId}_invoices`, []);
+      safeStorageSet(`${STORAGE_PREFIX}c_${currentCompanyId}_invoices`, [newInvoice, ...existingPartitionInvoices.filter(i => i.id !== newInvoice.id)]);
+      safeStorageSet(STORAGE_PREFIX + 'invoices', [newInvoice, ...invoices.filter(i => i.id !== newInvoice.id)]);
+    } catch (e) {
+      console.warn('Local partition save error:', e);
+    }
+
+    // Save to Cloud Firestore
+    cloudDb.syncEntityDoc('invoices', currentCompanyId, newInvoice).then(res => {
+      if (res.success) {
+        setCloudSyncStatus('online');
+        setLastCloudSyncTime(new Date());
+        setIsCloudQuotaExceeded(false);
+      } else if (res.error) {
+        if (isQuotaExceededError(res.error)) {
+          setIsCloudQuotaExceeded(true);
+          setCloudSyncErrorMessage('Free daily write units quota exceeded on Google Cloud Firestore.');
+          setCloudSyncStatus('error');
+          showToast(
+            'warning',
+            'Saved Locally (Cloud Quota Limit)',
+            'Invoice is safely stored on your device. Google Cloud Firestore daily write quota limit reached. Data will sync automatically when quota resets.'
+          );
+        } else {
+          setCloudSyncStatus('error');
+          console.warn('Cloud sync error for new invoice:', res.error);
+        }
+      }
+    }).catch(err => {
+      console.warn('Error syncing invoice doc:', err);
+    });
 
     // Calculate advance for next invoice number sequence as strict integer (e.g., 3406 -> 3407)
     const parsed = parseInvoiceNumber(invoiceNumber);
@@ -2953,6 +3027,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const cleanInv: Invoice = {
         ...invData,
+        companyId: currentCompanyId,
         id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         customerId: customerId || invData.customerId,
         createdAt: new Date().toISOString(),
@@ -5052,6 +5127,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cloudSyncStatus,
         isCloudSyncing,
         lastCloudSyncTime,
+        isCloudQuotaExceeded,
+        cloudSyncErrorMessage,
+        firestoreUpgradeUrl,
         triggerCloudSync,
         refreshData,
         selectedInvoiceIdForPrint,

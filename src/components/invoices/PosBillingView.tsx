@@ -495,7 +495,7 @@ export const PosBillingView: React.FC = () => {
   const totalCartItemsCount = cart.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    <div className="space-y-4 pb-20 lg:pb-4">
+    <div className="space-y-4 pb-36 lg:pb-6">
       {/* Top Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
@@ -887,40 +887,6 @@ export const PosBillingView: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-
-          {/* Floating Sticky Quick Cart Switcher on Mobile & Tablet */}
-          {totalCartItemsCount > 0 && (
-            <div className="lg:hidden sticky bottom-3 z-30 pt-2 animate-in slide-in-from-bottom-3 duration-200">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileTab('cart');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="w-full p-3.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-2xl shadow-xl border border-emerald-400/30 flex items-center justify-between transition-all active:scale-[0.98] cursor-pointer"
-              >
-                <div className="flex items-center gap-3 text-left">
-                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold text-sm text-white">
-                    <ShoppingCart className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold flex items-center gap-1.5">
-                      <span>{totalCartItemsCount} Item{totalCartItemsCount > 1 ? 's' : ''} in Cart</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
-                    </div>
-                    <div className="text-[11px] text-emerald-100 font-mono">
-                      Total: <span className="font-bold text-white text-xs">{formatCurrency(totals.grandTotal, business.currencySymbol)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 bg-white text-emerald-800 px-3.5 py-2 rounded-xl font-extrabold text-xs shadow-sm">
-                  <span>View Cart & Pay</span>
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </button>
             </div>
           )}
         </div>
@@ -1457,37 +1423,37 @@ export const PosBillingView: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Floating Cart Bar for Mobile & Tablet (Active when on Products view with items in cart) */}
-      {mobileTab === 'products' && cart.length > 0 && (
-        <div className="lg:hidden fixed bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-4 z-30 animate-in slide-in-from-bottom duration-300">
-          <div className="bg-slate-900/95 backdrop-blur-md text-white p-2.5 sm:p-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-                <ShoppingCart className="w-4 h-4" />
+      {/* Single Unified Floating Cart Bar for Mobile & Tablet (Active on Products view when cart has items) */}
+      {mobileTab === 'products' && totalCartItemsCount > 0 && (
+        <div className="lg:hidden fixed bottom-16 sm:bottom-18 left-3 sm:left-4 right-3 sm:right-4 z-30 animate-in slide-in-from-bottom-3 duration-200">
+          <button
+            type="button"
+            onClick={() => {
+              setMobileTab('cart');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="w-full p-3 sm:p-3.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-2xl shadow-2xl border border-emerald-400/40 flex items-center justify-between transition-all active:scale-[0.98] cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5 sm:gap-3 text-left min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold text-sm text-white shrink-0">
+                <ShoppingCart className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5 truncate">
-                  <span>{totalCartItemsCount} item{totalCartItemsCount > 1 ? 's' : ''} in cart</span>
-                  <span className="text-[10px] font-normal text-slate-400">({cart.length} item{cart.length > 1 ? 's' : ''})</span>
+                <div className="text-xs font-bold flex items-center gap-1.5 truncate">
+                  <span>{totalCartItemsCount} Item{totalCartItemsCount > 1 ? 's' : ''} in Cart</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping shrink-0" />
                 </div>
-                <div className="text-sm font-extrabold font-mono text-emerald-400">
-                  {formatCurrency(totals.grandTotal, business.currencySymbol)}
+                <div className="text-[11px] text-emerald-100 font-mono">
+                  Total: <span className="font-bold text-white text-xs sm:text-sm">{formatCurrency(totals.grandTotal, business.currencySymbol)}</span>
                 </div>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMobileTab('cart');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 transition-all"
-            >
+            <div className="flex items-center gap-1.5 bg-white text-emerald-800 px-3.5 py-2 rounded-xl font-extrabold text-xs shadow-sm shrink-0">
               <span>View Cart & Pay</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+              <ArrowRight className="w-4 h-4" />
+            </div>
+          </button>
         </div>
       )}
 

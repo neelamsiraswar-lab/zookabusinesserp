@@ -93,3 +93,41 @@ export function hasCollectionChanged<T extends { id?: string; updatedAt?: string
 
   return false;
 }
+
+/**
+ * Merges local and remote collections without destroying unsynced local records
+ * Resolves conflicts by comparing updatedAt ISO timestamps
+ */
+export function mergeEntities<T extends { id?: string; updatedAt?: string }>(
+  local: T[] = [],
+  remote: T[] = []
+): T[] {
+  if (!remote || remote.length === 0) return local || [];
+  if (!local || local.length === 0) return remote || [];
+
+  const map = new Map<string, T>();
+  
+  // Seed with local items
+  local.forEach(item => {
+    const key = item.id || JSON.stringify(item);
+    map.set(key, item);
+  });
+
+  // Merge remote items
+  remote.forEach(remoteItem => {
+    const key = remoteItem.id || JSON.stringify(remoteItem);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, remoteItem);
+    } else {
+      const localTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const remoteTime = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
+      if (remoteTime >= localTime) {
+        map.set(key, remoteItem);
+      }
+    }
+  });
+
+  return Array.from(map.values());
+}
+
