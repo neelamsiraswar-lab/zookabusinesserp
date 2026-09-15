@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { Pagination } from '../common/Pagination';
 import { 
   Calculator, 
   Download, 
@@ -651,6 +652,99 @@ export const GstReturnsView: React.FC = () => {
     });
   }, [customHsnCodes, hsnSearchQuery, hsnScopeFilter, hsnTypeFilter, hsnRateFilter]);
 
+  // =========================================================================
+  // PAGINATION CONTROLS
+  // =========================================================================
+  // 1. Sales Register Pagination
+  const [salesPage, setSalesPage] = useState<number>(1);
+  const [salesPageSize, setSalesPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setSalesPage(1);
+  }, [filterMode, selectedMonth, startDate, endDate, searchQuery, salesTypeFilter]);
+
+  const totalSalesPages = Math.max(1, Math.ceil(filteredSalesInvoices.length / salesPageSize));
+  useEffect(() => {
+    if (salesPage > totalSalesPages) setSalesPage(totalSalesPages);
+  }, [salesPage, totalSalesPages]);
+
+  const paginatedSalesInvoices = useMemo(() => {
+    const start = (salesPage - 1) * salesPageSize;
+    return filteredSalesInvoices.slice(start, start + salesPageSize);
+  }, [filteredSalesInvoices, salesPage, salesPageSize]);
+
+  // 2. Purchase Register Pagination
+  const [purchasePage, setPurchasePage] = useState<number>(1);
+  const [purchasePageSize, setPurchasePageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setPurchasePage(1);
+  }, [filterMode, selectedMonth, startDate, endDate, searchQuery, purchaseItcFilter]);
+
+  const totalPurchasePages = Math.max(1, Math.ceil(filteredPurchaseBills.length / purchasePageSize));
+  useEffect(() => {
+    if (purchasePage > totalPurchasePages) setPurchasePage(totalPurchasePages);
+  }, [purchasePage, totalPurchasePages]);
+
+  const paginatedPurchaseBills = useMemo(() => {
+    const start = (purchasePage - 1) * purchasePageSize;
+    return filteredPurchaseBills.slice(start, start + purchasePageSize);
+  }, [filteredPurchaseBills, purchasePage, purchasePageSize]);
+
+  // 3. GSTR-1 Table 4 (B2B Invoices) Pagination
+  const [gstr1B2bPage, setGstr1B2bPage] = useState<number>(1);
+  const [gstr1B2bPageSize, setGstr1B2bPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setGstr1B2bPage(1);
+  }, [selectedPeriod, invoices]);
+
+  const totalGstr1B2bPages = Math.max(1, Math.ceil(b2bInvoices.length / gstr1B2bPageSize));
+  useEffect(() => {
+    if (gstr1B2bPage > totalGstr1B2bPages) setGstr1B2bPage(totalGstr1B2bPages);
+  }, [gstr1B2bPage, totalGstr1B2bPages]);
+
+  const paginatedB2bInvoices = useMemo(() => {
+    const start = (gstr1B2bPage - 1) * gstr1B2bPageSize;
+    return b2bInvoices.slice(start, start + gstr1B2bPageSize);
+  }, [b2bInvoices, gstr1B2bPage, gstr1B2bPageSize]);
+
+  // 4. GSTR-1 Table 12 (HSN Summary) Pagination
+  const [gstr1HsnPage, setGstr1HsnPage] = useState<number>(1);
+  const [gstr1HsnPageSize, setGstr1HsnPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setGstr1HsnPage(1);
+  }, [selectedPeriod, invoices]);
+
+  const totalGstr1HsnPages = Math.max(1, Math.ceil(hsnSummaryList.length / gstr1HsnPageSize));
+  useEffect(() => {
+    if (gstr1HsnPage > totalGstr1HsnPages) setGstr1HsnPage(totalGstr1HsnPages);
+  }, [gstr1HsnPage, totalGstr1HsnPages]);
+
+  const paginatedHsnSummaryList = useMemo(() => {
+    const start = (gstr1HsnPage - 1) * gstr1HsnPageSize;
+    return hsnSummaryList.slice(start, start + gstr1HsnPageSize);
+  }, [hsnSummaryList, gstr1HsnPage, gstr1HsnPageSize]);
+
+  // 5. HSN & SAC Tariff Directory Pagination
+  const [tariffPage, setTariffPage] = useState<number>(1);
+  const [tariffPageSize, setTariffPageSize] = useState<number>(15);
+
+  useEffect(() => {
+    setTariffPage(1);
+  }, [hsnSearchQuery, hsnScopeFilter, hsnTypeFilter, hsnRateFilter, customHsnCodes]);
+
+  const totalTariffPages = Math.max(1, Math.ceil(combinedTariffDirectory.length / tariffPageSize));
+  useEffect(() => {
+    if (tariffPage > totalTariffPages) setTariffPage(totalTariffPages);
+  }, [tariffPage, totalTariffPages]);
+
+  const paginatedTariffDirectory = useMemo(() => {
+    const start = (tariffPage - 1) * tariffPageSize;
+    return combinedTariffDirectory.slice(start, start + tariffPageSize);
+  }, [combinedTariffDirectory, tariffPage, tariffPageSize]);
+
   const handleOpenAddHsn = (initialCode = '', initialType: 'HSN' | 'SAC' = 'HSN') => {
     setEditingHsnId(null);
     setFormCode(initialCode.toUpperCase());
@@ -1240,7 +1334,7 @@ export const GstReturnsView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredSalesInvoices.length > 0 ? (
-                    filteredSalesInvoices.map((inv, idx) => {
+                    paginatedSalesInvoices.map((inv, idx) => {
                       const isExpanded = Boolean(expandedSaleInvIds[inv.id]);
                       const uniqueHsns: string[] = Array.from(new Set((inv.items || []).map(it => it.hsnCode).filter(Boolean)));
 
@@ -1462,6 +1556,18 @@ export const GstReturnsView: React.FC = () => {
                 )}
               </table>
             </div>
+
+            {filteredSalesInvoices.length > 0 && (
+              <Pagination
+                currentPage={salesPage}
+                totalItems={filteredSalesInvoices.length}
+                pageSize={salesPageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+                onPageChange={setSalesPage}
+                onPageSizeChange={setSalesPageSize}
+                itemLabel="invoices"
+              />
+            )}
           </div>
         </div>
       )}
@@ -1555,7 +1661,7 @@ export const GstReturnsView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredPurchaseBills.length > 0 ? (
-                    filteredPurchaseBills.map((bill, idx) => {
+                    paginatedPurchaseBills.map((bill, idx) => {
                       const isExpanded = Boolean(expandedPurchaseBillIds[bill.id]);
                       const uniqueHsns: string[] = Array.from(new Set((bill.items || []).map(it => it.hsnCode).filter(Boolean)));
 
@@ -1801,6 +1907,18 @@ export const GstReturnsView: React.FC = () => {
                 )}
               </table>
             </div>
+
+            {filteredPurchaseBills.length > 0 && (
+              <Pagination
+                currentPage={purchasePage}
+                totalItems={filteredPurchaseBills.length}
+                pageSize={purchasePageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+                onPageChange={setPurchasePage}
+                onPageSizeChange={setPurchasePageSize}
+                itemLabel="purchase bills"
+              />
+            )}
           </div>
         </div>
       )}
@@ -1872,7 +1990,7 @@ export const GstReturnsView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {b2bInvoices.length > 0 ? (
-                    b2bInvoices.map(inv => (
+                    paginatedB2bInvoices.map(inv => (
                       <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td className="py-2.5 px-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">{inv.customerGstin}</td>
                         <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-slate-100">{inv.customerName}</td>
@@ -1896,6 +2014,18 @@ export const GstReturnsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {b2bInvoices.length > 0 && (
+              <Pagination
+                currentPage={gstr1B2bPage}
+                totalItems={b2bInvoices.length}
+                pageSize={gstr1B2bPageSize}
+                pageSizeOptions={[10, 25, 50]}
+                onPageChange={setGstr1B2bPage}
+                onPageSizeChange={setGstr1B2bPageSize}
+                itemLabel="B2B invoices"
+              />
+            )}
           </div>
 
           {/* Table 12: HSN Summary */}
@@ -1929,7 +2059,7 @@ export const GstReturnsView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {hsnSummaryList.map(h => (
+                  {paginatedHsnSummaryList.map(h => (
                     <tr key={h.hsn} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-2.5 px-4 font-mono font-bold text-slate-900 dark:text-white">{h.hsn}</td>
                       <td className="py-2.5 px-4 font-medium text-slate-700 dark:text-slate-300">{h.desc}</td>
@@ -1945,6 +2075,18 @@ export const GstReturnsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {hsnSummaryList.length > 0 && (
+              <Pagination
+                currentPage={gstr1HsnPage}
+                totalItems={hsnSummaryList.length}
+                pageSize={gstr1HsnPageSize}
+                pageSizeOptions={[10, 25, 50]}
+                onPageChange={setGstr1HsnPage}
+                onPageSizeChange={setGstr1HsnPageSize}
+                itemLabel="HSN items"
+              />
+            )}
           </div>
         </div>
       )}
@@ -2307,7 +2449,7 @@ export const GstReturnsView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {combinedTariffDirectory.map(item => (
+                    {paginatedTariffDirectory.map(item => (
                       <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
                         {/* HSN / SAC Code & Type */}
                         <td className="py-3 px-4">
@@ -2438,6 +2580,16 @@ export const GstReturnsView: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+
+                <Pagination
+                  currentPage={tariffPage}
+                  totalItems={combinedTariffDirectory.length}
+                  pageSize={tariffPageSize}
+                  pageSizeOptions={[10, 15, 25, 50, 100]}
+                  onPageChange={setTariffPage}
+                  onPageSizeChange={setTariffPageSize}
+                  itemLabel="tariff codes"
+                />
               </div>
             )}
 

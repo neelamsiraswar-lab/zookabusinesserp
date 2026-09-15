@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PaymentRecord, PaymentType, PaymentMethod, Party, Invoice, PurchaseBill } from '../../types';
 import { formatINR, formatDate, numberToIndianWords } from '../../utils/formatters';
+import { Pagination } from '../common/Pagination';
 import { 
   ArrowDownLeft, 
   ArrowUpRight, 
@@ -201,6 +202,42 @@ export const PaymentsView: React.FC = () => {
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [payments, activeTab, filterMethod, dateFilter, searchQuery]);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, filterMethod, dateFilter]);
+
+  const currentTotal = activeTab === 'PENDING_RECEIVABLES'
+    ? filteredPendingInvoices.length
+    : activeTab === 'PENDING_PAYABLES'
+    ? filteredPendingBills.length
+    : filteredPayments.length;
+
+  const totalPages = Math.max(1, Math.ceil(currentTotal / pageSize));
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedPendingInvoices = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPendingInvoices.slice(start, start + pageSize);
+  }, [filteredPendingInvoices, currentPage, pageSize]);
+
+  const paginatedPendingBills = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPendingBills.slice(start, start + pageSize);
+  }, [filteredPendingBills, currentPage, pageSize]);
+
+  const paginatedPayments = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPayments.slice(start, start + pageSize);
+  }, [filteredPayments, currentPage, pageSize]);
 
   // Available Customers & Vendors for dropdowns
   const customers = useMemo(() => parties.filter(p => p.type === 'CUSTOMER' || p.type === 'BOTH'), [parties]);
@@ -827,7 +864,7 @@ export const PaymentsView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredPendingInvoices.map(inv => {
+                  paginatedPendingInvoices.map(inv => {
                     const dueAmt = inv.amountDue !== undefined ? inv.amountDue : inv.grandTotal;
                     const paidAmt = inv.amountPaid || (inv.grandTotal - dueAmt);
 
@@ -881,6 +918,18 @@ export const PaymentsView: React.FC = () => {
                 )}
               </tbody>
             </table>
+
+            {filteredPendingInvoices.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalItems={filteredPendingInvoices.length}
+                pageSize={pageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                itemLabel="invoices"
+              />
+            )}
           </div>
         )}
 
@@ -919,7 +968,7 @@ export const PaymentsView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredPendingBills.map(bill => {
+                  paginatedPendingBills.map(bill => {
                     const dueAmt = bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal;
                     const paidAmt = bill.amountPaid || (bill.grandTotal - dueAmt);
 
@@ -973,6 +1022,18 @@ export const PaymentsView: React.FC = () => {
                 )}
               </tbody>
             </table>
+
+            {filteredPendingBills.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalItems={filteredPendingBills.length}
+                pageSize={pageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                itemLabel="bills"
+              />
+            )}
           </div>
         )}
 
@@ -1002,7 +1063,7 @@ export const PaymentsView: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredPayments.map(p => {
+                paginatedPayments.map(p => {
                   const isMoneyIn = p.type === 'PAYMENT_IN';
                   const isMoneyOut = p.type === 'PAYMENT_OUT';
                   const isContra = p.type === 'CONTRA_TRANSFER';
@@ -1125,6 +1186,18 @@ export const PaymentsView: React.FC = () => {
               )}
             </tbody>
           </table>
+
+          {filteredPayments.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredPayments.length}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemLabel="payments"
+            />
+          )}
         </div>
         )}
       </div>

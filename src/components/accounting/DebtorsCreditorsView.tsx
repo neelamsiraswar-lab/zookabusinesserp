@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Party, Invoice, PurchaseBill, PaymentRecord } from '../../types';
 import { formatCurrency, formatINR, formatDate } from '../../utils/formatters';
 import { ClientStatementModal } from '../parties/ClientStatementModal';
+import { Pagination } from '../common/Pagination';
 import { 
   Users, 
   Search, 
@@ -386,6 +387,24 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
     });
   }, [partyDetailsList, roleFilter, balanceFilter, searchQuery, sortBy]);
 
+  // Parties Master List Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [roleFilter, balanceFilter, searchQuery, sortBy]);
+
+  const totalPartiesPages = Math.max(1, Math.ceil(filteredParties.length / pageSize));
+  useEffect(() => {
+    if (currentPage > totalPartiesPages) setCurrentPage(totalPartiesPages);
+  }, [currentPage, totalPartiesPages]);
+
+  const paginatedParties = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredParties.slice(start, start + pageSize);
+  }, [filteredParties, currentPage, pageSize]);
+
   // =========================================================================
   // 2. DETAILED LEDGER POSTINGS GENERATOR (FOR SELECTED PARTY)
   // =========================================================================
@@ -576,6 +595,24 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
       p.oppositeAccount.toLowerCase().includes(q)
     );
   }, [activePartyLedgerPostings, ledgerSearch]);
+
+  // Modal Ledger Postings Pagination
+  const [modalPage, setModalPage] = useState<number>(1);
+  const [modalPageSize, setModalPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setModalPage(1);
+  }, [selectedPartyForLedger, ledgerSearch]);
+
+  const totalModalPages = Math.max(1, Math.ceil(filteredLedgerPostings.length / modalPageSize));
+  useEffect(() => {
+    if (modalPage > totalModalPages) setModalPage(totalModalPages);
+  }, [modalPage, totalModalPages]);
+
+  const paginatedLedgerPostings = useMemo(() => {
+    const start = (modalPage - 1) * modalPageSize;
+    return filteredLedgerPostings.slice(start, start + modalPageSize);
+  }, [filteredLedgerPostings, modalPage, modalPageSize]);
 
   // WhatsApp Reminder Handler
   const handleSendWhatsAppReminder = (detail: DebtorCreditorPartyDetail) => {
@@ -985,7 +1022,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredParties.map(detail => {
+                {paginatedParties.map(detail => {
                   const isDebtor = detail.closingBalance > 0.01;
                   const isCreditor = detail.closingBalance < -0.01;
                   const isSettled = !isDebtor && !isCreditor;
@@ -1220,6 +1257,18 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
             </table>
           </div>
         )}
+
+        {filteredParties.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredParties.length}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="parties"
+          />
+        )}
       </div>
 
       {/* =========================================================================
@@ -1339,7 +1388,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredLedgerPostings.map((p, idx) => (
+                    {paginatedLedgerPostings.map((p, idx) => (
                       <tr key={p.id || idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 font-mono text-[11px]">
                         <td className="py-2.5 px-3 font-sans text-slate-600 dark:text-slate-400 whitespace-nowrap">
                           {p.date}
@@ -1386,6 +1435,20 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
                     ))}
                   </tbody>
                 </table>
+              )}
+
+              {filteredLedgerPostings.length > 0 && (
+                <div className="mt-3">
+                  <Pagination
+                    currentPage={modalPage}
+                    totalItems={filteredLedgerPostings.length}
+                    pageSize={modalPageSize}
+                    pageSizeOptions={[10, 25, 50]}
+                    onPageChange={setModalPage}
+                    onPageSizeChange={setModalPageSize}
+                    itemLabel="vouchers"
+                  />
+                </div>
               )}
             </div>
 

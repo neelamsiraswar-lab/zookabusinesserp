@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Product, GstTaxRate } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
@@ -9,6 +9,7 @@ import { BarcodeLabelPrintModal } from './BarcodeLabelPrintModal';
 import { BulkProductUploadModal } from './BulkProductUploadModal';
 import { CustomHsnModal } from '../common/CustomHsnModal';
 import { HsnLookupDialog } from '../common/HsnLookupDialog';
+import { Pagination } from '../common/Pagination';
 import { 
   Package, 
   Search, 
@@ -209,6 +210,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
     }
     return sortDirection === 'asc' ? compareResult : -compareResult;
   });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // Reset to page 1 on filter, category, or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, showLowStockOnly, itemTypeFilter, sortField, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / pageSize));
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedProducts.slice(start, start + pageSize);
+  }, [sortedProducts, currentPage, pageSize]);
 
   const totalInventoryValuation = health.totalValuation;
   const lowStockCount = health.lowStockItems;
@@ -648,7 +670,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
 
         {/* 1. Mobile Card List (Hidden on md+ screens) */}
         <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
-          {sortedProducts.map(prod => {
+          {paginatedProducts.map(prod => {
             const effectiveThreshold = getProductStockThreshold(prod, stockSettings);
             const isOutOfStock = isProductOutOfStock(prod);
             const isCritical = isProductCriticalStock(prod, stockSettings);
@@ -1054,7 +1076,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {sortedProducts.map(prod => {
+              {paginatedProducts.map(prod => {
                 const effectiveThreshold = getProductStockThreshold(prod, stockSettings);
                 const isOutOfStock = isProductOutOfStock(prod);
                 const isCritical = isProductCriticalStock(prod, stockSettings);
@@ -1354,6 +1376,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
             </tbody>
           </table>
         </div>
+
+        {sortedProducts.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalItems={sortedProducts.length}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="items"
+          />
+        )}
       </div>
 
       {/* Add / Edit Product Modal */}

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Party } from '../../types';
 import { formatCurrency, formatDate, validateGstin } from '../../utils/formatters';
 import { INDIAN_STATES } from '../../utils/constants';
 import { ClientStatementModal } from './ClientStatementModal';
 import { BulkPartyUploadModal } from './BulkPartyUploadModal';
+import { Pagination } from '../common/Pagination';
 import { 
   Users, 
   Search, 
@@ -90,6 +91,10 @@ export const PartiesView: React.FC = () => {
   const [openingBalanceType, setOpeningBalanceType] = useState<'Dr' | 'Cr'>('Cr');
   const [openingBalanceDate, setOpeningBalanceDate] = useState<string>('2026-04-01');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
   const filteredParties = parties.filter(p => {
     const matchesSearch = 
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -108,6 +113,23 @@ export const PartiesView: React.FC = () => {
 
     return matchesSearch && matchesType;
   });
+
+  // Reset to page 1 on search or filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, partyTypeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredParties.length / pageSize));
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedParties = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredParties.slice(start, start + pageSize);
+  }, [filteredParties, currentPage, pageSize]);
 
   const totalReceivables = parties
     .filter(p => p.currentBalance > 0)
@@ -357,7 +379,7 @@ export const PartiesView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredParties.map(party => {
+              {paginatedParties.map(party => {
                 const isDebtor = party.currentBalance > 0;
                 const isCreditor = party.currentBalance < 0;
 
@@ -506,6 +528,18 @@ export const PartiesView: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {filteredParties.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredParties.length}
+            pageSize={pageSize}
+            pageSizeOptions={[10, 25, 50, 100]}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="contacts"
+          />
+        )}
       </div>
 
       {/* Add / Edit Party Modal */}

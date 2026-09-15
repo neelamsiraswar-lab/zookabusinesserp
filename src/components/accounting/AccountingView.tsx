@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { Pagination } from '../common/Pagination';
 import { 
   BookOpen, 
   Plus, 
@@ -830,6 +831,63 @@ export const AccountingView: React.FC = () => {
   }, [journalEntries, daybookSearch, daybookAccountFilter]);
 
   // =========================================================================
+  // PAGINATION CONTROLS
+  // =========================================================================
+  // 1. Chart of Accounts Pagination
+  const [coaPage, setCoaPage] = useState<number>(1);
+  const [coaPageSize, setCoaPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setCoaPage(1);
+  }, [coaSearch, coaCategoryFilter]);
+
+  const totalCoaPages = Math.max(1, Math.ceil(filteredChartOfAccounts.length / coaPageSize));
+  useEffect(() => {
+    if (coaPage > totalCoaPages) setCoaPage(totalCoaPages);
+  }, [coaPage, totalCoaPages]);
+
+  const paginatedChartOfAccounts = useMemo(() => {
+    const start = (coaPage - 1) * coaPageSize;
+    return filteredChartOfAccounts.slice(start, start + coaPageSize);
+  }, [filteredChartOfAccounts, coaPage, coaPageSize]);
+
+  // 2. General Ledger Statement Pagination
+  const [glPage, setGlPage] = useState<number>(1);
+  const [glPageSize, setGlPageSize] = useState<number>(15);
+
+  useEffect(() => {
+    setGlPage(1);
+  }, [selectedAccountId, ledgerSearch, ledgerStartDate, ledgerEndDate]);
+
+  const totalGlPages = Math.max(1, Math.ceil(currentAccountPostings.length / glPageSize));
+  useEffect(() => {
+    if (glPage > totalGlPages) setGlPage(totalGlPages);
+  }, [glPage, totalGlPages]);
+
+  const paginatedAccountPostings = useMemo(() => {
+    const start = (glPage - 1) * glPageSize;
+    return currentAccountPostings.slice(start, start + glPageSize);
+  }, [currentAccountPostings, glPage, glPageSize]);
+
+  // 3. Daybook Entries Pagination
+  const [daybookPage, setDaybookPage] = useState<number>(1);
+  const [daybookPageSize, setDaybookPageSize] = useState<number>(10);
+
+  useEffect(() => {
+    setDaybookPage(1);
+  }, [daybookSearch, daybookAccountFilter]);
+
+  const totalDaybookPages = Math.max(1, Math.ceil(filteredDaybookEntries.length / daybookPageSize));
+  useEffect(() => {
+    if (daybookPage > totalDaybookPages) setDaybookPage(totalDaybookPages);
+  }, [daybookPage, totalDaybookPages]);
+
+  const paginatedDaybookEntries = useMemo(() => {
+    const start = (daybookPage - 1) * daybookPageSize;
+    return filteredDaybookEntries.slice(start, start + daybookPageSize);
+  }, [filteredDaybookEntries, daybookPage, daybookPageSize]);
+
+  // =========================================================================
   // ACCOUNT HEAD (LEDGER MASTER) HANDLERS
   // =========================================================================
   const suggestAccountCode = (category: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE') => {
@@ -1620,7 +1678,7 @@ export const AccountingView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredChartOfAccounts.map(acc => {
+                  {paginatedChartOfAccounts.map(acc => {
                     const isDr = acc.category === 'ASSET' || acc.category === 'EXPENSE';
                     const isDebtorsControl = acc.id === 'acc-3' || acc.code === '1030';
                     const isCreditorsControl = acc.id === 'acc-8' || acc.code === '2020';
@@ -1854,6 +1912,18 @@ export const AccountingView: React.FC = () => {
                 </tfoot>
               </table>
             </div>
+
+            {filteredChartOfAccounts.length > 0 && (
+              <Pagination
+                currentPage={coaPage}
+                totalItems={filteredChartOfAccounts.length}
+                pageSize={coaPageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+                onPageChange={setCoaPage}
+                onPageSizeChange={setCoaPageSize}
+                itemLabel="accounts"
+              />
+            )}
           </div>
         </div>
       )}
@@ -2045,7 +2115,7 @@ export const AccountingView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {currentAccountPostings.map((p) => (
+                  {paginatedAccountPostings.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-2.5 px-4 font-mono text-slate-600 dark:text-slate-400">
                         {p.date}
@@ -2117,6 +2187,18 @@ export const AccountingView: React.FC = () => {
                 </tfoot>
               </table>
             </div>
+
+            {currentAccountPostings.length > 0 && (
+              <Pagination
+                currentPage={glPage}
+                totalItems={currentAccountPostings.length}
+                pageSize={glPageSize}
+                pageSizeOptions={[10, 15, 25, 50, 100]}
+                onPageChange={setGlPage}
+                onPageSizeChange={setGlPageSize}
+                itemLabel="transactions"
+              />
+            )}
           </div>
         </div>
       )}
@@ -2169,7 +2251,7 @@ export const AccountingView: React.FC = () => {
           </div>
 
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {filteredDaybookEntries.map(entry => {
+            {paginatedDaybookEntries.map(entry => {
               const drTotal = entry.lines.reduce((s, l) => s + l.debit, 0);
               return (
                 <div key={entry.id} className="p-4 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
@@ -2257,6 +2339,18 @@ export const AccountingView: React.FC = () => {
               </div>
             )}
           </div>
+
+          {filteredDaybookEntries.length > 0 && (
+            <Pagination
+              currentPage={daybookPage}
+              totalItems={filteredDaybookEntries.length}
+              pageSize={daybookPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageChange={setDaybookPage}
+              onPageSizeChange={setDaybookPageSize}
+              itemLabel="vouchers"
+            />
+          )}
         </div>
       )}
 

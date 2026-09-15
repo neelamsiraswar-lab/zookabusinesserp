@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PurchaseBill, PurchaseBillItem, Expense, GstTaxRate, PaymentMethod, Product } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -6,6 +6,7 @@ import { STANDARD_UNITS, COMMON_HSN_CODES } from '../../utils/constants';
 import { calculateBaseRateFromInclusive } from '../../utils/gstCalculations';
 import { CustomHsnModal } from '../common/CustomHsnModal';
 import { HsnLookupDialog } from '../common/HsnLookupDialog';
+import { Pagination } from '../common/Pagination';
 import { 
   Truck, 
   Search, 
@@ -640,6 +641,47 @@ export const PurchasesView: React.FC = () => {
     bill.vendorInvoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Filtered expenses
+  const filteredExpenses = expenses.filter(exp =>
+    exp.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (exp.payee && exp.payee.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (exp.notes && exp.notes.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (exp.referenceNo && exp.referenceNo.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // Bills pagination
+  const [billsPage, setBillsPage] = useState(1);
+  const [billsPageSize, setBillsPageSize] = useState(10);
+
+  // Expenses pagination
+  const [expensesPage, setExpensesPage] = useState(1);
+  const [expensesPageSize, setExpensesPageSize] = useState(10);
+
+  useEffect(() => {
+    setBillsPage(1);
+    setExpensesPage(1);
+  }, [searchQuery, activeTab]);
+
+  const totalBillsPages = Math.max(1, Math.ceil(filteredBills.length / billsPageSize));
+  useEffect(() => {
+    if (billsPage > totalBillsPages) setBillsPage(totalBillsPages);
+  }, [billsPage, totalBillsPages]);
+
+  const paginatedBills = useMemo(() => {
+    const start = (billsPage - 1) * billsPageSize;
+    return filteredBills.slice(start, start + billsPageSize);
+  }, [filteredBills, billsPage, billsPageSize]);
+
+  const totalExpensesPages = Math.max(1, Math.ceil(filteredExpenses.length / expensesPageSize));
+  useEffect(() => {
+    if (expensesPage > totalExpensesPages) setExpensesPage(totalExpensesPages);
+  }, [expensesPage, totalExpensesPages]);
+
+  const paginatedExpenses = useMemo(() => {
+    const start = (expensesPage - 1) * expensesPageSize;
+    return filteredExpenses.slice(start, start + expensesPageSize);
+  }, [filteredExpenses, expensesPage, expensesPageSize]);
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -777,7 +819,7 @@ export const PurchasesView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredBills.map(bill => (
+                  paginatedBills.map(bill => (
                     <tr key={bill.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
                       <td className="py-3 px-4 font-medium">
                         <div className="font-bold text-slate-900 dark:text-white">{bill.billNumber}</div>
@@ -848,6 +890,18 @@ export const PurchasesView: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {filteredBills.length > 0 && (
+            <Pagination
+              currentPage={billsPage}
+              totalItems={filteredBills.length}
+              pageSize={billsPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageChange={setBillsPage}
+              onPageSizeChange={setBillsPageSize}
+              itemLabel="bills"
+            />
+          )}
         </div>
       ) : (
         /* Expenses Table */
@@ -865,7 +919,14 @@ export const PurchasesView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {expenses.map(exp => (
+                {filteredExpenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                      No expenses found. Click &quot;Add Expense&quot; to record business overheads.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedExpenses.map(exp => (
                   <tr key={exp.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
                     <td className="py-3 px-4 font-medium text-slate-700 dark:text-slate-300">{formatDate(exp.date)}</td>
                     <td className="py-3 px-4">
@@ -891,10 +952,23 @@ export const PurchasesView: React.FC = () => {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )))
+              }
               </tbody>
             </table>
           </div>
+
+          {filteredExpenses.length > 0 && (
+            <Pagination
+              currentPage={expensesPage}
+              totalItems={filteredExpenses.length}
+              pageSize={expensesPageSize}
+              pageSizeOptions={[10, 25, 50, 100]}
+              onPageChange={setExpensesPage}
+              onPageSizeChange={setExpensesPageSize}
+              itemLabel="expenses"
+            />
+          )}
         </div>
       )}
 

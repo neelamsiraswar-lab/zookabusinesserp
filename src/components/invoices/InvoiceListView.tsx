@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Invoice, InvoiceStatus, InvoiceType, PaymentMethod } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -9,6 +9,7 @@ import { ShareInvoiceModal } from './ShareInvoiceModal';
 import { InvoiceCardGrid } from './InvoiceCardGrid';
 import { AutoUpdateInvoiceNumbersModal } from './AutoUpdateInvoiceNumbersModal';
 import { formatInvoiceSequence } from '../../utils/invoiceNumberUtils';
+import { Pagination } from '../common/Pagination';
 import { 
   Search, 
   Filter, 
@@ -212,6 +213,27 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
     }
     return sortDirection === 'asc' ? compareResult : -compareResult;
   });
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // Reset to page 1 on search, filter, or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, typeFilter, sortField, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedInvoices.length / pageSize));
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedInvoices = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedInvoices.slice(start, start + pageSize);
+  }, [sortedInvoices, currentPage, pageSize]);
 
   const handleOpenPayment = (inv: Invoice) => {
     setPaymentModalInvoice(inv);
@@ -474,7 +496,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
 
         {viewMode === 'card' ? (
           <InvoiceCardGrid
-            invoices={sortedInvoices}
+            invoices={paginatedInvoices}
             expandedInvoiceIds={expandedInvoiceIds}
             toggleExpandInvoice={toggleExpandInvoice}
             onSelectInvoiceForPrint={setSelectedInvoiceIdForPrint}
@@ -492,7 +514,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
           <>
             {/* 1. Mobile Card List (Hidden on md+ screens in List mode) */}
             <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
-              {sortedInvoices.map(inv => {
+              {paginatedInvoices.map(inv => {
                 const isPaid = inv.status === 'PAID';
                 const hasPendingPayment = (inv.amountDue || 0) > 0;
                 const totalItemsCount = inv.items?.length || 0;
@@ -973,7 +995,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {sortedInvoices.map(inv => {
+              {paginatedInvoices.map(inv => {
                 const isPaid = inv.status === 'PAID';
                 const hasPendingPayment = (inv.amountDue || 0) > 0;
                 const totalItemsCount = inv.items?.length || 0;
@@ -1273,6 +1295,18 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
           </table>
         </div>
       </>
+    )}
+
+    {sortedInvoices.length > 0 && (
+      <Pagination
+        currentPage={currentPage}
+        totalItems={sortedInvoices.length}
+        pageSize={pageSize}
+        pageSizeOptions={[10, 25, 50, 100]}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        itemLabel="invoices"
+      />
     )}
   </div>
 
