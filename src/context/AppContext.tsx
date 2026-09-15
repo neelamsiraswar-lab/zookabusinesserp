@@ -3453,10 +3453,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Parties
   const createParty = (partyData: Omit<Party, 'id' | 'createdAt' | 'currentBalance'>): Party => {
+    const rawOpening = Math.abs(partyData.openingBalance || 0);
+    let effectiveType = partyData.openingBalanceType;
+    if (!effectiveType) {
+      effectiveType = partyData.type === 'VENDOR' ? 'Cr' : 'Dr';
+    }
+    const initialSignedBalance = rawOpening === 0 ? 0 : (effectiveType === 'Cr' ? -rawOpening : rawOpening);
+
     const newParty: Party = {
       ...partyData,
       id: 'party-' + Date.now(),
-      currentBalance: partyData.openingBalance || 0,
+      openingBalance: rawOpening,
+      openingBalanceType: effectiveType,
+      currentBalance: initialSignedBalance,
       createdAt: new Date().toISOString()
     };
     setParties(prev => [newParty, ...prev]);
@@ -3483,10 +3492,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
         updated++;
       } else {
+        const rawOpening = Math.abs(partyData.openingBalance || 0);
+        let effectiveType = partyData.openingBalanceType;
+        if (!effectiveType) {
+          effectiveType = partyData.type === 'VENDOR' ? 'Cr' : 'Dr';
+        }
+        const initialSignedBalance = rawOpening === 0 ? 0 : (effectiveType === 'Cr' ? -rawOpening : rawOpening);
+
         const newP: Party = {
           ...partyData,
           id: 'party-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-          currentBalance: partyData.openingBalance || 0,
+          openingBalance: rawOpening,
+          openingBalanceType: effectiveType,
+          currentBalance: initialSignedBalance,
           createdAt: new Date().toISOString()
         };
         partiesToAdd.push(newP);
@@ -3505,7 +3523,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateParty = (id: string, partyData: Partial<Party>) => {
     setParties(prev => prev.map(p => {
       if (p.id === id) {
-        const updated = { ...p, ...partyData };
+        let updatedBalance = p.currentBalance;
+        if (partyData.openingBalance !== undefined || partyData.openingBalanceType !== undefined) {
+          const oldOpeningVal = Math.abs(p.openingBalance || 0);
+          const oldType = p.openingBalanceType || (p.type === 'VENDOR' ? 'Cr' : 'Dr');
+          const oldSignedOpening = oldOpeningVal === 0 ? 0 : (oldType === 'Cr' ? -oldOpeningVal : oldOpeningVal);
+
+          const newOpeningVal = partyData.openingBalance !== undefined ? Math.abs(partyData.openingBalance) : oldOpeningVal;
+          const newType = partyData.openingBalanceType || p.openingBalanceType || ((partyData.type || p.type) === 'VENDOR' ? 'Cr' : 'Dr');
+          const newSignedOpening = newOpeningVal === 0 ? 0 : (newType === 'Cr' ? -newOpeningVal : newOpeningVal);
+
+          updatedBalance = p.currentBalance - oldSignedOpening + newSignedOpening;
+        }
+
+        const updated = { 
+          ...p, 
+          ...partyData,
+          currentBalance: updatedBalance
+        };
         cloudDb.syncEntityDoc('parties', currentCompanyId, updated).catch(console.warn);
         return updated;
       }
@@ -3570,6 +3605,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           stateCode: billData.vendorStateCode || business.stateCode,
           pincode: business.pincode,
           openingBalance: 0,
+          openingBalanceType: 'Cr',
           currentBalance: -(billData.amountDue || 0),
           creditLimit: 100000,
           creditPeriodDays: 30,

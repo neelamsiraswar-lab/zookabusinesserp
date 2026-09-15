@@ -193,6 +193,8 @@ export interface Party {
   creditPeriodDays?: number;
   currentBalance: number; // Positive = Receivable (Debtor), Negative = Payable (Creditor)
   openingBalance?: number;
+  openingBalanceType?: 'Dr' | 'Cr'; // 'Dr' = Debit (Receivable / Advance paid to vendor), 'Cr' = Credit (Payable / Dues owed to vendor)
+  openingBalanceDate?: string;
   createdAt: string;
 }
 

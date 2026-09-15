@@ -37,6 +37,7 @@ interface ParsedPartyRow {
   creditLimit: number;
   creditPeriodDays: number;
   openingBalance: number;
+  openingBalanceType?: 'Dr' | 'Cr';
   status: 'VALID' | 'WARNING' | 'ERROR';
   messages: string[];
 }
@@ -86,7 +87,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
       'PIN Code',
       'Credit Limit (INR)',
       'Credit Period (Days)',
-      'Opening Balance (+Receivable / -Payable)'
+      'Opening Balance Amount',
+      'Balance Type (Dr/Cr)'
     ];
 
     const sampleRows = [
@@ -104,7 +106,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
         '110020',
         '250000',
         '30',
-        '45000'
+        '45000',
+        'Dr'
       ],
       [
         'CUSTOMER',
@@ -120,7 +123,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
         '400050',
         '500000',
         '45',
-        '0'
+        '0',
+        'Dr'
       ],
       [
         'VENDOR',
@@ -136,7 +140,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
         '382028',
         '1000000',
         '60',
-        '-78500'
+        '78500',
+        'Cr'
       ],
       [
         'VENDOR',
@@ -152,7 +157,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
         '700001',
         '300000',
         '15',
-        '-12000'
+        '12000',
+        'Cr'
       ],
       [
         'BOTH',
@@ -168,7 +174,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
         '682011',
         '400000',
         '30',
-        '15000'
+        '15000',
+        'Dr'
       ]
     ];
 
@@ -291,7 +298,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
         const pincodeIdx = findIndex(['pincode', 'pin', 'zip', 'postalcode']);
         const creditLimitIdx = findIndex(['creditlimit', 'limit', 'credit']);
         const creditPeriodIdx = findIndex(['creditperiod', 'creditdays', 'days', 'paymentterms', 'terms']);
-        const openingBalIdx = findIndex(['openingbalance', 'balance', 'openingdue', 'dueamount', 'currentbalance']);
+        const openingBalIdx = findIndex(['openingbalance', 'balance', 'openingdue', 'dueamount', 'currentbalance', 'openingamount']);
+        const openingBalTypeIdx = findIndex(['balancetype', 'openingbalancetype', 'openingtype', 'drcr', 'type_drcr', 'creditdebit', 'crdr', 'cr_dr']);
 
         const parsedList: ParsedPartyRow[] = [];
 
@@ -392,14 +400,29 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
             ? parseInt(row[creditPeriodIdx].replace(/[^0-9]/g, ''), 10) || 30
             : 30;
 
-          // 10. Opening Balance
+          // 10. Opening Balance & Type (Dr/Cr)
           let rawOpeningBal = openingBalIdx !== -1 && row[openingBalIdx]
             ? parseFloat(row[openingBalIdx].replace(/[^0-9.-]/g, '')) || 0
             : 0;
 
-          // If vendor and positive opening balance was entered, make it negative (payable)
-          if (parsedType === 'VENDOR' && rawOpeningBal > 0) {
-            rawOpeningBal = -rawOpeningBal;
+          let parsedOpenType: 'Dr' | 'Cr' | undefined = undefined;
+          if (openingBalTypeIdx !== -1 && row[openingBalTypeIdx]) {
+            const tVal = row[openingBalTypeIdx].trim().toUpperCase();
+            if (tVal.includes('CR') || tVal.includes('CREDIT') || tVal.includes('PAYABLE')) {
+              parsedOpenType = 'Cr';
+            } else if (tVal.includes('DR') || tVal.includes('DEBIT') || tVal.includes('RECEIVABLE')) {
+              parsedOpenType = 'Dr';
+            }
+          }
+
+          if (!parsedOpenType && openingBalIdx !== -1 && row[openingBalIdx]) {
+            const rawCell = row[openingBalIdx].trim().toUpperCase();
+            if (rawCell.includes('CR') || rawCell.includes('CREDIT')) parsedOpenType = 'Cr';
+            else if (rawCell.includes('DR') || rawCell.includes('DEBIT')) parsedOpenType = 'Dr';
+          }
+
+          if (!parsedOpenType) {
+            parsedOpenType = (parsedType === 'VENDOR' || rawOpeningBal < 0) ? 'Cr' : 'Dr';
           }
 
           parsedList.push({
@@ -418,7 +441,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
             pincode: rawPincode,
             creditLimit: rawCreditLimit,
             creditPeriodDays: rawCreditPeriod,
-            openingBalance: rawOpeningBal,
+            openingBalance: Math.abs(rawOpeningBal),
+            openingBalanceType: parsedOpenType,
             status,
             messages
           });
@@ -503,7 +527,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
         pincode: r.pincode,
         creditLimit: r.creditLimit,
         creditPeriodDays: r.creditPeriodDays,
-        openingBalance: r.openingBalance
+        openingBalance: Math.abs(r.openingBalance),
+        openingBalanceType: r.openingBalanceType || (r.type === 'VENDOR' ? 'Cr' : 'Dr')
       }));
 
     if (validPartiesToImport.length === 0) {
@@ -896,14 +921,14 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono">
                           <span className={`font-bold ${
-                            row.openingBalance > 0 
+                            row.openingBalanceType === 'Dr' 
                               ? 'text-emerald-700 dark:text-emerald-400' 
-                              : row.openingBalance < 0 
+                              : row.openingBalanceType === 'Cr'
                               ? 'text-rose-600 dark:text-rose-400' 
                               : 'text-slate-500 dark:text-slate-400'
                           }`}>
                             {formatCurrency(Math.abs(row.openingBalance), currencySymbol)}
-                            {row.openingBalance > 0 ? ' (Dr)' : row.openingBalance < 0 ? ' (Cr)' : ''}
+                            {row.openingBalance > 0 ? (row.openingBalanceType === 'Cr' ? ' (Cr)' : ' (Dr)') : ''}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-center">

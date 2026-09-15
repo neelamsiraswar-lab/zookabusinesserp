@@ -39,12 +39,17 @@ import {
   Fingerprint,
   Lock,
   Unlock,
-  ScanFace
+  ScanFace,
+  Users,
+  ArrowRightLeft,
+  ChevronDown,
+  Phone
 } from 'lucide-react';
 import { formatINR } from '../../utils/formatters';
-import { AccountHead, JournalEntry, Invoice, PurchaseBill, Expense } from '../../types';
+import { AccountHead, JournalEntry, Invoice, PurchaseBill, Expense, Party, PaymentRecord } from '../../types';
 import { BankStatementImportModal } from './BankStatementImportModal';
 import { AccountingBiometricShield } from './AccountingBiometricShield';
+import { DebtorsCreditorsView } from './DebtorsCreditorsView';
 
 interface LedgerPosting {
   id: string;
@@ -122,6 +127,9 @@ export const AccountingView: React.FC = () => {
     invoices, 
     purchaseBills, 
     expenses,
+    parties,
+    payments,
+    showToast,
     biometricConfig,
     isBiometricAccountingUnlocked,
     lockBiometricAccounting,
@@ -129,7 +137,24 @@ export const AccountingView: React.FC = () => {
     promptBiometricVerification
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'general_ledger' | 'daybook' | 'trial_balance' | 'pnl' | 'balance_sheet'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'debtors_creditors' | 'general_ledger' | 'daybook' | 'trial_balance' | 'pnl' | 'balance_sheet'>('overview');
+  
+  // Debtors & Creditors sub-ledger toggle inside Chart of Accounts
+  const [showDebtorsBreakdown, setShowDebtorsBreakdown] = useState(false);
+  const [showCreditorsBreakdown, setShowCreditorsBreakdown] = useState(false);
+  
+  // Balance Sheet breakdown toggles
+  const [showBsDebtorsBreakdown, setShowBsDebtorsBreakdown] = useState(false);
+  const [showBsCreditorsBreakdown, setShowBsCreditorsBreakdown] = useState(false);
+
+  // Customer Debtors & Vendor Creditors derived list
+  const customerDebtors = useMemo(() => {
+    return parties.filter(p => p.type === 'CUSTOMER' || p.type === 'BOTH');
+  }, [parties]);
+
+  const vendorCreditors = useMemo(() => {
+    return parties.filter(p => p.type === 'VENDOR' || p.type === 'BOTH');
+  }, [parties]);
   
   // Ledger Drilldown State
   const [selectedAccountId, setSelectedAccountId] = useState<string>('acc-2'); // Default to Bank
@@ -197,6 +222,25 @@ export const AccountingView: React.FC = () => {
       if (!map[id]) map[id] = [];
     });
 
+    // Initialize party sub-ledger postings for every customer/vendor
+    parties.forEach(p => {
+      map['party-' + p.id] = [];
+      if (p.openingBalance && p.openingBalance > 0) {
+        const isDr = p.openingBalanceType === 'Dr' || (!p.openingBalanceType && (p.type === 'CUSTOMER' || (p.type === 'BOTH' && (p.currentBalance || 0) >= 0)));
+        map['party-' + p.id].push({
+          id: `party-op-${p.id}`,
+          date: '2026-04-01',
+          timestamp: new Date('2026-04-01T00:00:00').getTime(),
+          voucherType: 'OPENING',
+          voucherNumber: 'OP-BAL',
+          particulars: `Opening Balance b/f (${p.name}) [${isDr ? 'Debit / Dr' : 'Credit / Cr'}]`,
+          oppositeAccount: 'Opening Balance Suspense',
+          debit: isDr ? p.openingBalance : 0,
+          credit: !isDr ? p.openingBalance : 0
+        });
+      }
+    });
+
     // 2. Post Sales Invoices (Accrual basis)
     invoices.filter(inv => inv.status !== 'CANCELLED').forEach(inv => {
       const invDate = inv.invoiceDate;
@@ -211,6 +255,21 @@ export const AccountingView: React.FC = () => {
           voucherType: 'INVOICE',
           voucherNumber: inv.invoiceNumber,
           particulars: `Sales to ${inv.customerName} (${inv.items.length} items)`,
+          oppositeAccount: 'Sales Revenue & GST',
+          debit: inv.grandTotal,
+          credit: 0
+        });
+      }
+
+      // Dr: Specific Customer Debtor Sub-Ledger
+      if (inv.customerId && map['party-' + inv.customerId]) {
+        map['party-' + inv.customerId].push({
+          id: `inv-party-${inv.id}`,
+          date: invDate,
+          timestamp: invTimestamp,
+          voucherType: 'INVOICE',
+          voucherNumber: inv.invoiceNumber,
+          particulars: `Tax Invoice to Customer (${inv.items.length} items)`,
           oppositeAccount: 'Sales Revenue & GST',
           debit: inv.grandTotal,
           credit: 0
@@ -311,6 +370,21 @@ export const AccountingView: React.FC = () => {
             credit: inv.amountPaid
           });
         }
+
+        // Cr: Specific Customer Debtor Sub-Ledger
+        if (inv.customerId && map['party-' + inv.customerId]) {
+          map['party-' + inv.customerId].push({
+            id: `pay-party-${inv.id}`,
+            date: invDate,
+            timestamp: payTimestamp,
+            voucherType: 'PAYMENT_RECEIVED',
+            voucherNumber: `RCPT-${inv.invoiceNumber}`,
+            particulars: `Payment received against ${inv.invoiceNumber} (${inv.paymentMethod || 'UPI/Bank'})`,
+            oppositeAccount: inv.paymentMethod === 'CASH' ? 'Cash on Hand' : 'Bank Current A/C',
+            debit: 0,
+            credit: inv.amountPaid
+          });
+        }
       }
     });
 
@@ -394,6 +468,21 @@ export const AccountingView: React.FC = () => {
         });
       }
 
+      // Cr: Specific Vendor Creditor Sub-Ledger
+      if (bill.vendorId && map['party-' + bill.vendorId]) {
+        map['party-' + bill.vendorId].push({
+          id: `bill-party-${bill.id}`,
+          date: billDate,
+          timestamp: billTimestamp,
+          voucherType: 'PURCHASE_BILL',
+          voucherNumber: bill.billNumber,
+          particulars: `Inward Purchase Bill (Ref: ${bill.vendorInvoiceNumber || bill.billNumber})`,
+          oppositeAccount: 'Purchases & ITC',
+          debit: 0,
+          credit: bill.grandTotal
+        });
+      }
+
       // Vendor Payments
       if (bill.amountPaid > 0) {
         const payAccount = bill.paymentMethod === 'CASH' ? 'acc-1' : 'acc-2';
@@ -409,6 +498,21 @@ export const AccountingView: React.FC = () => {
             voucherNumber: `PMT-${bill.billNumber}`,
             particulars: `Payment to ${bill.vendorName} (${bill.paymentMethod || 'Bank'})`,
             oppositeAccount: bill.paymentMethod === 'CASH' ? 'Cash in Hand' : 'HDFC Bank',
+            debit: bill.amountPaid,
+            credit: 0
+          });
+        }
+
+        // Dr: Specific Vendor Creditor Sub-Ledger
+        if (bill.vendorId && map['party-' + bill.vendorId]) {
+          map['party-' + bill.vendorId].push({
+            id: `vpay-party-${bill.id}`,
+            date: billDate,
+            timestamp: payTimestamp,
+            voucherType: 'VENDOR_PAYMENT',
+            voucherNumber: `PMT-${bill.billNumber}`,
+            particulars: `Payment made against ${bill.billNumber} (${bill.paymentMethod || 'Bank'})`,
+            oppositeAccount: bill.paymentMethod === 'CASH' ? 'Cash on Hand' : 'Bank Current A/C',
             debit: bill.amountPaid,
             credit: 0
           });
@@ -589,6 +693,25 @@ export const AccountingView: React.FC = () => {
       };
     });
 
+    // 7. Compute running balances for all Customer Debtor & Vendor Creditor sub-ledgers
+    parties.forEach(p => {
+      const partyPostings = map['party-' + p.id] || [];
+      partyPostings.sort((a, b) => a.timestamp - b.timestamp);
+      const isDebtor = p.type === 'CUSTOMER' || (p.type === 'BOTH' && (p.currentBalance || 0) >= 0);
+      let running = 0;
+      partyPostings.forEach(pst => {
+        if (isDebtor) {
+          running += (pst.debit - pst.credit);
+          pst.runningBalance = Math.abs(running);
+          pst.balanceType = running >= 0 ? 'Dr' : 'Cr';
+        } else {
+          running += (pst.credit - pst.debit);
+          pst.runningBalance = Math.abs(running);
+          pst.balanceType = running >= 0 ? 'Cr' : 'Dr';
+        }
+      });
+    });
+
     return {
       accountLedgerMap: map,
       dynamicAccountHeads: dynamicHeads,
@@ -597,12 +720,32 @@ export const AccountingView: React.FC = () => {
         totalCredit: totalTrialCredit
       }
     };
-  }, [baseAccountHeads, invoices, purchaseBills, expenses, journalEntries]);
+  }, [baseAccountHeads, invoices, purchaseBills, expenses, journalEntries, parties]);
 
-  // Selected Account for Ledger Statement View
-  const currentAccount = useMemo(() => {
+  // Selected Account for Ledger Statement View (Supports both GL Heads and Party Sub-Ledgers)
+  const currentAccount = useMemo((): AccountHead => {
+    if (selectedAccountId.startsWith('party-')) {
+      const pid = selectedAccountId.replace('party-', '');
+      const party = parties.find(p => p.id === pid);
+      if (party) {
+        const isVendor = party.type === 'VENDOR';
+        const isBoth = party.type === 'BOTH';
+        const bal = party.currentBalance || 0;
+        return {
+          id: selectedAccountId,
+          code: isVendor ? `CR-${party.id.slice(-4).toUpperCase()}` : `DR-${party.id.slice(-4).toUpperCase()}`,
+          name: `${party.name} (${isBoth ? 'Debtor / Creditor' : isVendor ? 'Sundry Creditor' : 'Sundry Debtor'})`,
+          category: (isVendor ? 'LIABILITY' : 'ASSET') as any,
+          subCategory: isBoth ? 'Dual Party (Customer & Vendor Sub-Ledger)' : isVendor ? 'Sundry Creditors (Trade Payables)' : 'Sundry Debtors (Trade Receivables)',
+          openingBalance: party.openingBalance || 0,
+          balance: bal,
+          isSystem: false,
+          description: `Party sub-ledger statement for ${party.name} (${party.phone || party.city || 'No contact provided'})`
+        };
+      }
+    }
     return dynamicAccountHeads.find(a => a.id === selectedAccountId) || dynamicAccountHeads[0];
-  }, [dynamicAccountHeads, selectedAccountId]);
+  }, [dynamicAccountHeads, selectedAccountId, parties]);
 
   const currentAccountPostings = useMemo(() => {
     const rawPostings = accountLedgerMap[selectedAccountId] || [];
@@ -1012,6 +1155,21 @@ export const AccountingView: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setActiveSubTab('debtors_creditors')}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+            activeSubTab === 'debtors_creditors'
+              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/40 rounded-t-lg'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <span>Debtors & Creditors (Party Balances)</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold">
+            {parties.length}
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('trial_balance')}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
             activeSubTab === 'trial_balance'
@@ -1242,7 +1400,144 @@ export const AccountingView: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Sundry Debtors & Creditors (Customer & Vendor Balances) Widget */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Sundry Debtors & Creditors (Party Balances in Detail)</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Customers consolidated as Trade Debtors (Receivables / Dr) and Vendors as Trade Creditors (Payables / Cr).
+                </p>
+              </div>
+
+              <button
+                onClick={() => setActiveSubTab('debtors_creditors')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
+              >
+                <span>View Full Debtors & Creditors Ledger</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Debtors Column */}
+              <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold text-xs font-mono">
+                      Dr
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">Sundry Debtors (Customers)</h4>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">{customerDebtors.length} Customer Accounts</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-black font-mono text-blue-700 dark:text-blue-300">
+                      {formatINR(Math.abs(debtorsHead?.balance || totalReceivables))}
+                    </div>
+                    <span className="text-[9px] uppercase font-bold text-blue-600 dark:text-blue-400">Total Net Receivables</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-blue-200/60 dark:border-blue-900/40 text-xs">
+                  {customerDebtors.slice(0, 4).map(cust => (
+                    <div
+                      key={cust.id}
+                      onClick={() => {
+                        setSelectedAccountId('party-' + cust.id);
+                        setActiveSubTab('general_ledger');
+                      }}
+                      className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-850 border border-blue-100 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-[10px] text-slate-400 font-bold">DR-{cust.id.slice(-4).toUpperCase()}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{cust.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono font-bold text-blue-700 dark:text-blue-300 text-xs">
+                          {formatINR(Math.abs(cust.currentBalance || 0))}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
+                          {(cust.currentBalance || 0) >= 0 ? 'Dr' : 'Cr'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {customerDebtors.length === 0 && (
+                    <div className="text-center py-4 text-xs text-slate-400">No customer debtors found.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Creditors Column */}
+              <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold text-xs font-mono">
+                      Cr
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">Sundry Creditors (Vendors)</h4>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">{vendorCreditors.length} Vendor Accounts</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-black font-mono text-amber-700 dark:text-amber-300">
+                      {formatINR(Math.abs(creditorsHead?.balance || totalPayables))}
+                    </div>
+                    <span className="text-[9px] uppercase font-bold text-amber-600 dark:text-amber-400">Total Net Payables</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-amber-200/60 dark:border-amber-900/40 text-xs">
+                  {vendorCreditors.slice(0, 4).map(vend => (
+                    <div
+                      key={vend.id}
+                      onClick={() => {
+                        setSelectedAccountId('party-' + vend.id);
+                        setActiveSubTab('general_ledger');
+                      }}
+                      className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-850 border border-amber-100 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-600 transition-all cursor-pointer group shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-[10px] text-slate-400 font-bold">CR-{vend.id.slice(-4).toUpperCase()}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{vend.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono font-bold text-amber-700 dark:text-amber-300 text-xs">
+                          {formatINR(Math.abs(vend.currentBalance || 0))}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                          {(vend.currentBalance || 0) <= 0 ? 'Cr' : 'Dr'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {vendorCreditors.length === 0 && (
+                    <div className="text-center py-4 text-xs text-slate-400">No vendor creditors found.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* =========================================================================
+          TAB: DEBTORS (CUSTOMERS) & CREDITORS (VENDORS) DETAILED BALANCES & LEDGER
+         ========================================================================= */}
+      {activeSubTab === 'debtors_creditors' && (
+        <DebtorsCreditorsView
+          onSelectPartyInGeneralLedger={(partyId) => {
+            setSelectedAccountId('party-' + partyId);
+            setActiveSubTab('general_ledger');
+          }}
+        />
       )}
 
       {/* =========================================================================
@@ -1327,81 +1622,211 @@ export const AccountingView: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredChartOfAccounts.map(acc => {
                     const isDr = acc.category === 'ASSET' || acc.category === 'EXPENSE';
+                    const isDebtorsControl = acc.id === 'acc-3' || acc.code === '1030';
+                    const isCreditorsControl = acc.id === 'acc-8' || acc.code === '2020';
+
                     return (
-                      <tr key={acc.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
-                        <td className="py-3 px-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                          {acc.code}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <span>{acc.name}</span>
-                            {acc.isSystem && (
-                              <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700">
-                                System Default
-                              </span>
-                            )}
-                          </div>
-                          {acc.subCategory && (
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                              {acc.subCategory}
+                      <React.Fragment key={acc.id}>
+                        <tr className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group">
+                          <td className="py-3 px-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            {acc.code}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                              <span>{acc.name}</span>
+                              {acc.isSystem && (
+                                <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700">
+                                  System Default
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            acc.category === 'ASSET' ? 'bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300' :
-                            acc.category === 'LIABILITY' ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300' :
-                            acc.category === 'EQUITY' ? 'bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300' :
-                            acc.category === 'INCOME' ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300' :
-                            'bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300'
-                          }`}>
-                            {acc.category}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-400">
-                          {acc.openingBalance ? formatINR(acc.openingBalance) : '-'}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-blue-700 dark:text-blue-400">
-                          {isDr ? formatINR(Math.abs(acc.balance)) : '-'}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                          {!isDr ? formatINR(Math.abs(acc.balance)) : '-'}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {/* Drilldown to Statement */}
-                            <button
-                              onClick={() => {
-                                setSelectedAccountId(acc.id);
-                                setActiveSubTab('general_ledger');
-                              }}
-                              className="px-2 py-1 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md font-semibold cursor-pointer flex items-center gap-1"
-                              title="View Ledger Statement"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              <span>Statement</span>
-                            </button>
+                            {acc.subCategory && (
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                {acc.subCategory}
+                              </div>
+                            )}
 
-                            {/* Edit Account */}
-                            <button
-                              onClick={() => handleOpenEditAccount(acc)}
-                              className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md cursor-pointer transition-colors"
-                              title="Edit Ledger Account Details"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Sub-ledger toggles for Debtors and Creditors */}
+                            {isDebtorsControl && (
+                              <button
+                                type="button"
+                                onClick={() => setShowDebtorsBreakdown(!showDebtorsBreakdown)}
+                                className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 cursor-pointer bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md transition-colors"
+                              >
+                                <ChevronDown className={`w-3 h-3 transition-transform ${showDebtorsBreakdown ? 'rotate-180' : ''}`} />
+                                <span>{showDebtorsBreakdown ? 'Hide Customer Debtors' : `Show Individual Debtors (${customerDebtors.length} Customers)`}</span>
+                              </button>
+                            )}
 
-                            {/* Delete Account */}
-                            <button
-                              onClick={() => setAccountToDelete(acc)}
-                              className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md cursor-pointer transition-colors"
-                              title="Delete Ledger Account"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                            {isCreditorsControl && (
+                              <button
+                                type="button"
+                                onClick={() => setShowCreditorsBreakdown(!showCreditorsBreakdown)}
+                                className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 cursor-pointer bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md transition-colors"
+                              >
+                                <ChevronDown className={`w-3 h-3 transition-transform ${showCreditorsBreakdown ? 'rotate-180' : ''}`} />
+                                <span>{showCreditorsBreakdown ? 'Hide Vendor Creditors' : `Show Individual Creditors (${vendorCreditors.length} Vendors)`}</span>
+                              </button>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              acc.category === 'ASSET' ? 'bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300' :
+                              acc.category === 'LIABILITY' ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300' :
+                              acc.category === 'EQUITY' ? 'bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300' :
+                              acc.category === 'INCOME' ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300' :
+                              'bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300'
+                            }`}>
+                              {acc.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-400">
+                            {acc.openingBalance ? formatINR(acc.openingBalance) : '-'}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-blue-700 dark:text-blue-400">
+                            {isDr ? formatINR(Math.abs(acc.balance)) : '-'}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                            {!isDr ? formatINR(Math.abs(acc.balance)) : '-'}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Drilldown to Statement */}
+                              <button
+                                onClick={() => {
+                                  setSelectedAccountId(acc.id);
+                                  setActiveSubTab('general_ledger');
+                                }}
+                                className="px-2 py-1 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md font-semibold cursor-pointer flex items-center gap-1"
+                                title="View Ledger Statement"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Statement</span>
+                              </button>
+
+                              {/* Edit Account */}
+                              <button
+                                onClick={() => handleOpenEditAccount(acc)}
+                                className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md cursor-pointer transition-colors"
+                                title="Edit Ledger Account Details"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Delete Account */}
+                              <button
+                                onClick={() => setAccountToDelete(acc)}
+                                className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md cursor-pointer transition-colors"
+                                title="Delete Ledger Account"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Expandable Customer Debtors Sub-Ledger Rows */}
+                        {isDebtorsControl && showDebtorsBreakdown && customerDebtors.map(cust => (
+                          <tr key={'sub-dr-' + cust.id} className="bg-blue-50/40 dark:bg-blue-950/20 text-xs border-l-4 border-l-blue-500">
+                            <td className="py-2.5 px-4 font-mono font-bold text-blue-600 dark:text-blue-400 pl-8">
+                              ↳ DR-{cust.id.slice(-4).toUpperCase()}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <div className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <span>{cust.name}</span>
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 font-bold">
+                                  Customer Debtor
+                                </span>
+                              </div>
+                              {cust.phone && (
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                                  <Phone className="w-3 h-3" />
+                                  <span>{cust.phone}</span>
+                                  {cust.city && <span>• {cust.city}</span>}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                Trade Receivable
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                              {cust.openingBalance ? formatINR(cust.openingBalance) : '-'}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-blue-700 dark:text-blue-400">
+                              {formatINR(Math.abs(cust.currentBalance || 0))}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-400">
+                              -
+                            </td>
+                            <td className="py-2.5 px-4 text-center">
+                              <button
+                                onClick={() => {
+                                  setSelectedAccountId('party-' + cust.id);
+                                  setActiveSubTab('general_ledger');
+                                }}
+                                className="px-2 py-0.5 text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded font-semibold cursor-pointer inline-flex items-center gap-1"
+                                title="View Customer Ledger Statement"
+                              >
+                                <FileText className="w-3 h-3" />
+                                <span>Drilldown</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* Expandable Vendor Creditors Sub-Ledger Rows */}
+                        {isCreditorsControl && showCreditorsBreakdown && vendorCreditors.map(vend => (
+                          <tr key={'sub-cr-' + vend.id} className="bg-amber-50/40 dark:bg-amber-950/20 text-xs border-l-4 border-l-amber-500">
+                            <td className="py-2.5 px-4 font-mono font-bold text-amber-600 dark:text-amber-400 pl-8">
+                              ↳ CR-{vend.id.slice(-4).toUpperCase()}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <div className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <span>{vend.name}</span>
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                                  Vendor Creditor
+                                </span>
+                              </div>
+                              {vend.phone && (
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                                  <Phone className="w-3 h-3" />
+                                  <span>{vend.phone}</span>
+                                  {vend.city && <span>• {vend.city}</span>}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                                Trade Payable
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-500">
+                              {vend.openingBalance ? formatINR(vend.openingBalance) : '-'}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono text-slate-400">
+                              -
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                              {formatINR(Math.abs(vend.currentBalance || 0))}
+                            </td>
+                            <td className="py-2.5 px-4 text-center">
+                              <button
+                                onClick={() => {
+                                  setSelectedAccountId('party-' + vend.id);
+                                  setActiveSubTab('general_ledger');
+                                }}
+                                className="px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded font-semibold cursor-pointer inline-flex items-center gap-1"
+                                title="View Vendor Ledger Statement"
+                              >
+                                <FileText className="w-3 h-3" />
+                                <span>Drilldown</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
                     );
                   })}
 
@@ -1453,13 +1878,35 @@ export const AccountingView: React.FC = () => {
                 <select
                   value={selectedAccountId}
                   onChange={e => setSelectedAccountId(e.target.value)}
-                  className="px-3 py-2 text-sm font-bold text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 min-w-[280px]"
+                  className="px-3 py-2 text-sm font-bold text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 min-w-[320px]"
                 >
-                  {dynamicAccountHeads.map(acc => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.code} - {acc.name} ({acc.category}) — Bal: {formatINR(Math.abs(acc.balance))}
-                    </option>
-                  ))}
+                  <optgroup label="General Ledger Control Accounts">
+                    {dynamicAccountHeads.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.code} - {acc.name} ({acc.category}) — Bal: {formatINR(Math.abs(acc.balance))}
+                      </option>
+                    ))}
+                  </optgroup>
+
+                  {customerDebtors.length > 0 && (
+                    <optgroup label="Customer Debtors (Trade Receivables / Dr Sub-Ledgers)">
+                      {customerDebtors.map(cust => (
+                        <option key={'party-' + cust.id} value={'party-' + cust.id}>
+                          DR-{cust.id.slice(-4).toUpperCase()} - {cust.name} (Debtor) — Bal: {formatINR(Math.abs(cust.currentBalance || 0))} {(cust.currentBalance || 0) >= 0 ? 'Dr' : 'Cr'}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+
+                  {vendorCreditors.length > 0 && (
+                    <optgroup label="Vendor Creditors (Trade Payables / Cr Sub-Ledgers)">
+                      {vendorCreditors.map(vend => (
+                        <option key={'party-' + vend.id} value={'party-' + vend.id}>
+                          CR-{vend.id.slice(-4).toUpperCase()} - {vend.name} (Creditor) — Bal: {formatINR(Math.abs(vend.currentBalance || 0))} {(vend.currentBalance || 0) <= 0 ? 'Cr' : 'Dr'}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 

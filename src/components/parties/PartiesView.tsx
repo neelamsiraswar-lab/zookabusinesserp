@@ -23,7 +23,8 @@ import {
   FileSpreadsheet,
   Download,
   ShoppingCart,
-  RefreshCw
+  RefreshCw,
+  Scale
 } from 'lucide-react';
 
 export const PartiesView: React.FC = () => {
@@ -86,6 +87,8 @@ export const PartiesView: React.FC = () => {
   const [creditLimit, setCreditLimit] = useState<number>(0);
   const [creditPeriodDays, setCreditPeriodDays] = useState<number>(30);
   const [openingBalance, setOpeningBalance] = useState<number>(0);
+  const [openingBalanceType, setOpeningBalanceType] = useState<'Dr' | 'Cr'>('Cr');
+  const [openingBalanceDate, setOpeningBalanceDate] = useState<string>('2026-04-01');
 
   const filteredParties = parties.filter(p => {
     const matchesSearch = 
@@ -114,9 +117,10 @@ export const PartiesView: React.FC = () => {
     .filter(p => p.currentBalance < 0)
     .reduce((s, p) => s + Math.abs(p.currentBalance), 0);
 
-  const handleOpenCreate = () => {
+  const handleOpenCreate = (presetType?: 'CUSTOMER' | 'VENDOR' | 'BOTH') => {
     setEditingParty(null);
-    setType('CUSTOMER');
+    const chosenType = presetType || (partyTypeFilter === 'VENDOR' ? 'VENDOR' : 'CUSTOMER');
+    setType(chosenType);
     setName('');
     setCompanyName('');
     setGstin('');
@@ -124,12 +128,14 @@ export const PartiesView: React.FC = () => {
     setEmail('');
     setBillingAddress('');
     setCity('');
-    setState('Delhi');
-    setStateCode('07');
-    setPincode('');
+    setState(business.state || 'Delhi');
+    setStateCode(business.stateCode || '07');
+    setPincode(business.pincode || '');
     setCreditLimit(100000);
     setCreditPeriodDays(30);
     setOpeningBalance(0);
+    setOpeningBalanceType(chosenType === 'VENDOR' ? 'Cr' : 'Dr');
+    setOpeningBalanceDate(new Date().toISOString().split('T')[0]);
     setIsModalOpen(true);
   };
 
@@ -148,6 +154,9 @@ export const PartiesView: React.FC = () => {
     setPincode(p.pincode);
     setCreditLimit(p.creditLimit || 0);
     setCreditPeriodDays(p.creditPeriodDays || 30);
+    setOpeningBalance(Math.abs(p.openingBalance || 0));
+    setOpeningBalanceType(p.openingBalanceType || (p.type === 'VENDOR' ? 'Cr' : (p.currentBalance < 0 ? 'Cr' : 'Dr')));
+    setOpeningBalanceDate(p.openingBalanceDate || (p.createdAt ? p.createdAt.split('T')[0] : '2026-04-01'));
     setIsModalOpen(true);
   };
 
@@ -159,6 +168,7 @@ export const PartiesView: React.FC = () => {
     }
 
     const pan = gstin && gstin.length >= 12 ? gstin.substring(2, 12) : undefined;
+    const cleanOpening = Math.abs(openingBalance || 0);
 
     if (editingParty) {
       updateParty(editingParty.id, {
@@ -175,7 +185,10 @@ export const PartiesView: React.FC = () => {
         stateCode,
         pincode,
         creditLimit,
-        creditPeriodDays
+        creditPeriodDays,
+        openingBalance: cleanOpening,
+        openingBalanceType,
+        openingBalanceDate
       });
     } else {
       createParty({
@@ -193,7 +206,9 @@ export const PartiesView: React.FC = () => {
         pincode,
         creditLimit,
         creditPeriodDays,
-        openingBalance
+        openingBalance: cleanOpening,
+        openingBalanceType,
+        openingBalanceDate
       });
     }
 
@@ -258,11 +273,11 @@ export const PartiesView: React.FC = () => {
             <span>Account Statements</span>
           </button>
           <button
-            onClick={handleOpenCreate}
+            onClick={() => handleOpenCreate(partyTypeFilter === 'VENDOR' ? 'VENDOR' : 'CUSTOMER')}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Add New Contact</span>
+            <span>{partyTypeFilter === 'VENDOR' ? 'Add New Vendor' : partyTypeFilter === 'CUSTOMER' ? 'Add New Customer' : 'Add New Contact'}</span>
           </button>
         </div>
       </div>
@@ -403,10 +418,15 @@ export const PartiesView: React.FC = () => {
                         isDebtor ? 'text-emerald-600 dark:text-emerald-400' : isCreditor ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'
                       }`}>
                         {formatCurrency(Math.abs(party.currentBalance), business.currencySymbol)}
-                        <span className="text-[10px] ml-1 font-sans">
-                          {isDebtor ? '(To Receive)' : isCreditor ? '(To Pay)' : '(Settled)'}
+                        <span className="text-[10px] ml-1 font-sans font-bold">
+                          {isDebtor ? '(Dr)' : isCreditor ? '(Cr)' : '(Settled)'}
                         </span>
                       </div>
+                      {Boolean(party.openingBalance && party.openingBalance > 0) && (
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                          Opening: {formatCurrency(party.openingBalance, business.currencySymbol)} ({party.openingBalanceType || (party.type === 'VENDOR' ? 'Cr' : 'Dr')})
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -509,8 +529,13 @@ export const PartiesView: React.FC = () => {
                     <button
                       key={t}
                       type="button"
-                      onClick={() => setType(t)}
-                      className={`py-1.5 rounded-xl font-bold transition-all ${
+                      onClick={() => {
+                        setType(t);
+                        if (!editingParty && openingBalance === 0) {
+                          setOpeningBalanceType(t === 'VENDOR' ? 'Cr' : 'Dr');
+                        }
+                      }}
+                      className={`py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
                         type === t
                           ? 'bg-indigo-600 text-white shadow-sm'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -627,18 +652,109 @@ export const PartiesView: React.FC = () => {
                   />
                 </div>
 
-                {!editingParty && (
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Opening Balance ({business.currencySymbol})</label>
-                    <input
-                      type="number"
-                      value={openingBalance}
-                      onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none"
-                    />
+                <div className="col-span-2 p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Scale className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                        Opening Balance & Account Nature
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      Starting FY 2026–27 Ledger Balance
+                    </span>
                   </div>
-                )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-7">
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 text-[11px] mb-1">
+                        Opening Balance Amount ({business.currencySymbol})
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-bold text-xs">
+                          {business.currencySymbol}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={openingBalance === 0 ? '' : openingBalance}
+                          onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="w-full pl-8 pr-3 py-2 font-mono font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-5">
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 text-[11px] mb-1">
+                        Balance Type (Dr / Cr)
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setOpeningBalanceType('Cr')}
+                          className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${
+                            openingBalanceType === 'Cr'
+                              ? 'bg-rose-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                          title="Credit (Cr) - Payable balance owed to party"
+                        >
+                          <span className="leading-tight">Credit (Cr)</span>
+                          <span className={`text-[9px] font-medium ${openingBalanceType === 'Cr' ? 'text-rose-100' : 'text-slate-400'}`}>
+                            Payable
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setOpeningBalanceType('Dr')}
+                          className={`py-1.5 px-2 rounded-lg font-bold text-xs transition-all flex flex-col items-center justify-center cursor-pointer ${
+                            openingBalanceType === 'Dr'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                          title="Debit (Dr) - Receivable balance or advance paid"
+                        >
+                          <span className="leading-tight">Debit (Dr)</span>
+                          <span className={`text-[9px] font-medium ${openingBalanceType === 'Dr' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                            {type === 'VENDOR' ? 'Advance' : 'Receivable'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border text-[11px] flex items-start gap-2 ${
+                    openingBalanceType === 'Cr'
+                      ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-200/80 dark:border-rose-900/50 text-rose-800 dark:text-rose-300'
+                      : 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200/80 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300'
+                  }`}>
+                    <div className={`mt-0.5 px-1.5 py-0.5 rounded font-black text-[10px] shrink-0 ${
+                      openingBalanceType === 'Cr' ? 'bg-rose-200/80 dark:bg-rose-900/60 text-rose-900 dark:text-rose-100' : 'bg-emerald-200/80 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-100'
+                    }`}>
+                      {openingBalanceType}
+                    </div>
+                    <div className="flex-1 leading-relaxed">
+                      {openingBalanceType === 'Cr' ? (
+                        <span>
+                          <strong>Credit (Payable):</strong> {type === 'VENDOR' 
+                            ? `Your business owes ${formatCurrency(openingBalance || 0, business.currencySymbol)} to this vendor for past supplies. Sub-ledger recorded under Sundry Creditors.`
+                            : `Client has deposited an advance/credit of ${formatCurrency(openingBalance || 0, business.currencySymbol)} with your business.`
+                          }
+                        </span>
+                      ) : (
+                        <span>
+                          <strong>Debit (Receivable / Advance):</strong> {type === 'VENDOR'
+                            ? `Your business gave an advance payment of ${formatCurrency(openingBalance || 0, business.currencySymbol)} to this vendor before receiving goods.`
+                            : `Customer owes ${formatCurrency(openingBalance || 0, business.currencySymbol)} to your business for past sales invoices. Sub-ledger recorded under Sundry Debtors.`
+                          }
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">

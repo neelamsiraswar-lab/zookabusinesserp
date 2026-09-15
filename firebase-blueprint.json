@@ -144,7 +144,9 @@
         "email": { "type": "string" },
         "state": { "type": "string" },
         "stateCode": { "type": "string" },
-        "balance": { "type": "number" }
+        "balance": { "type": "number" },
+        "openingBalance": { "type": "number" },
+        "openingBalanceType": { "type": "string" }
       },
       "required": ["id", "name"]
     },

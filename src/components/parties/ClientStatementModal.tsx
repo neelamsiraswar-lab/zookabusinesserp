@@ -409,7 +409,9 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
     allEvents.sort((a, b) => a.timestamp - b.timestamp);
 
     // 2. Compute Opening Balance (initial party balance + sum of events before startDate)
-    let calculatedOpening = currentParty.openingBalance || 0;
+    const rawPartyOpen = Math.abs(currentParty.openingBalance || 0);
+    const isOpenCr = currentParty.openingBalanceType === 'Cr' || (!currentParty.openingBalanceType && (currentParty.type === 'VENDOR' || (currentParty.openingBalance || 0) < 0));
+    let calculatedOpening = rawPartyOpen === 0 ? 0 : (isOpenCr ? -rawPartyOpen : rawPartyOpen);
     allEvents.forEach(evt => {
       if (evt.timestamp < startTimestamp) {
         calculatedOpening += (evt.debit - evt.credit);
