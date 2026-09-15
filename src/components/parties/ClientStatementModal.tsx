@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Party, Invoice, PurchaseBill, PaymentMethod } from '../../types';
+import { Party, Invoice, PurchaseBill, PaymentMethod, PaymentType, PaymentRecord } from '../../types';
 import { formatCurrency, formatDate, normalizeSignatureUrl } from '../../utils/formatters';
 import { buildUpiPaymentUri, cleanUpiId } from '../../utils/upi';
 import { QrCodeSvg } from '../common/QrCodeSvg';
@@ -31,7 +31,10 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Filter
 } from 'lucide-react';
 
 interface ClientStatementModalProps {
@@ -56,13 +59,17 @@ export interface LedgerEntry {
   date: string;
   type: 'INVOICE' | 'PAYMENT' | 'PURCHASE' | 'VENDOR_PAYMENT' | 'OPENING_BALANCE' | 'CREDIT_NOTE';
   typeName: string;
+  flowType: 'MONEY_IN' | 'MONEY_OUT' | 'INVOICE_BILLED' | 'PURCHASE_OWED' | 'OPENING';
   docNo: string;
   refInvoiceId?: string;
+  refBillId?: string;
   description: string;
-  debit: number;   // Invoiced to customer / money they owe
-  credit: number;  // Paid by customer / money they settled
+  debit: number;   // Money Out / Invoiced to customer / Billed to vendor
+  credit: number;  // Money In / Received from customer / Paid to vendor
   runningBalance: number;
-  balanceType: 'Dr' | 'Cr';
+  balanceType: 'Dr' | 'Cr' | 'Nil';
+  balanceStatus: 'RECEIVABLE' | 'PAYABLE' | 'SETTLED';
+  balanceLabel: string;
   status?: string;
 }
 
@@ -75,6 +82,8 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
     parties, 
     invoices, 
     purchaseBills, 
+    payments,
+    createPayment,
     business, 
     recordInvoicePayment, 
     showToast 
@@ -151,12 +160,18 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
+  // Filter for statement ledger transactions
+  const [ledgerTypeFilter, setLedgerTypeFilter] = useState<'ALL' | 'MONEY_IN' | 'MONEY_OUT' | 'INVOICES' | 'PURCHASES'>('ALL');
+
   // Quick Payment Modal inside Statement
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
+  const [paymentType, setPaymentType] = useState<PaymentType>('PAYMENT_IN');
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentDate, setPaymentDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<string>('');
+  const [selectedBillForPayment, setSelectedBillForPayment] = useState<string>('');
 
   const statementRef = useRef<HTMLDivElement>(null);
 
@@ -175,19 +190,25 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
   const {
     openingBalance,
     entries,
+    filteredEntries,
     totalDebits,
     totalCredits,
     closingBalance,
-    unpaidInvoices
+    unpaidInvoices,
+    unpaidBills,
+    counts
   } = useMemo(() => {
     if (!currentParty) {
       return {
         openingBalance: 0,
         entries: [],
+        filteredEntries: [],
         totalDebits: 0,
         totalCredits: 0,
         closingBalance: 0,
-        unpaidInvoices: []
+        unpaidInvoices: [],
+        unpaidBills: [],
+        counts: { all: 0, moneyIn: 0, moneyOut: 0, invoices: 0, purchases: 0 }
       };
     }
 
@@ -201,8 +222,10 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
       timestamp: number;
       type: 'INVOICE' | 'PAYMENT' | 'PURCHASE' | 'VENDOR_PAYMENT' | 'CREDIT_NOTE';
       typeName: string;
+      flowType: 'MONEY_IN' | 'MONEY_OUT' | 'INVOICE_BILLED' | 'PURCHASE_OWED' | 'OPENING';
       docNo: string;
       refInvoiceId?: string;
+      refBillId?: string;
       description: string;
       debit: number;
       credit: number;
@@ -211,19 +234,51 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
 
     const allEvents: RawEvent[] = [];
 
-    // Party Invoices (as customer including POS sales)
-    invoices.filter(inv => 
+    // Identify party matching invoices
+    const partyInvoices = invoices.filter(inv => 
       inv.customerId === currentParty.id || 
       (currentParty.phone && inv.customerPhone && currentParty.phone.replace(/[^0-9]/g, '').slice(-10) === inv.customerPhone.replace(/[^0-9]/g, '').slice(-10))
-    ).forEach(inv => {
+    );
+    const partyInvoiceIds = new Set(partyInvoices.map(i => i.id));
+    const partyInvoiceNumbers = new Set(partyInvoices.map(i => i.invoiceNumber));
+
+    // Identify party matching purchase bills
+    const partyBills = purchaseBills.filter(bill => 
+      bill.vendorId === currentParty.id ||
+      (bill.vendorName && bill.vendorName.toLowerCase().trim() === currentParty.name.toLowerCase().trim())
+    );
+    const partyBillIds = new Set(partyBills.map(b => b.id));
+    const partyBillNumbers = new Set(partyBills.map(b => b.billNumber));
+
+    // Identify party matching payments in payments register (Money In & Money Out)
+    const partyPayments = (payments || []).filter(p => {
+      if (p.partyId && p.partyId === currentParty.id) return true;
+      if (p.partyName && p.partyName.toLowerCase().trim() === currentParty.name.toLowerCase().trim()) return true;
+      if (p.linkedInvoiceId && partyInvoiceIds.has(p.linkedInvoiceId)) return true;
+      if (p.linkedInvoiceNumber && partyInvoiceNumbers.has(p.linkedInvoiceNumber)) return true;
+      if (p.linkedBillId && partyBillIds.has(p.linkedBillId)) return true;
+      if (p.linkedBillNumber && partyBillNumbers.has(p.linkedBillNumber)) return true;
+      return false;
+    });
+
+    const invoicesCoveredInPayments = new Set<string>();
+    const billsCoveredInPayments = new Set<string>();
+
+    partyPayments.forEach(p => {
+      if (p.linkedInvoiceId) invoicesCoveredInPayments.add(p.linkedInvoiceId);
+      if (p.linkedBillId) billsCoveredInPayments.add(p.linkedBillId);
+    });
+
+    // A. Post Party Invoices (Debit - Money Billed / Receivable from Customer)
+    partyInvoices.forEach(inv => {
       const isPos = inv.invoiceType === 'POS_SALE';
-      // Invoiced amount (Debit)
       allEvents.push({
         id: 'inv-' + inv.id,
         date: inv.invoiceDate,
         timestamp: new Date(inv.invoiceDate + 'T10:00:00').getTime(),
         type: 'INVOICE',
-        typeName: isPos ? 'POS Quick Sale' : inv.invoiceType.replace(/_/g, ' '),
+        typeName: isPos ? 'POS Counter Sale' : inv.invoiceType.replace(/_/g, ' '),
+        flowType: 'INVOICE_BILLED',
         docNo: inv.invoiceNumber,
         refInvoiceId: inv.id,
         description: isPos 
@@ -234,49 +289,116 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
         status: inv.status
       });
 
-      // Payments recorded against this invoice
-      if (inv.amountPaid > 0) {
-        allEvents.push({
-          id: 'pay-' + inv.id,
-          date: inv.invoiceDate, // or payment date if recorded
-          timestamp: new Date(inv.invoiceDate + 'T15:00:00').getTime(),
-          type: 'PAYMENT',
-          typeName: isPos ? 'POS Cash/UPI Tender' : 'Payment Receipt',
-          docNo: `RCPT-${inv.invoiceNumber}`,
-          refInvoiceId: inv.id,
-          description: `Payment received via ${inv.paymentMethod || 'Cash/UPI'} against ${inv.invoiceNumber}`,
-          debit: 0,
-          credit: inv.amountPaid,
-          status: 'SETTLED'
-        });
+      // If this invoice has settled payment not recorded in payments register, add receipt event
+      if (!invoicesCoveredInPayments.has(inv.id)) {
+        if (inv.paymentsList && inv.paymentsList.length > 0) {
+          inv.paymentsList.forEach((line, idx) => {
+            allEvents.push({
+              id: `pay-${inv.id}-${idx}`,
+              date: line.date || inv.invoiceDate,
+              timestamp: new Date((line.date || inv.invoiceDate) + 'T15:00:00').getTime() + idx,
+              type: 'PAYMENT',
+              typeName: 'Money In (Receipt)',
+              flowType: 'MONEY_IN',
+              docNo: `RCPT-${inv.invoiceNumber}`,
+              refInvoiceId: inv.id,
+              description: line.notes || `Payment received via ${line.method || 'Cash/UPI'} against ${inv.invoiceNumber}`,
+              debit: 0,
+              credit: line.amount,
+              status: 'SETTLED'
+            });
+          });
+        } else if (inv.amountPaid > 0) {
+          allEvents.push({
+            id: 'pay-' + inv.id,
+            date: inv.invoiceDate,
+            timestamp: new Date(inv.invoiceDate + 'T15:00:00').getTime(),
+            type: 'PAYMENT',
+            typeName: isPos ? 'POS Tender' : 'Money In (Receipt)',
+            flowType: 'MONEY_IN',
+            docNo: `RCPT-${inv.invoiceNumber}`,
+            refInvoiceId: inv.id,
+            description: `Payment received via ${inv.paymentMethod || 'Cash/UPI'} against ${inv.invoiceNumber}`,
+            debit: 0,
+            credit: inv.amountPaid,
+            status: 'SETTLED'
+          });
+        }
       }
     });
 
-    // Party Purchase Bills (if vendor / both)
-    purchaseBills.filter(bill => bill.vendorId === currentParty.id).forEach(bill => {
+    // B. Post Party Purchase Bills (Credit - Money Owed / Payable to Vendor)
+    partyBills.forEach(bill => {
       allEvents.push({
         id: 'pb-' + bill.id,
         date: bill.billDate,
         timestamp: new Date(bill.billDate + 'T11:00:00').getTime(),
         type: 'PURCHASE',
         typeName: 'Inward Purchase Bill',
+        flowType: 'PURCHASE_OWED',
         docNo: bill.billNumber,
-        description: `Purchase Bill (Ref: ${bill.vendorInvoiceNumber})`,
+        refBillId: bill.id,
+        description: `Purchase Bill (Ref: ${bill.vendorInvoiceNumber || bill.billNumber})`,
         debit: 0,
         credit: bill.grandTotal,
         status: bill.status
       });
 
-      if (bill.amountPaid > 0) {
+      // If this bill has payment not recorded in payments register, add disbursement event
+      if (!billsCoveredInPayments.has(bill.id) && bill.amountPaid > 0) {
         allEvents.push({
           id: 'vpay-' + bill.id,
           date: bill.billDate,
           timestamp: new Date(bill.billDate + 'T16:00:00').getTime(),
           type: 'VENDOR_PAYMENT',
-          typeName: 'Supplier Payment',
+          typeName: 'Money Out (Disbursement)',
+          flowType: 'MONEY_OUT',
           docNo: `PMT-${bill.billNumber}`,
+          refBillId: bill.id,
           description: `Disbursement to vendor against ${bill.billNumber}`,
           debit: bill.amountPaid,
+          credit: 0,
+          status: 'PAID'
+        });
+      }
+    });
+
+    // C. Post Payments from Payments Register (Money In & Money Out)
+    partyPayments.forEach(p => {
+      const pTimestamp = new Date(p.date + 'T14:30:00').getTime();
+      if (p.type === 'PAYMENT_IN') {
+        // Money In: Credit customer account (reducing receivable)
+        allEvents.push({
+          id: 'pmt-' + p.id,
+          date: p.date,
+          timestamp: pTimestamp,
+          type: 'PAYMENT',
+          typeName: 'Money In (Receipt)',
+          flowType: 'MONEY_IN',
+          docNo: p.voucherNumber || ('RCPT-' + (p.linkedInvoiceNumber || p.id.slice(-6))),
+          refInvoiceId: p.linkedInvoiceId,
+          description: p.notes || (p.linkedInvoiceNumber 
+            ? `Payment received via ${p.paymentMethod || 'UPI/Cash'} against Inv #${p.linkedInvoiceNumber}` 
+            : `Direct Payment Receipt (Money In) via ${p.paymentMethod || 'UPI/Cash'}`),
+          debit: 0,
+          credit: p.amount,
+          status: 'SETTLED'
+        });
+      } else if (p.type === 'PAYMENT_OUT') {
+        // Money Out: Debit vendor account (reducing payable or client refund)
+        allEvents.push({
+          id: 'pmt-' + p.id,
+          date: p.date,
+          timestamp: pTimestamp,
+          type: 'VENDOR_PAYMENT',
+          typeName: 'Money Out (Disbursement)',
+          flowType: 'MONEY_OUT',
+          docNo: p.voucherNumber || ('PMT-' + (p.linkedBillNumber || p.id.slice(-6))),
+          refBillId: p.linkedBillId,
+          description: p.notes || (p.linkedBillNumber 
+            ? `Payment disbursed via ${p.paymentMethod || 'Bank'} against Bill #${p.linkedBillNumber}` 
+            : `Payment Disbursement (Money Out) via ${p.paymentMethod || 'Bank'}`),
+          debit: p.amount,
           credit: 0,
           status: 'PAID'
         });
@@ -307,37 +429,71 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
         periodDebits += evt.debit;
         periodCredits += evt.credit;
 
+        const isDr = running > 0;
+        const isCr = running < 0;
+
         ledgerEntries.push({
           id: evt.id,
           date: evt.date,
           type: evt.type,
           typeName: evt.typeName,
+          flowType: evt.flowType,
           docNo: evt.docNo,
           refInvoiceId: evt.refInvoiceId,
+          refBillId: evt.refBillId,
           description: evt.description,
           debit: evt.debit,
           credit: evt.credit,
           runningBalance: Math.abs(running),
-          balanceType: running >= 0 ? 'Dr' : 'Cr',
+          balanceType: isDr ? 'Dr' : isCr ? 'Cr' : 'Nil',
+          balanceStatus: isDr ? 'RECEIVABLE' : isCr ? 'PAYABLE' : 'SETTLED',
+          balanceLabel: isDr ? 'Receivable (Dr)' : isCr ? 'Payable (Cr)' : 'Settled',
           status: evt.status
         });
       }
     });
 
+    // Filter entries based on user filter tab
+    const filteredEntries = ledgerEntries.filter(entry => {
+      if (ledgerTypeFilter === 'ALL') return true;
+      if (ledgerTypeFilter === 'MONEY_IN') return entry.flowType === 'MONEY_IN' || entry.credit > 0;
+      if (ledgerTypeFilter === 'MONEY_OUT') return entry.flowType === 'MONEY_OUT' || entry.type === 'VENDOR_PAYMENT';
+      if (ledgerTypeFilter === 'INVOICES') return entry.type === 'INVOICE';
+      if (ledgerTypeFilter === 'PURCHASES') return entry.type === 'PURCHASE';
+      return true;
+    });
+
+    // Counts for tabs
+    const counts = {
+      all: ledgerEntries.length,
+      moneyIn: ledgerEntries.filter(e => e.flowType === 'MONEY_IN' || e.credit > 0).length,
+      moneyOut: ledgerEntries.filter(e => e.flowType === 'MONEY_OUT' || e.type === 'VENDOR_PAYMENT').length,
+      invoices: ledgerEntries.filter(e => e.type === 'INVOICE').length,
+      purchases: ledgerEntries.filter(e => e.type === 'PURCHASE').length
+    };
+
     // Unpaid invoices for quick payment recording
-    const partyUnpaid = invoices.filter(
-      inv => inv.customerId === currentParty.id && inv.amountDue > 0 && inv.status !== 'CANCELLED'
+    const partyUnpaid = partyInvoices.filter(
+      inv => inv.amountDue > 0 && inv.status !== 'CANCELLED'
+    );
+
+    // Unpaid bills for quick payment recording
+    const partyUnpaidBills = partyBills.filter(
+      bill => (bill.amountDue === undefined || bill.amountDue > 0) && bill.status !== 'PAID'
     );
 
     return {
       openingBalance: calculatedOpening,
       entries: ledgerEntries,
+      filteredEntries,
       totalDebits: periodDebits,
       totalCredits: periodCredits,
       closingBalance: running,
-      unpaidInvoices: partyUnpaid
+      unpaidInvoices: partyUnpaid,
+      unpaidBills: partyUnpaidBills,
+      counts
     };
-  }, [currentParty, startDate, endDate, invoices, purchaseBills]);
+  }, [currentParty, startDate, endDate, invoices, purchaseBills, payments, ledgerTypeFilter]);
 
   // Export to PDF
   const handleDownloadPdf = async () => {
@@ -515,39 +671,40 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
 
     const headers = [
       'Date',
-      'Transaction Type',
-      'Document Number',
+      'Transaction Type & Flow',
+      'Document / Voucher No',
       'Description',
-      'Debit (Dr)',
-      'Credit (Cr)',
+      'Debit (Dr) / Money Out',
+      'Credit (Cr) / Money In',
       'Running Balance',
-      'Dr/Cr'
+      'Balance Status (Receivable / Payable)'
     ];
 
     const rows = [
       // Statement Metadata Header
-      [`Client Account Statement: ${currentParty.name}`],
+      [`Statement of Ledger: ${currentParty.name}`],
       [`Company: ${currentParty.companyName || 'N/A'}`],
+      [`Party Type: ${currentParty.type}`],
       [`GSTIN: ${currentParty.gstin || 'Unregistered'}`],
       [`Statement Period: ${formatDate(startDate)} to ${formatDate(endDate)}`],
       [`Generated On: ${new Date().toLocaleString()}`],
       [],
-      [`Opening Balance as on ${formatDate(startDate)}`, '', '', '', '', '', Math.abs(openingBalance).toFixed(2), openingBalance >= 0 ? 'Dr' : 'Cr'],
+      [`Opening Balance as on ${formatDate(startDate)}`, '', '', '', '', '', Math.abs(openingBalance).toFixed(2), openingBalance > 0 ? 'Receivable (Dr)' : openingBalance < 0 ? 'Payable (Cr)' : 'Settled'],
       headers,
       ...entries.map(e => [
         formatDate(e.date),
-        e.typeName,
+        `${e.typeName} [${e.flowType}]`,
         e.docNo,
         `"${e.description.replace(/"/g, '""')}"`,
         e.debit ? e.debit.toFixed(2) : '0.00',
         e.credit ? e.credit.toFixed(2) : '0.00',
         e.runningBalance.toFixed(2),
-        e.balanceType
+        e.balanceLabel
       ]),
       [],
-      ['Total Period Debits', '', '', '', totalDebits.toFixed(2), '', '', ''],
-      ['Total Period Credits', '', '', '', '', totalCredits.toFixed(2), '', ''],
-      [`Closing Balance as on ${formatDate(endDate)}`, '', '', '', '', '', Math.abs(closingBalance).toFixed(2), closingBalance >= 0 ? 'Dr (Receivable)' : 'Cr (Payable)']
+      ['Total Period Debits (Money Out / Invoiced)', '', '', '', totalDebits.toFixed(2), '', '', ''],
+      ['Total Period Credits (Money In / Received)', '', '', '', '', totalCredits.toFixed(2), '', ''],
+      [`Closing Balance as on ${formatDate(endDate)}`, '', '', '', '', '', Math.abs(closingBalance).toFixed(2), closingBalance > 0 ? 'RECEIVABLE (To Collect - Dr)' : closingBalance < 0 ? 'PAYABLE (To Pay - Cr)' : 'SETTLED']
     ];
 
     const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
@@ -555,7 +712,7 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     const sanitizedName = currentParty.name.replace(/[^a-zA-Z0-9-_]/g, '_');
-    link.setAttribute('download', `Statement_${sanitizedName}_${startDate}_to_${endDate}.csv`);
+    link.setAttribute('download', `Ledger_Statement_${sanitizedName}_${startDate}_to_${endDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -567,20 +724,28 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
   const handleShareWhatsApp = () => {
     if (!currentParty) return;
 
-    const isDebtor = closingBalance > 0;
+    const isReceivable = closingBalance > 0;
+    const isPayable = closingBalance < 0;
+    const statusText = isReceivable 
+      ? 'Receivable (Money to Collect)' 
+      : isPayable 
+      ? 'Payable (Credit / Money to Pay)' 
+      : 'Fully Settled (Nil Balance)';
+
     const msg = 
-`*STATEMENT OF ACCOUNT*
+`*STATEMENT OF ACCOUNT & LEDGER*
 From: *${business.tradeName || business.name}*
 To: *${currentParty.name}* ${currentParty.companyName ? `(${currentParty.companyName})` : ''}
 Period: ${formatDate(startDate)} to ${formatDate(endDate)}
 
-*Summary:*
-• Opening Balance: ${formatCurrency(Math.abs(openingBalance), business.currencySymbol)} (${openingBalance >= 0 ? 'Dr' : 'Cr'})
-• Invoiced / Debits: ${formatCurrency(totalDebits, business.currencySymbol)}
-• Payments / Credits: ${formatCurrency(totalCredits, business.currencySymbol)}
-• *Net Outstanding Balance: ${formatCurrency(Math.abs(closingBalance), business.currencySymbol)} ${isDebtor ? '(To Pay)' : '(Credit Balance)'}*
+*Financial Summary:*
+• Opening Balance: ${formatCurrency(Math.abs(openingBalance), business.currencySymbol)} (${openingBalance > 0 ? 'Dr - Receivable' : openingBalance < 0 ? 'Cr - Payable' : 'Nil'})
+• Total Debits (Invoiced/Money Out): ${formatCurrency(totalDebits, business.currencySymbol)}
+• Total Credits (Money In/Received): ${formatCurrency(totalCredits, business.currencySymbol)}
+• *Net Closing Balance: ${formatCurrency(Math.abs(closingBalance), business.currencySymbol)}*
+• *Status: ${statusText}*
 
-${isDebtor ? `*Payment Remittance Details:*
+${isReceivable ? `*Payment Remittance Details:*
 • UPI ID: ${business.upiId || 'N/A'}
 • Bank: ${business.bankName || 'N/A'}
 • A/C No: ${business.accountNumber || 'N/A'}
@@ -600,15 +765,20 @@ _Please contact us if you need any clarification._`;
   const handleCopySummary = () => {
     if (!currentParty) return;
 
+    const isReceivable = closingBalance > 0;
+    const isPayable = closingBalance < 0;
+    const statusText = isReceivable ? 'RECEIVABLE (Dr)' : isPayable ? 'PAYABLE (Cr)' : 'SETTLED';
+
     const summaryText = 
-`STATEMENT OF ACCOUNT
-Client: ${currentParty.name} ${currentParty.companyName ? `(${currentParty.companyName})` : ''}
+`STATEMENT OF ACCOUNT & LEDGER
+Party: ${currentParty.name} ${currentParty.companyName ? `(${currentParty.companyName})` : ''}
+Party Type: ${currentParty.type}
 GSTIN: ${currentParty.gstin || 'Unregistered'}
 Period: ${formatDate(startDate)} to ${formatDate(endDate)}
-Opening Balance: ${formatCurrency(Math.abs(openingBalance), business.currencySymbol)} (${openingBalance >= 0 ? 'Dr' : 'Cr'})
-Total Debits: ${formatCurrency(totalDebits, business.currencySymbol)}
-Total Credits: ${formatCurrency(totalCredits, business.currencySymbol)}
-Closing Balance: ${formatCurrency(Math.abs(closingBalance), business.currencySymbol)} (${closingBalance >= 0 ? 'Dr' : 'Cr'})
+Opening Balance: ${formatCurrency(Math.abs(openingBalance), business.currencySymbol)} (${openingBalance > 0 ? 'Dr' : openingBalance < 0 ? 'Cr' : 'Nil'})
+Total Debits (Money Out / Billed): ${formatCurrency(totalDebits, business.currencySymbol)}
+Total Credits (Money In / Received): ${formatCurrency(totalCredits, business.currencySymbol)}
+Closing Balance: ${formatCurrency(Math.abs(closingBalance), business.currencySymbol)} (${statusText})
 Transactions: ${entries.length} records`;
 
     navigator.clipboard.writeText(summaryText);
@@ -617,20 +787,39 @@ Transactions: ${entries.length} records`;
     setTimeout(() => setCopiedSummary(false), 2000);
   };
 
-  // Handle Quick Payment
-  const handleOpenPayment = (invId?: string) => {
+  // Handle Quick Payment (Money In or Money Out)
+  const handleOpenPayment = (invId?: string, billId?: string, type?: PaymentType) => {
+    const isVendorOrNegative = currentParty.type === 'VENDOR' || closingBalance < 0;
+    const defaultType: PaymentType = type || (billId ? 'PAYMENT_OUT' : invId ? 'PAYMENT_IN' : isVendorOrNegative ? 'PAYMENT_OUT' : 'PAYMENT_IN');
+    setPaymentType(defaultType);
+    setPaymentDate(new Date().toISOString().split('T')[0]);
+
     if (invId) {
       const inv = invoices.find(i => i.id === invId);
       if (inv) {
         setSelectedInvoiceForPayment(inv.id);
+        setSelectedBillForPayment('');
         setPaymentAmount(inv.amountDue);
       }
-    } else if (unpaidInvoices.length > 0) {
+    } else if (billId) {
+      const bill = purchaseBills.find(b => b.id === billId);
+      if (bill) {
+        setSelectedBillForPayment(bill.id);
+        setSelectedInvoiceForPayment('');
+        setPaymentAmount(bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal);
+      }
+    } else if (defaultType === 'PAYMENT_IN' && unpaidInvoices.length > 0) {
       setSelectedInvoiceForPayment(unpaidInvoices[0].id);
+      setSelectedBillForPayment('');
       setPaymentAmount(unpaidInvoices[0].amountDue);
+    } else if (defaultType === 'PAYMENT_OUT' && unpaidBills.length > 0) {
+      setSelectedBillForPayment(unpaidBills[0].id);
+      setSelectedInvoiceForPayment('');
+      setPaymentAmount(unpaidBills[0].amountDue !== undefined ? unpaidBills[0].amountDue : unpaidBills[0].grandTotal);
     } else {
       setSelectedInvoiceForPayment('');
-      setPaymentAmount(Math.max(0, closingBalance));
+      setSelectedBillForPayment('');
+      setPaymentAmount(Math.abs(closingBalance) || 0);
     }
     setIsRecordPaymentOpen(true);
   };
@@ -642,12 +831,39 @@ Transactions: ${entries.length} records`;
       return;
     }
 
-    if (!selectedInvoiceForPayment) {
-      showToast('error', 'Select Invoice', 'Please select an invoice to record payment against.');
-      return;
+    if (paymentType === 'PAYMENT_IN') {
+      if (selectedInvoiceForPayment) {
+        recordInvoicePayment(selectedInvoiceForPayment, paymentAmount, paymentMethod, paymentNotes);
+      } else {
+        createPayment({
+          voucherNumber: `REC-${Date.now().toString().slice(-6)}`,
+          date: paymentDate || new Date().toISOString().split('T')[0],
+          type: 'PAYMENT_IN',
+          amount: paymentAmount,
+          paymentMethod,
+          partyId: currentParty.id,
+          partyName: currentParty.name,
+          partyType: currentParty.type === 'VENDOR' ? 'VENDOR' : 'CUSTOMER',
+          notes: paymentNotes || `On-Account Payment Received (Money In) from ${currentParty.name}`
+        });
+      }
+    } else if (paymentType === 'PAYMENT_OUT') {
+      const linkedBill = selectedBillForPayment ? purchaseBills.find(b => b.id === selectedBillForPayment) : undefined;
+      createPayment({
+        voucherNumber: `PAY-${Date.now().toString().slice(-6)}`,
+        date: paymentDate || new Date().toISOString().split('T')[0],
+        type: 'PAYMENT_OUT',
+        amount: paymentAmount,
+        paymentMethod,
+        partyId: currentParty.id,
+        partyName: currentParty.name,
+        partyType: currentParty.type === 'CUSTOMER' ? 'CUSTOMER' : 'VENDOR',
+        linkedBillId: linkedBill?.id,
+        linkedBillNumber: linkedBill?.billNumber,
+        notes: paymentNotes || (linkedBill ? `Payment disbursed against Bill #${linkedBill.billNumber}` : `On-Account Payment Disbursed (Money Out) to ${currentParty.name}`)
+      });
     }
 
-    recordInvoicePayment(selectedInvoiceForPayment, paymentAmount, paymentMethod, paymentNotes);
     setIsRecordPaymentOpen(false);
   };
 
@@ -764,8 +980,8 @@ Transactions: ${entries.length} records`;
               <span className="text-[11px] font-bold uppercase tracking-wider">Closing Balance:</span>
               <span className="text-sm font-extrabold font-mono text-amber-300">
                 {formatCurrency(Math.abs(closingBalance), business.currencySymbol)}
-                <span className="text-[11px] ml-1 text-white font-sans">
-                  {closingBalance > 0 ? '(Dr - Due)' : closingBalance < 0 ? '(Cr - Advance)' : '(Nil)'}
+                <span className="text-[11px] ml-1 text-white font-sans font-semibold">
+                  {closingBalance > 0 ? '(Dr - Receivable / Due)' : closingBalance < 0 ? '(Cr - Payable / Advance)' : '(Settled)'}
                 </span>
               </span>
             </div>
@@ -778,11 +994,11 @@ Transactions: ${entries.length} records`;
             <thead>
               <tr className="bg-slate-900 text-white font-bold text-[10px] uppercase tracking-wider">
                 <th className="py-2 px-3">Date</th>
-                <th className="py-2 px-3">Ref / Doc No</th>
-                <th className="py-2 px-3">Transaction Description</th>
-                <th className="py-2 px-3 text-right">Debit (₹)</th>
-                <th className="py-2 px-3 text-right">Credit (₹)</th>
-                <th className="py-2 px-3 text-right">Balance (₹)</th>
+                <th className="py-2 px-3">Ref / Voucher No</th>
+                <th className="py-2 px-3">Type & Particulars</th>
+                <th className="py-2 px-3 text-right">Debit / Money Out (₹)</th>
+                <th className="py-2 px-3 text-right">Credit / Money In (₹)</th>
+                <th className="py-2 px-3 text-right">Balance & Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -798,7 +1014,7 @@ Transactions: ${entries.length} records`;
                   {openingBalance < 0 ? formatCurrency(Math.abs(openingBalance), '') : '-'}
                 </td>
                 <td className="py-2 px-3 text-right font-mono font-bold">
-                  {formatCurrency(Math.abs(openingBalance), '')} {openingBalance >= 0 ? 'Dr' : 'Cr'}
+                  {formatCurrency(Math.abs(openingBalance), '')} {openingBalance > 0 ? 'Dr (Receivable)' : openingBalance < 0 ? 'Cr (Payable)' : 'Nil'}
                 </td>
               </tr>
 
@@ -807,15 +1023,18 @@ Transactions: ${entries.length} records`;
                 <tr key={entry.id} className="hover:bg-slate-50">
                   <td className="py-2 px-3 font-mono">{formatDate(entry.date)}</td>
                   <td className="py-2 px-3 font-mono font-bold">{entry.docNo}</td>
-                  <td className="py-2 px-3">{entry.description}</td>
-                  <td className="py-2 px-3 text-right font-mono font-semibold">
+                  <td className="py-2 px-3">
+                    <span className="font-semibold text-slate-800">{entry.typeName}</span>
+                    <span className="text-slate-500 text-[10px] block">{entry.description}</span>
+                  </td>
+                  <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
                     {entry.debit > 0 ? formatCurrency(entry.debit, '') : '-'}
                   </td>
-                  <td className="py-2 px-3 text-right font-mono font-semibold">
+                  <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
                     {entry.credit > 0 ? formatCurrency(entry.credit, '') : '-'}
                   </td>
                   <td className="py-2 px-3 text-right font-mono font-bold">
-                    {formatCurrency(entry.runningBalance, '')} {entry.balanceType}
+                    {formatCurrency(entry.runningBalance, '')} {entry.balanceLabel}
                   </td>
                 </tr>
               ))}
@@ -831,16 +1050,16 @@ Transactions: ${entries.length} records`;
             <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300">
               <tr>
                 <td colSpan={3} className="py-2.5 px-3 uppercase text-[10px] text-slate-800">
-                  Total Period Debits & Credits
+                  Total Period Debits (Money Out) & Credits (Money In)
                 </td>
-                <td className="py-2.5 px-3 text-right font-mono">
+                <td className="py-2.5 px-3 text-right font-mono text-indigo-900">
                   {formatCurrency(totalDebits, '')}
                 </td>
-                <td className="py-2.5 px-3 text-right font-mono">
+                <td className="py-2.5 px-3 text-right font-mono text-emerald-900">
                   {formatCurrency(totalCredits, '')}
                 </td>
-                <td className="py-2.5 px-3 text-right font-mono font-black text-xs">
-                  {formatCurrency(Math.abs(closingBalance), '')} {closingBalance >= 0 ? 'Dr' : 'Cr'}
+                <td className="py-2.5 px-3 text-right font-mono font-black text-xs text-slate-900">
+                  {formatCurrency(Math.abs(closingBalance), '')} {closingBalance > 0 ? 'Dr (Receivable)' : closingBalance < 0 ? 'Cr (Payable)' : 'Settled'}
                 </td>
               </tr>
             </tfoot>
@@ -1113,15 +1332,23 @@ Transactions: ${entries.length} records`;
                     <span>{copiedSummary ? 'Copied' : 'Copy'}</span>
                   </button>
 
-                  {closingBalance > 0 && (
-                    <button
-                      onClick={() => handleOpenPayment()}
-                      className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all cursor-pointer shadow-md shadow-indigo-600/20 active:scale-95"
-                    >
-                      <CreditCard className="w-3.5 h-3.5" />
-                      <span>Record Payment</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleOpenPayment(undefined, undefined, 'PAYMENT_IN')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all cursor-pointer shadow-md shadow-emerald-600/20 active:scale-95"
+                    title="Record money received from party"
+                  >
+                    <ArrowDownLeft className="w-3.5 h-3.5" />
+                    <span>Money In (Receipt)</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenPayment(undefined, undefined, 'PAYMENT_OUT')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95"
+                    title="Record money paid / disbursed to party"
+                  >
+                    <ArrowUpRight className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Money Out (Payment)</span>
+                  </button>
                 </div>
               </div>
 
@@ -1132,52 +1359,110 @@ Transactions: ${entries.length} records`;
                   <div className="text-base sm:text-lg font-bold font-mono text-slate-800 mt-1">
                     {formatCurrency(Math.abs(openingBalance), business.currencySymbol)}
                   </div>
-                  <span className="text-[10px] text-slate-400">
-                    As on {formatDate(startDate)} ({openingBalance >= 0 ? 'Dr' : 'Cr'})
+                  <span className="text-[10px] text-slate-500 block font-medium mt-0.5">
+                    {openingBalance > 0 ? 'Dr • Receivable' : openingBalance < 0 ? 'Cr • Payable' : 'Nil • Settled'}
                   </span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-                  <span className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wider block">Invoiced (Debits)</span>
+                  <span className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wider block">Invoiced / Debits</span>
                   <div className="text-base sm:text-lg font-bold font-mono text-indigo-700 mt-1">
                     +{formatCurrency(totalDebits, business.currencySymbol)}
                   </div>
-                  <span className="text-[10px] text-slate-400">Period sales/billings</span>
+                  <span className="text-[10px] text-slate-500 block font-medium mt-0.5">Period Sales & Money Out</span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-                  <span className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Received (Credits)</span>
+                  <span className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider block">Received / Credits</span>
                   <div className="text-base sm:text-lg font-bold font-mono text-emerald-700 mt-1">
                     -{formatCurrency(totalCredits, business.currencySymbol)}
                   </div>
-                  <span className="text-[10px] text-slate-400">Payments & settlements</span>
+                  <span className="text-[10px] text-slate-500 block font-medium mt-0.5">Money In & Settlements</span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-slate-900 text-white shadow-md border border-slate-800">
-                  <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block">Closing Balance</span>
+                  <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block">Net Closing Balance</span>
                   <div className={`text-base sm:text-lg font-bold font-mono mt-1 ${
-                    closingBalance > 0 ? 'text-amber-400' : closingBalance < 0 ? 'text-rose-400' : 'text-emerald-400'
+                    closingBalance > 0 ? 'text-amber-300' : closingBalance < 0 ? 'text-rose-300' : 'text-emerald-400'
                   }`}>
                     {formatCurrency(Math.abs(closingBalance), business.currencySymbol)}
                   </div>
-                  <span className="text-[10px] text-slate-400">
-                    {closingBalance > 0 ? 'To Collect (Dr)' : closingBalance < 0 ? 'Excess/Payable (Cr)' : 'Fully Settled'}
+                  <span className={`text-[10px] block font-bold mt-0.5 ${
+                    closingBalance > 0 ? 'text-amber-400' : closingBalance < 0 ? 'text-rose-400' : 'text-emerald-400'
+                  }`}>
+                    {closingBalance > 0 ? 'RECEIVABLE (To Collect • Dr)' : closingBalance < 0 ? 'PAYABLE (To Pay • Cr)' : 'SETTLED (Nil Balance)'}
                   </span>
                 </div>
               </div>
 
               {/* Transactions Ledger Table */}
               <div className="rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden">
-                <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                {/* Header & Filter Tabs */}
+                <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Statement Ledger</span>
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Statement of Ledger</span>
                     <span className="px-2 py-0.5 text-[10px] font-mono bg-slate-200 text-slate-700 rounded-md font-semibold">
-                      {entries.length} Entries
+                      {filteredEntries.length} of {entries.length}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-mono">
-                    {formatDate(startDate)} → {formatDate(endDate)}
-                  </span>
+
+                  {/* Flow Category Filters */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                    <button
+                      onClick={() => setLedgerTypeFilter('ALL')}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer shrink-0 ${
+                        ledgerTypeFilter === 'ALL'
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      All ({counts.all})
+                    </button>
+                    <button
+                      onClick={() => setLedgerTypeFilter('MONEY_IN')}
+                      className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer shrink-0 ${
+                        ledgerTypeFilter === 'MONEY_IN'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
+                      }`}
+                    >
+                      <ArrowDownLeft className="w-3 h-3" />
+                      <span>Money In ({counts.moneyIn})</span>
+                    </button>
+                    <button
+                      onClick={() => setLedgerTypeFilter('MONEY_OUT')}
+                      className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer shrink-0 ${
+                        ledgerTypeFilter === 'MONEY_OUT'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-white text-rose-700 hover:bg-rose-50 border border-rose-200'
+                      }`}
+                    >
+                      <ArrowUpRight className="w-3 h-3" />
+                      <span>Money Out ({counts.moneyOut})</span>
+                    </button>
+                    <button
+                      onClick={() => setLedgerTypeFilter('INVOICES')}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer shrink-0 ${
+                        ledgerTypeFilter === 'INVOICES'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200'
+                      }`}
+                    >
+                      Invoices ({counts.invoices})
+                    </button>
+                    {counts.purchases > 0 && (
+                      <button
+                        onClick={() => setLedgerTypeFilter('PURCHASES')}
+                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer shrink-0 ${
+                          ledgerTypeFilter === 'PURCHASES'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white text-purple-700 hover:bg-purple-50 border border-purple-200'
+                        }`}
+                      >
+                        Purchases ({counts.purchases})
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1186,11 +1471,11 @@ Transactions: ${entries.length} records`;
                       <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-700 font-semibold text-[11px]">
                         <th className="py-2.5 px-3">Date</th>
                         <th className="py-2.5 px-3">Voucher / Doc No</th>
-                        <th className="py-2.5 px-3">Transaction Details</th>
-                        <th className="py-2.5 px-3 text-right">Debit (Dr)</th>
-                        <th className="py-2.5 px-3 text-right">Credit (Cr)</th>
+                        <th className="py-2.5 px-3">Type & Particulars</th>
+                        <th className="py-2.5 px-3 text-right">Debit / Money Out (Dr)</th>
+                        <th className="py-2.5 px-3 text-right">Credit / Money In (Cr)</th>
                         <th className="py-2.5 px-3 text-right">Running Balance</th>
-                        <th className="py-2.5 px-2 text-center w-12"></th>
+                        <th className="py-2.5 px-2 text-center w-12">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1198,24 +1483,29 @@ Transactions: ${entries.length} records`;
                       <tr className="bg-slate-50/60 font-semibold text-slate-700">
                         <td className="py-2.5 px-3 font-mono text-[11px]">{formatDate(startDate)}</td>
                         <td className="py-2.5 px-3 font-mono text-slate-500">OB-{startDate.replace(/-/g, '')}</td>
-                        <td className="py-2.5 px-3 italic text-slate-600">
-                          Opening Balance Brought Forward
+                        <td className="py-2.5 px-3">
+                          <span className="font-semibold text-slate-800">Opening Balance</span>
+                          <span className="text-[10px] text-slate-500 block">Brought Forward from prior periods</span>
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800">
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700">
                           {openingBalance > 0 ? formatCurrency(openingBalance, business.currencySymbol) : '-'}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800">
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700">
                           {openingBalance < 0 ? formatCurrency(Math.abs(openingBalance), business.currencySymbol) : '-'}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                          {formatCurrency(Math.abs(openingBalance), business.currencySymbol)}
-                          <span className="text-[10px] ml-1 text-slate-500 font-sans">{openingBalance >= 0 ? 'Dr' : 'Cr'}</span>
+                          <div>{formatCurrency(Math.abs(openingBalance), business.currencySymbol)}</div>
+                          <span className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
+                            openingBalance > 0 ? 'bg-emerald-100 text-emerald-800' : openingBalance < 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {openingBalance > 0 ? 'Receivable (Dr)' : openingBalance < 0 ? 'Payable (Cr)' : 'Settled'}
+                          </span>
                         </td>
                         <td className="py-2.5 px-2"></td>
                       </tr>
 
                       {/* Entries Rows */}
-                      {entries.map(entry => (
+                      {filteredEntries.map(entry => (
                         <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-2.5 px-3 font-mono text-[11px] font-medium text-slate-800">
                             {formatDate(entry.date)}
@@ -1225,9 +1515,28 @@ Transactions: ${entries.length} records`;
                             <span className="text-[10px] text-slate-500 font-sans">{entry.typeName}</span>
                           </td>
                           <td className="py-2.5 px-3">
-                            <div className="text-slate-700 font-medium">{entry.description}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {entry.flowType === 'MONEY_IN' ? (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <ArrowDownLeft className="w-3 h-3" /> Money In
+                                </span>
+                              ) : entry.flowType === 'MONEY_OUT' ? (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ArrowUpRight className="w-3 h-3" /> Money Out
+                                </span>
+                              ) : entry.flowType === 'INVOICE_BILLED' ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                  Invoice Billed
+                                </span>
+                              ) : entry.flowType === 'PURCHASE_OWED' ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                                  Purchase Bill
+                                </span>
+                              ) : null}
+                              <span className="text-slate-700 font-medium text-xs">{entry.description}</span>
+                            </div>
                             {entry.status && (
-                              <span className={`inline-block text-[9px] px-1.5 py-0.2 rounded font-semibold ${
+                              <span className={`inline-block text-[9px] px-1.5 py-0.2 rounded font-semibold mt-0.5 ${
                                 entry.status === 'PAID' || entry.status === 'SETTLED'
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : entry.status === 'UNPAID'
@@ -1245,32 +1554,58 @@ Transactions: ${entries.length} records`;
                             {entry.credit > 0 ? formatCurrency(entry.credit, business.currencySymbol) : '-'}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                            {formatCurrency(entry.runningBalance, business.currencySymbol)}
-                            <span className={`text-[10px] ml-1 font-sans ${entry.balanceType === 'Dr' ? 'text-indigo-600' : 'text-emerald-600'}`}>
-                              {entry.balanceType}
+                            <div>{formatCurrency(entry.runningBalance, business.currencySymbol)}</div>
+                            <span className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
+                              entry.balanceStatus === 'RECEIVABLE'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : entry.balanceStatus === 'PAYABLE'
+                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {entry.balanceLabel}
                             </span>
                           </td>
                           <td className="py-2.5 px-2 text-center">
-                            {entry.refInvoiceId && onSelectInvoiceForPrint && (
-                              <button
-                                onClick={() => {
-                                  onClose();
-                                  onSelectInvoiceForPrint(entry.refInvoiceId!);
-                                }}
-                                title="View / Print Tax Invoice"
-                                className="p-1 text-slate-400 hover:text-indigo-600 rounded cursor-pointer"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            <div className="flex items-center justify-center gap-1">
+                              {entry.refInvoiceId && onSelectInvoiceForPrint && (
+                                <button
+                                  onClick={() => {
+                                    onClose();
+                                    onSelectInvoiceForPrint(entry.refInvoiceId!);
+                                  }}
+                                  title="View / Print Tax Invoice"
+                                  className="p-1 text-slate-400 hover:text-indigo-600 rounded cursor-pointer transition-colors"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {entry.type === 'INVOICE' && entry.status !== 'PAID' && (
+                                <button
+                                  onClick={() => handleOpenPayment(entry.refInvoiceId, undefined, 'PAYMENT_IN')}
+                                  title="Collect Payment (Money In)"
+                                  className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded cursor-pointer"
+                                >
+                                  Collect
+                                </button>
+                              )}
+                              {entry.type === 'PURCHASE' && entry.status !== 'PAID' && (
+                                <button
+                                  onClick={() => handleOpenPayment(undefined, entry.refBillId, 'PAYMENT_OUT')}
+                                  title="Disburse Payment (Money Out)"
+                                  className="px-1.5 py-0.5 text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded cursor-pointer"
+                                >
+                                  Pay
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
 
-                      {entries.length === 0 && (
+                      {filteredEntries.length === 0 && (
                         <tr>
                           <td colSpan={7} className="py-8 text-center text-slate-400 italic">
-                            No ledger transactions recorded in this date range.
+                            No ledger transactions found matching this filter.
                           </td>
                         </tr>
                       )}
@@ -1278,7 +1613,7 @@ Transactions: ${entries.length} records`;
                     <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs">
                       <tr>
                         <td colSpan={3} className="py-3 px-3 text-slate-800 uppercase font-extrabold">
-                          Period Totals & Closing Balance ({formatDate(endDate)})
+                          Period Totals & Net Closing ({formatDate(endDate)})
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-indigo-700">
                           {formatCurrency(totalDebits, business.currencySymbol)}
@@ -1287,9 +1622,11 @@ Transactions: ${entries.length} records`;
                           {formatCurrency(totalCredits, business.currencySymbol)}
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-900 font-extrabold text-sm">
-                          {formatCurrency(Math.abs(closingBalance), business.currencySymbol)}
-                          <span className="text-xs ml-1 font-sans text-slate-600">
-                            {closingBalance >= 0 ? 'Dr' : 'Cr'}
+                          <div>{formatCurrency(Math.abs(closingBalance), business.currencySymbol)}</div>
+                          <span className={`inline-block text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
+                            closingBalance > 0 ? 'bg-emerald-100 text-emerald-800' : closingBalance < 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {closingBalance > 0 ? 'RECEIVABLE (Dr)' : closingBalance < 0 ? 'PAYABLE (Cr)' : 'SETTLED'}
                           </span>
                         </td>
                         <td></td>
@@ -1330,47 +1667,137 @@ Transactions: ${entries.length} records`;
           )}
         </div>
 
-        {/* Quick Payment Modal */}
+        {/* Quick Payment Modal (Money In / Money Out) */}
         {isRecordPaymentOpen && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in overflow-y-auto modal-overlay print:hidden">
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-5 max-w-[96vw] sm:max-w-md w-full max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll text-xs space-y-3 my-auto">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-5 max-w-[96vw] sm:max-w-md w-full max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll text-xs space-y-3.5 my-auto">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200 shrink-0">
-                <h4 className="font-bold text-slate-900 text-sm">Record Client Payment</h4>
-                <button onClick={() => setIsRecordPaymentOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-slate-900 text-sm">Record Payment / Transaction</h4>
+                  <span className="text-[10px] font-semibold text-slate-500">({currentParty.name})</span>
+                </div>
+                <button onClick={() => setIsRecordPaymentOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer p-1">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
+              {/* Toggle Money In / Money Out */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentType('PAYMENT_IN');
+                    if (unpaidInvoices.length > 0) {
+                      setSelectedInvoiceForPayment(unpaidInvoices[0].id);
+                      setPaymentAmount(unpaidInvoices[0].amountDue);
+                    } else {
+                      setSelectedInvoiceForPayment('');
+                      setPaymentAmount(Math.max(0, closingBalance));
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-2 font-bold rounded-lg transition-all cursor-pointer ${
+                    paymentType === 'PAYMENT_IN'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                  <span>Money In (Receipt)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentType('PAYMENT_OUT');
+                    if (unpaidBills.length > 0) {
+                      setSelectedBillForPayment(unpaidBills[0].id);
+                      setPaymentAmount(unpaidBills[0].amountDue !== undefined ? unpaidBills[0].amountDue : unpaidBills[0].grandTotal);
+                    } else {
+                      setSelectedBillForPayment('');
+                      setPaymentAmount(closingBalance < 0 ? Math.abs(closingBalance) : 0);
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-2 font-bold rounded-lg transition-all cursor-pointer ${
+                    paymentType === 'PAYMENT_OUT'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>Money Out (Disbursement)</span>
+                </button>
+              </div>
+
               <form onSubmit={handleSavePayment} className="space-y-3">
+                {/* Date Input */}
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Invoice Against Payment *</label>
-                  <select
-                    value={selectedInvoiceForPayment}
-                    onChange={(e) => {
-                      setSelectedInvoiceForPayment(e.target.value);
-                      const inv = invoices.find(i => i.id === e.target.value);
-                      if (inv) setPaymentAmount(inv.amountDue);
-                    }}
+                  <label className="block font-semibold text-slate-700 mb-1">Transaction Date *</label>
+                  <input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
                     required
-                  >
-                    <option value="">-- Choose Unpaid Invoice --</option>
-                    {unpaidInvoices.map(inv => (
-                      <option key={inv.id} value={inv.id}>
-                        {inv.invoiceNumber} — Due: {formatCurrency(inv.amountDue, business.currencySymbol)}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
+                {/* Linked Document Selection */}
+                {paymentType === 'PAYMENT_IN' ? (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Settle Against Invoice</label>
+                    <select
+                      value={selectedInvoiceForPayment}
+                      onChange={(e) => {
+                        setSelectedInvoiceForPayment(e.target.value);
+                        const inv = invoices.find(i => i.id === e.target.value);
+                        if (inv) setPaymentAmount(inv.amountDue);
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                    >
+                      <option value="">-- Direct / On-Account Advance Receipt --</option>
+                      {unpaidInvoices.map(inv => (
+                        <option key={inv.id} value={inv.id}>
+                          {inv.invoiceNumber} — Due: {formatCurrency(inv.amountDue, business.currencySymbol)}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      {selectedInvoiceForPayment ? 'Will settle selected invoice balance.' : 'Will record on-account receipt in client ledger.'}
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Disburse Against Purchase Bill</label>
+                    <select
+                      value={selectedBillForPayment}
+                      onChange={(e) => {
+                        setSelectedBillForPayment(e.target.value);
+                        const bill = purchaseBills.find(b => b.id === e.target.value);
+                        if (bill) setPaymentAmount(bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal);
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                    >
+                      <option value="">-- Direct / On-Account Disbursement --</option>
+                      {unpaidBills.map(bill => (
+                        <option key={bill.id} value={bill.id}>
+                          {bill.billNumber} — Due: {formatCurrency(bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal, business.currencySymbol)}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      {selectedBillForPayment ? 'Will settle selected purchase bill.' : 'Will record on-account payment in vendor ledger.'}
+                    </span>
+                  </div>
+                )}
+
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Payment Amount (₹) *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Amount (₹) *</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0.01"
                     step="0.01"
                     value={paymentAmount || ''}
                     onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                    placeholder="Enter amount"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold font-mono text-sm"
                     required
                   />
@@ -1378,19 +1805,19 @@ Transactions: ${entries.length} records`;
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Mode</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['UPI', 'BANK_TRANSFER', 'CASH'] as const).map(m => (
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE'] as const).map(m => (
                       <button
                         key={m}
                         type="button"
                         onClick={() => setPaymentMethod(m)}
-                        className={`py-1.5 rounded-xl font-bold transition-all ${
+                        className={`py-1.5 text-[11px] rounded-xl font-bold transition-all cursor-pointer ${
                           paymentMethod === m
-                            ? 'bg-indigo-600 text-white shadow-xs'
+                            ? 'bg-slate-900 text-white shadow-xs'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        {m}
+                        {m === 'BANK_TRANSFER' ? 'BANK' : m}
                       </button>
                     ))}
                   </div>
@@ -1402,7 +1829,7 @@ Transactions: ${entries.length} records`;
                     type="text"
                     value={paymentNotes}
                     onChange={(e) => setPaymentNotes(e.target.value)}
-                    placeholder="e.g. UTR / IMPS ref #12345"
+                    placeholder="e.g. UTR / IMPS ref / Cheque #12345"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                   />
                 </div>
@@ -1411,15 +1838,17 @@ Transactions: ${entries.length} records`;
                   <button
                     type="button"
                     onClick={() => setIsRecordPaymentOpen(false)}
-                    className="px-3.5 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                    className="px-3.5 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md"
+                    className={`px-4 py-2 font-bold text-white rounded-xl shadow-md cursor-pointer transition-all ${
+                      paymentType === 'PAYMENT_IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                    }`}
                   >
-                    Confirm Payment
+                    Confirm {paymentType === 'PAYMENT_IN' ? 'Money In' : 'Money Out'}
                   </button>
                 </div>
               </form>

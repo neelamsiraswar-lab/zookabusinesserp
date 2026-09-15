@@ -3200,7 +3200,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (inv.customerId) {
           setParties(pList => pList.map(p => {
             if (p.id === inv.customerId) {
-              const updatedP = { ...p, currentBalance: Math.max(0, p.currentBalance - amount) };
+              const updatedP = { ...p, currentBalance: p.currentBalance - amount };
               cloudDb.syncEntityDoc('parties', currentCompanyId, updatedP).catch(console.warn);
               return updatedP;
             }
@@ -3864,14 +3864,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // Update Party Balance
+    // Update Party Balance (Receivable = positive, Payable = negative)
     if (newPayment.partyId) {
       setParties(prev => prev.map(p => {
         if (p.id === newPayment.partyId) {
           let updatedParty = p;
           if (newPayment.type === 'PAYMENT_IN') {
-            updatedParty = { ...p, currentBalance: Math.max(0, p.currentBalance - newPayment.amount) };
+            // Money In reduces customer receivable or increases vendor refund advance
+            updatedParty = { ...p, currentBalance: p.currentBalance - newPayment.amount };
           } else if (newPayment.type === 'PAYMENT_OUT') {
+            // Money Out settles vendor payable or increases customer refund
             updatedParty = { ...p, currentBalance: p.currentBalance + newPayment.amount };
           }
           cloudDb.syncEntityDoc('parties', currentCompanyId, updatedParty).catch(console.warn);
@@ -3899,6 +3901,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deletePayment = (id: string) => {
     const target = payments.find(p => p.id === id);
+    if (target) {
+      // Reverse party balance
+      if (target.partyId) {
+        setParties(prev => prev.map(p => {
+          if (p.id === target.partyId) {
+            let updatedParty = p;
+            if (target.type === 'PAYMENT_IN') {
+              updatedParty = { ...p, currentBalance: p.currentBalance + target.amount };
+            } else if (target.type === 'PAYMENT_OUT') {
+              updatedParty = { ...p, currentBalance: p.currentBalance - target.amount };
+            }
+            cloudDb.syncEntityDoc('parties', currentCompanyId, updatedParty).catch(console.warn);
+            return updatedParty;
+          }
+          return p;
+        }));
+      }
+
+      // Revert linked invoice settlement if applicable
+      if (target.linkedInvoiceId) {
+        setInvoices(prev => prev.map(inv => {
+          if (inv.id === target.linkedInvoiceId) {
+            const newPaid = Math.max(0, (inv.amountPaid || 0) - target.amount);
+            const newDue = Math.max(0, inv.grandTotal - newPaid);
+            const newStatus = newDue <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+            const updated = {
+              ...inv,
+              amountPaid: newPaid,
+              amountDue: newDue,
+              status: newStatus,
+              paymentsList: (inv.paymentsList || []).filter(p => p.amount !== target.amount)
+            };
+            cloudDb.syncEntityDoc('invoices', currentCompanyId, updated).catch(console.warn);
+            return updated;
+          }
+          return inv;
+        }));
+      }
+
+      // Revert linked bill settlement if applicable
+      if (target.linkedBillId) {
+        setPurchaseBills(prev => prev.map(bill => {
+          if (bill.id === target.linkedBillId) {
+            const newPaid = Math.max(0, (bill.amountPaid || 0) - target.amount);
+            const newDue = Math.max(0, bill.grandTotal - newPaid);
+            const newStatus = newDue <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+            const updated = {
+              ...bill,
+              amountPaid: newPaid,
+              amountDue: newDue,
+              status: newStatus
+            };
+            cloudDb.syncEntityDoc('purchaseBills', currentCompanyId, updated).catch(console.warn);
+            return updated;
+          }
+          return bill;
+        }));
+      }
+    }
     setPayments(prev => prev.filter(p => p.id !== id));
     cloudDb.deleteEntityDoc('payments', currentCompanyId, id).catch(console.warn);
     showToast('info', 'Payment Deleted', `Voucher ${target?.voucherNumber || ''} removed.`);
