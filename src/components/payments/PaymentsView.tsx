@@ -33,6 +33,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { BankStatementImportModal } from '../accounting/BankStatementImportModal';
+import { AutoUpdateVoucherNumbersModal } from './AutoUpdateVoucherNumbersModal';
+import { getNextAvailableVoucherNumber } from '../../utils/voucherNumberUtils';
 
 export const PaymentsView: React.FC = () => {
   const { 
@@ -56,6 +58,7 @@ export const PaymentsView: React.FC = () => {
   // Modals state
   const [isRecordModalOpen, setIsRecordModalOpen] = useState<boolean>(false);
   const [recordModalType, setRecordModalType] = useState<PaymentType>('PAYMENT_IN');
+  const [showResequenceModal, setShowResequenceModal] = useState<boolean>(false);
   const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
   const [voucherToPrint, setVoucherToPrint] = useState<PaymentRecord | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -247,12 +250,10 @@ export const PaymentsView: React.FC = () => {
   const handleOpenRecord = (type: PaymentType) => {
     setEditingPayment(null);
     setRecordModalType(type);
-    const prefix = type === 'PAYMENT_IN' ? 'RCPT' : type === 'PAYMENT_OUT' ? 'PMT' : 'CNTR';
-    const num = Math.floor(100 + Math.random() * 900);
-    const defaultVoucher = `${prefix}-2026-${num}`;
+    const nextVoucher = getNextAvailableVoucherNumber(payments, business, type).voucherNumber;
 
     setFormData({
-      voucherNumber: defaultVoucher,
+      voucherNumber: nextVoucher,
       type: type,
       date: new Date().toISOString().split('T')[0],
       partyId: '',
@@ -279,13 +280,12 @@ export const PaymentsView: React.FC = () => {
   const handleOpenCollectInvoice = (inv: Invoice) => {
     setEditingPayment(null);
     setRecordModalType('PAYMENT_IN');
-    const num = Math.floor(100 + Math.random() * 900);
-    const defaultVoucher = `RCPT-2026-${num}`;
+    const nextVoucher = getNextAvailableVoucherNumber(payments, business, 'PAYMENT_IN').voucherNumber;
     const party = parties.find(p => p.id === inv.customerId || p.name.toLowerCase() === (inv.customerName || '').toLowerCase());
     const dueAmt = inv.amountDue !== undefined ? inv.amountDue : inv.grandTotal;
 
     setFormData({
-      voucherNumber: defaultVoucher,
+      voucherNumber: nextVoucher,
       type: 'PAYMENT_IN',
       date: new Date().toISOString().split('T')[0],
       partyId: party?.id || inv.customerId || '',
@@ -312,13 +312,12 @@ export const PaymentsView: React.FC = () => {
   const handleOpenPayBill = (bill: PurchaseBill) => {
     setEditingPayment(null);
     setRecordModalType('PAYMENT_OUT');
-    const num = Math.floor(100 + Math.random() * 900);
-    const defaultVoucher = `PMT-2026-${num}`;
+    const nextVoucher = getNextAvailableVoucherNumber(payments, business, 'PAYMENT_OUT').voucherNumber;
     const party = parties.find(p => p.id === bill.vendorId || p.name.toLowerCase() === (bill.vendorName || '').toLowerCase());
     const dueAmt = bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal;
 
     setFormData({
-      voucherNumber: defaultVoucher,
+      voucherNumber: nextVoucher,
       type: 'PAYMENT_OUT',
       date: new Date().toISOString().split('T')[0],
       partyId: party?.id || bill.vendorId || '',
@@ -541,6 +540,16 @@ export const PaymentsView: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setShowResequenceModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer active:scale-95"
+            title="Auto-resequence voucher numbers from a starting sequence"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <Hash className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>Voucher Sequences</span>
+          </button>
+
           <button
             onClick={() => setShowBankStatementModal(true)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer active:scale-95"
@@ -1665,6 +1674,12 @@ export const PaymentsView: React.FC = () => {
       <BankStatementImportModal
         isOpen={showBankStatementModal}
         onClose={() => setShowBankStatementModal(false)}
+      />
+
+      {/* Auto-Resequence Voucher Numbers Modal */}
+      <AutoUpdateVoucherNumbersModal
+        isOpen={showResequenceModal}
+        onClose={() => setShowResequenceModal(false)}
       />
     </div>
   );

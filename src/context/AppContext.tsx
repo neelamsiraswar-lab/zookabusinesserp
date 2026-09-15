@@ -70,6 +70,12 @@ import {
   auditInvoiceSequences,
   formatInvoiceSequence
 } from '../utils/invoiceNumberUtils';
+import {
+  getNextAvailableVoucherNumber,
+  parseVoucherNumber,
+  auditVoucherSequences,
+  formatVoucherSequence
+} from '../utils/voucherNumberUtils';
 import { cloudDb, defaultStandardAccountHeads } from '../services/cloudDb';
 import { isQuotaExceededError, getFirestoreUpgradeUrl } from '../services/firebase';
 import { applyThemeCssVariables } from '../utils/themeColors';
@@ -203,6 +209,8 @@ interface AppContextType {
   createPayment: (payment: Omit<PaymentRecord, 'id' | 'createdAt'>) => PaymentRecord;
   updatePayment: (id: string, updates: Partial<PaymentRecord>) => void;
   deletePayment: (id: string) => void;
+  resequenceAllVouchersFromStartingNumber: (options?: { startingNumber?: number; prefix?: string; type?: PaymentType; sortBy?: 'date' | 'created' }) => Promise<{ updatedCount: number; startingNumber: number; nextVoucherNo: string }>;
+  realignAndFixVoucherSequences: (type?: PaymentType, overrideSeq?: number) => Promise<{ fixedCount: number; nextVoucherNo: string }>;
   
   expenses: Expense[];
   createExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => Expense;
@@ -2773,6 +2781,180 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  const resequenceAllVouchersFromStartingNumber = async (
+    options?: { startingNumber?: number; prefix?: string; type?: PaymentType; sortBy?: 'date' | 'created' }
+  ): Promise<{ updatedCount: number; startingNumber: number; nextVoucherNo: string }> => {
+    const isUnified = business.voucherNumberingMode === 'UNIFIED';
+    const targetType = isUnified ? undefined : (options?.type || 'PAYMENT_IN');
+    
+    let defaultPrefix = isUnified
+      ? (business.voucherUnifiedPrefix || 'VCH-')
+      : (targetType === 'PAYMENT_IN' ? (business.paymentReceiptPrefix || 'RCPT-') : targetType === 'PAYMENT_OUT' ? (business.paymentVoucherPrefix || 'PMT-') : (business.contraVoucherPrefix || 'CNTR-'));
+
+    let defaultStart = isUnified
+      ? (business.nextUnifiedVoucherNumber || 1)
+      : (targetType === 'PAYMENT_IN' ? (business.nextPaymentReceiptNumber || 1) : targetType === 'PAYMENT_OUT' ? (business.nextPaymentVoucherNumber || 1) : (business.nextContraVoucherNumber || 1));
+
+    const prefix = options?.prefix !== undefined ? options.prefix.trim() : defaultPrefix.trim();
+    const rawStart = options?.startingNumber !== undefined ? options.startingNumber : defaultStart;
+    const startSeq = Math.max(1, parseInt(String(rawStart || 1), 10) || 1);
+    const sortBy = options?.sortBy || 'date';
+
+    const configKey = isUnified
+      ? 'nextUnifiedVoucherNumber'
+      : (targetType === 'PAYMENT_IN' ? 'nextPaymentReceiptNumber' : targetType === 'PAYMENT_OUT' ? 'nextPaymentVoucherNumber' : 'nextContraVoucherNumber');
+    
+    const prefixKey = isUnified
+      ? 'voucherUnifiedPrefix'
+      : (targetType === 'PAYMENT_IN' ? 'paymentReceiptPrefix' : targetType === 'PAYMENT_OUT' ? 'paymentVoucherPrefix' : 'contraVoucherPrefix');
+
+    const targetPayments = isUnified ? payments : payments.filter(p => p.type === targetType);
+
+    if (!targetPayments || targetPayments.length === 0) {
+      const updatedBusiness: BusinessProfile = {
+        ...business,
+        [prefixKey]: prefix,
+        [configKey]: startSeq
+      };
+      setBusiness(updatedBusiness);
+      setCompanies(prev => prev.map(c => c.id === currentCompanyId ? {
+        ...c,
+        [prefixKey]: prefix,
+        [configKey]: startSeq,
+        updatedAt: new Date().toISOString()
+      } : c));
+      try {
+        localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_business`, JSON.stringify(updatedBusiness));
+      } catch (e) {}
+      await cloudDb.saveBusinessProfile(currentCompanyId, updatedBusiness).catch(console.warn);
+      const nextVoucherNo = formatVoucherSequence(prefix, startSeq);
+      showToast('info', 'Starting Voucher Number Configured', `No existing vouchers to re-number. Next voucher will be ${nextVoucherNo}.`);
+      return { updatedCount: 0, startingNumber: startSeq, nextVoucherNo };
+    }
+
+    // Sort target vouchers chronologically
+    const sortedTarget = [...targetPayments].sort((a, b) => {
+      if (sortBy === 'created') {
+        const timeA = new Date(a.createdAt || a.date).getTime();
+        const timeB = new Date(b.createdAt || b.date).getTime();
+        return timeA - timeB;
+      }
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateA !== dateB) return dateA - dateB;
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeA - timeB;
+    });
+
+    const remappedMap = new Map<string, string>();
+    sortedTarget.forEach((p, index) => {
+      const newSeq = startSeq + index;
+      const newVoucherNumber = formatVoucherSequence(prefix, newSeq);
+      remappedMap.set(p.id, newVoucherNumber);
+    });
+
+    const updatedAllPayments = payments.map(p => {
+      if (remappedMap.has(p.id)) {
+        return {
+          ...p,
+          voucherNumber: remappedMap.get(p.id)!
+        };
+      }
+      return p;
+    });
+
+    const nextAvailableSeq = startSeq + sortedTarget.length;
+    const nextVoucherNo = formatVoucherSequence(prefix, nextAvailableSeq);
+
+    const updatedBusiness: BusinessProfile = {
+      ...business,
+      [prefixKey]: prefix,
+      [configKey]: nextAvailableSeq
+    };
+
+    setPayments(updatedAllPayments);
+    setBusiness(updatedBusiness);
+    setCompanies(prev => prev.map(c => c.id === currentCompanyId ? {
+      ...c,
+      [prefixKey]: prefix,
+      [configKey]: nextAvailableSeq,
+      updatedAt: new Date().toISOString()
+    } : c));
+
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_business`, JSON.stringify(updatedBusiness));
+      localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_payments`, JSON.stringify(updatedAllPayments));
+    } catch (e) {}
+
+    await Promise.all([
+      cloudDb.saveBusinessProfile(currentCompanyId, updatedBusiness).catch(console.warn),
+      ...updatedAllPayments.filter(p => remappedMap.has(p.id)).map(p => cloudDb.syncEntityDoc('payments', currentCompanyId, p).catch(console.warn))
+    ]);
+
+    logSecurityEvent(
+      'VOUCHERS_RENUMBERED_AUTOMATICALLY',
+      'Voucher Sequence',
+      `Auto-updated ${sortedTarget.length} payment vouchers starting from serial ${formatVoucherSequence(prefix, startSeq)} to ${formatVoucherSequence(prefix, nextAvailableSeq - 1)}. Next active: ${nextVoucherNo}`
+    );
+
+    return {
+      updatedCount: sortedTarget.length,
+      startingNumber: startSeq,
+      nextVoucherNo
+    };
+  };
+
+  const realignAndFixVoucherSequences = async (
+    type?: PaymentType,
+    overrideSeq?: number
+  ): Promise<{ fixedCount: number; nextVoucherNo: string }> => {
+    const isUnified = business.voucherNumberingMode === 'UNIFIED';
+    const targetType = isUnified ? undefined : (type || 'PAYMENT_IN');
+    const audit = auditVoucherSequences(payments, business, targetType);
+
+    const configKey = isUnified
+      ? 'nextUnifiedVoucherNumber'
+      : (targetType === 'PAYMENT_IN' ? 'nextPaymentReceiptNumber' : targetType === 'PAYMENT_OUT' ? 'nextPaymentVoucherNumber' : 'nextContraVoucherNumber');
+    
+    const prefixKey = isUnified
+      ? 'voucherUnifiedPrefix'
+      : (targetType === 'PAYMENT_IN' ? 'paymentReceiptPrefix' : targetType === 'PAYMENT_OUT' ? 'paymentVoucherPrefix' : 'contraVoucherPrefix');
+
+    const activePrefix = (business[prefixKey] || '').trim();
+    const finalNextSeq = overrideSeq !== undefined ? Math.max(1, overrideSeq) : audit.suggestedNextNumber;
+
+    const updatedBusiness: BusinessProfile = {
+      ...business,
+      [configKey]: finalNextSeq
+    };
+
+    setBusiness(updatedBusiness);
+    setCompanies(prev => prev.map(c => c.id === currentCompanyId ? {
+      ...c,
+      [configKey]: finalNextSeq,
+      updatedAt: new Date().toISOString()
+    } : c));
+
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_business`, JSON.stringify(updatedBusiness));
+    } catch (e) {}
+
+    await cloudDb.saveBusinessProfile(currentCompanyId, updatedBusiness).catch(console.warn);
+
+    const nextVoucherNo = formatVoucherSequence(activePrefix, finalNextSeq);
+    showToast(
+      'success',
+      'Voucher Sequence Realigned',
+      `Active voucher counter synchronized to #${nextVoucherNo}.`
+    );
+
+    return {
+      fixedCount: 0,
+      nextVoucherNo
+    };
+  };
+
   const createInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>): Invoice => {
     // Single Unified Serial Number Rule for both Tax Invoice and POS Billing
     let invoiceNumber = invoiceData.invoiceNumber?.trim();
@@ -3177,10 +3359,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         cloudDb.syncEntityDoc('invoices', currentCompanyId, updated).catch(console.warn);
 
-        // Also record a payment record in payments ledger
+        // Also record a payment record in payments ledger with sequential voucher numbering
+        const nextVoucherInfo = getNextAvailableVoucherNumber(payments, business, 'PAYMENT_IN');
+        const vchNo = nextVoucherInfo.voucherNumber;
+
         const pRec: PaymentRecord = {
           id: 'pay-rec-' + Date.now(),
-          voucherNumber: `RCPT-${Date.now().toString().slice(-6)}`,
+          voucherNumber: vchNo,
           type: 'PAYMENT_IN',
           date: new Date().toISOString().split('T')[0],
           partyId: inv.customerId,
@@ -3195,6 +3380,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         setPayments(p => [pRec, ...p]);
         cloudDb.syncEntityDoc('payments', currentCompanyId, pRec).catch(console.warn);
+
+        // Advance voucher number setting
+        const parsedVch = parseVoucherNumber(vchNo);
+        const createdVchSeq = parsedVch ? parsedVch.sequence : 0;
+        const vchConfigKey = nextVoucherInfo.configKey;
+
+        setBusiness(prevB => {
+          const curNum = Math.max(1, parseInt(String(prevB[vchConfigKey] || 1), 10) || 1);
+          const nextNum = Math.max(curNum, createdVchSeq > 0 ? createdVchSeq + 1 : curNum + 1);
+          const updatedB: BusinessProfile = {
+            ...prevB,
+            [vchConfigKey]: nextNum
+          };
+          try {
+            localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_business`, JSON.stringify(updatedB));
+          } catch (e) {}
+          cloudDb.saveBusinessProfile(currentCompanyId, updatedB).catch(console.warn);
+          return updatedB;
+        });
+
+        setCompanies(prevComps => prevComps.map(c => {
+          if (c.id === currentCompanyId) {
+            const curNum = Math.max(1, parseInt(String(c[vchConfigKey] || 1), 10) || 1);
+            const nextNum = Math.max(curNum, createdVchSeq > 0 ? createdVchSeq + 1 : curNum + 1);
+            const compUpdated: Company = {
+              ...c,
+              [vchConfigKey]: nextNum,
+              updatedAt: new Date().toISOString()
+            };
+            cloudDb.saveCompany(compUpdated).catch(console.warn);
+            return compUpdated;
+          }
+          return c;
+        }));
 
         // Update Party Balance
         if (inv.customerId) {
@@ -3850,13 +4069,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Payments Ledger
   const createPayment = (paymentData: Omit<PaymentRecord, 'id' | 'createdAt'>): PaymentRecord => {
+    // Generate sequential voucher number if not provided or empty
+    let voucherNo = (paymentData.voucherNumber || '').trim();
+    const nextInfo = getNextAvailableVoucherNumber(payments, business, paymentData.type);
+    if (!voucherNo) {
+      voucherNo = nextInfo.voucherNumber;
+    }
+
     const newPayment: PaymentRecord = {
       ...paymentData,
+      voucherNumber: voucherNo,
       id: 'pay-rec-' + Date.now(),
       createdAt: new Date().toISOString()
     };
     setPayments(prev => [newPayment, ...prev]);
     cloudDb.syncEntityDoc('payments', currentCompanyId, newPayment).catch(console.warn);
+
+    // Auto-advance voucher sequence in business settings
+    const parsedVoucher = parseVoucherNumber(voucherNo);
+    const createdSeq = parsedVoucher ? parsedVoucher.sequence : 0;
+    const configKey = nextInfo.configKey;
+
+    setBusiness(prev => {
+      const prevNum = Math.max(1, parseInt(String(prev[configKey] || 1), 10) || 1);
+      const nextNum = Math.max(prevNum, createdSeq > 0 ? createdSeq + 1 : prevNum + 1);
+      const updated: BusinessProfile = {
+        ...prev,
+        [configKey]: nextNum
+      };
+      try {
+        localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_business`, JSON.stringify(updated));
+      } catch (e) {}
+      cloudDb.saveBusinessProfile(currentCompanyId, updated).catch(console.warn);
+      return updated;
+    });
+
+    setCompanies(prevComps => prevComps.map(c => {
+      if (c.id === currentCompanyId) {
+        const cPrevNum = Math.max(1, parseInt(String(c[configKey] || 1), 10) || 1);
+        const cNextNum = Math.max(cPrevNum, createdSeq > 0 ? createdSeq + 1 : cPrevNum + 1);
+        const compUpdated: Company = {
+          ...c,
+          [configKey]: cNextNum,
+          updatedAt: new Date().toISOString()
+        };
+        cloudDb.saveCompany(compUpdated).catch(console.warn);
+        return compUpdated;
+      }
+      return c;
+    }));
 
     // Settle Linked Invoice
     if (newPayment.type === 'PAYMENT_IN' && newPayment.linkedInvoiceId) {
@@ -5171,6 +5432,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createPayment,
         updatePayment,
         deletePayment,
+        resequenceAllVouchersFromStartingNumber,
+        realignAndFixVoucherSequences,
         expenses,
         createExpense,
         deleteExpense,

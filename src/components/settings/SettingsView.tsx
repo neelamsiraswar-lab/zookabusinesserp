@@ -42,16 +42,20 @@ import {
   Fingerprint,
   Send,
   Hash,
-  Printer
+  Printer,
+  Receipt,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeftRight
 } from 'lucide-react';
 import { QrCodeSvg } from '../common/QrCodeSvg';
-import { AutoUpdateInvoiceNumbersModal } from '../invoices/AutoUpdateInvoiceNumbersModal';
 import { isValidUpiId, buildUpiPaymentUri, cleanUpiId } from '../../utils/upi';
 import { STATE_CODE_LIST } from '../../utils/constants';
 import { DEFAULT_SIGNATURE_DATA_URL, DEFAULT_SIGNATURE_2_DATA_URL, normalizeSignatureUrl } from '../../utils/formatters';
 import { InvoiceLineSettings } from '../../types';
 import { normalizeBusinessProfile, cleanDefaultBusinessProfile } from '../../utils/cleanDefaults';
 import { auditInvoiceSequences, formatInvoiceSequence } from '../../utils/invoiceNumberUtils';
+import { auditVoucherSequences, formatVoucherSequence } from '../../utils/voucherNumberUtils';
 import { InvoiceTemplateManager } from './InvoiceTemplateManager';
 import { ThemeSettingsTab } from './ThemeSettingsTab';
 import { BottomNavSettingsTab } from './BottomNavSettingsTab';
@@ -65,6 +69,9 @@ import { DispatchSettingsTab } from './DispatchSettingsTab';
 import { SnapshotRestoreSettingsTab } from './SnapshotRestoreSettingsTab';
 import { PosSettingsTab } from './PosSettingsTab';
 import { CloudSyncStatusBadge } from '../common/CloudSyncStatusBadge';
+import { AutoUpdateInvoiceNumbersModal } from '../invoices/AutoUpdateInvoiceNumbersModal';
+import { AutoUpdateVoucherNumbersModal } from '../payments/AutoUpdateVoucherNumbersModal';
+import { PaymentType } from '../../types';
 import { getThemePalette } from '../../utils/themeColors';
 
 export const SettingsView: React.FC = () => {
@@ -73,8 +80,10 @@ export const SettingsView: React.FC = () => {
     currentCompany,
     updateBusiness, 
     invoices,
+    payments,
     realignAndFixInvoiceSequences,
     resequenceAllInvoicesFromStartingNumber,
+    realignAndFixVoucherSequences,
     showToast,
     setActiveTab: setGlobalActiveTab
   } = useApp();
@@ -85,6 +94,9 @@ export const SettingsView: React.FC = () => {
   const [formData, setFormData] = useState({ ...business });
   const [isFixingSequence, setIsFixingSequence] = useState(false);
   const [isAutoUpdateModalOpen, setIsAutoUpdateModalOpen] = useState(false);
+  const [isAutoUpdateVoucherModalOpen, setIsAutoUpdateVoucherModalOpen] = useState(false);
+  const [autoUpdateVoucherType, setAutoUpdateVoucherType] = useState<PaymentType>('PAYMENT_IN');
+  const [isFixingVoucherSequence, setIsFixingVoucherSequence] = useState(false);
   const [newWarrantyPreset, setNewWarrantyPreset] = useState('');
 
   // Keep formData in sync when business updates
@@ -1599,6 +1611,302 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Voucher Numbering & Payment Receipt Settings */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    <span>Voucher Numbering & Payment Receipt Configuration</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Configure custom prefixes and continuous sequential serials for Money In (Receipts), Money Out (Payments), and Contra Transfers.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 text-[11px] font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 rounded-lg border border-teal-100 dark:border-teal-900/60">
+                    Auto-Incremental
+                  </span>
+                </div>
+              </div>
+
+              {/* Numbering Series Mode Toggle */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Voucher Series Numbering Scheme
+                  </label>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {formData.voucherNumberingMode === 'UNIFIED' ? 'Unified Single Counter' : 'Distinct Counters by Type'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <label 
+                    onClick={() => setFormData(prev => ({ ...prev, voucherNumberingMode: 'SEPARATE' }))}
+                    className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                      formData.voucherNumberingMode !== 'UNIFIED'
+                        ? 'bg-white dark:bg-slate-800 border-teal-500 shadow-xs ring-2 ring-teal-500/20'
+                        : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="voucherNumberingMode"
+                      value="SEPARATE"
+                      checked={formData.voucherNumberingMode !== 'UNIFIED'}
+                      onChange={() => setFormData(prev => ({ ...prev, voucherNumberingMode: 'SEPARATE' }))}
+                      className="mt-0.5 text-teal-600 focus:ring-teal-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white">Independent Series (Recommended)</div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Separate sequential series for Receipts (<span className="font-mono">RCPT-001</span>), Payments (<span className="font-mono">PMT-001</span>), and Contra (<span className="font-mono">CNTR-001</span>).
+                      </p>
+                    </div>
+                  </label>
+
+                  <label 
+                    onClick={() => setFormData(prev => ({ ...prev, voucherNumberingMode: 'UNIFIED' }))}
+                    className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                      formData.voucherNumberingMode === 'UNIFIED'
+                        ? 'bg-white dark:bg-slate-800 border-teal-500 shadow-xs ring-2 ring-teal-500/20'
+                        : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="voucherNumberingMode"
+                      value="UNIFIED"
+                      checked={formData.voucherNumberingMode === 'UNIFIED'}
+                      onChange={() => setFormData(prev => ({ ...prev, voucherNumberingMode: 'UNIFIED' }))}
+                      className="mt-0.5 text-teal-600 focus:ring-teal-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white">Unified Voucher Series</div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        All Money In, Money Out, and Contra entries share one common continuous sequence (<span className="font-mono">VCH-001</span>, <span className="font-mono">VCH-002</span>).
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Numbering Inputs */}
+              {formData.voucherNumberingMode === 'UNIFIED' ? (
+                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-teal-50/20 dark:bg-teal-950/20 space-y-3">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    <span>Unified Voucher Series Configuration</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Unified Prefix
+                      </label>
+                      <input
+                        type="text"
+                        name="voucherUnifiedPrefix"
+                        placeholder="e.g. VCH- or leave empty"
+                        value={formData.voucherUnifiedPrefix || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-teal-500 placeholder:text-slate-400 placeholder:font-normal"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Next Voucher Serial Number
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        name="nextUnifiedVoucherNumber"
+                        value={formData.nextUnifiedVoucherNumber || 1}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Next Active Preview: <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{formatVoucherSequence(formData.voucherUnifiedPrefix || 'VCH-', formData.nextUnifiedVoucherNumber || 1)}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {/* 1. Payment Receipt (Money In) */}
+                  <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-200/60 dark:border-emerald-900/60 pb-2">
+                      <div className="font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                        <ArrowDownLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>Payment Receipts</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300">
+                        Money In
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Receipt Prefix
+                      </label>
+                      <input
+                        type="text"
+                        name="paymentReceiptPrefix"
+                        placeholder="e.g. RCPT- or REC-"
+                        value={formData.paymentReceiptPrefix || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-400 placeholder:font-normal"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Next Serial Number
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        name="nextPaymentReceiptNumber"
+                        value={formData.nextPaymentReceiptNumber || 1}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
+                        Next Preview: <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">{formatVoucherSequence(formData.paymentReceiptPrefix || 'RCPT-', formData.nextPaymentReceiptNumber || 1)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 2. Payment Voucher (Money Out) */}
+                  <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-rose-200/60 dark:border-rose-900/60 pb-2">
+                      <div className="font-bold text-rose-900 dark:text-rose-300 flex items-center gap-1.5">
+                        <ArrowUpRight className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                        <span>Payment Vouchers</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-300">
+                        Money Out
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Payment Prefix
+                      </label>
+                      <input
+                        type="text"
+                        name="paymentVoucherPrefix"
+                        placeholder="e.g. PMT- or PV-"
+                        value={formData.paymentVoucherPrefix || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-rose-500 placeholder:text-slate-400 placeholder:font-normal"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Next Serial Number
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        name="nextPaymentVoucherNumber"
+                        value={formData.nextPaymentVoucherNumber || 1}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-rose-500"
+                      />
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
+                        Next Preview: <span className="font-mono font-bold text-rose-700 dark:text-rose-400">{formatVoucherSequence(formData.paymentVoucherPrefix || 'PMT-', formData.nextPaymentVoucherNumber || 1)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 3. Contra Voucher */}
+                  <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/30 dark:bg-blue-950/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-900/60 pb-2">
+                      <div className="font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                        <ArrowLeftRight className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span>Contra Transfers</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300">
+                        Bank / Cash
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Contra Prefix
+                      </label>
+                      <input
+                        type="text"
+                        name="contraVoucherPrefix"
+                        placeholder="e.g. CNTR- or CONTRA-"
+                        value={formData.contraVoucherPrefix || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 placeholder:font-normal"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                        Next Serial Number
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        name="nextContraVoucherNumber"
+                        value={formData.nextContraVoucherNumber || 1}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 font-mono font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
+                        Next Preview: <span className="font-mono font-bold text-blue-700 dark:text-blue-400">{formatVoucherSequence(formData.contraVoucherPrefix || 'CNTR-', formData.nextContraVoucherNumber || 1)}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons for Voucher Resequencing */}
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <span>Audit, fix duplicates, or re-sequence existing payment records from a starting number</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsFixingVoucherSequence(true);
+                      try {
+                        await realignAndFixVoucherSequences(formData.voucherNumberingMode === 'UNIFIED' ? undefined : 'PAYMENT_IN');
+                      } finally {
+                        setIsFixingVoucherSequence(false);
+                      }
+                    }}
+                    disabled={isFixingVoucherSequence}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all cursor-pointer"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isFixingVoucherSequence ? 'animate-spin' : ''}`} />
+                    <span>Auto-Fix Sequences</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAutoUpdateVoucherType('PAYMENT_IN');
+                      setIsAutoUpdateVoucherModalOpen(true);
+                    }}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 border border-teal-200 dark:border-teal-800 rounded-xl transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Receipt className="w-4 h-4" />
+                    <span>Auto-Resequence Payment Vouchers</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2025,6 +2333,13 @@ export const SettingsView: React.FC = () => {
       <AutoUpdateInvoiceNumbersModal
         isOpen={isAutoUpdateModalOpen}
         onClose={() => setIsAutoUpdateModalOpen(false)}
+      />
+
+      {/* Auto-Resequence Payment Voucher Numbers Modal */}
+      <AutoUpdateVoucherNumbersModal
+        isOpen={isAutoUpdateVoucherModalOpen}
+        onClose={() => setIsAutoUpdateVoucherModalOpen(false)}
+        defaultType={autoUpdateVoucherType}
       />
     </div>
   );

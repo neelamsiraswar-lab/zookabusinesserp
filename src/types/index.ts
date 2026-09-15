@@ -510,6 +510,15 @@ export interface Company {
   themeColor?: string;
   invoicePrefix?: string;
   nextInvoiceNumber?: number;
+  voucherNumberingMode?: 'SEPARATE' | 'UNIFIED';
+  paymentReceiptPrefix?: string;
+  nextPaymentReceiptNumber?: number;
+  paymentVoucherPrefix?: string;
+  nextPaymentVoucherNumber?: number;
+  contraVoucherPrefix?: string;
+  nextContraVoucherNumber?: number;
+  voucherUnifiedPrefix?: string;
+  nextUnifiedVoucherNumber?: number;
   isActive?: boolean; // Controls whether this business is enabled or disabled
   disabledReason?: string; // Reason when disabled by Super Admin
   headerConfig?: HeaderConfig;
@@ -784,6 +793,18 @@ export interface BusinessProfile {
   posInvoiceSeriesMode?: 'UNIFIED' | 'SEPARATE';
   posInvoicePrefix?: string;
   nextPosInvoiceNumber?: number;
+
+  // Voucher Numbering Settings (Receipt / Payment / Contra)
+  voucherNumberingMode?: 'SEPARATE' | 'UNIFIED';
+  paymentReceiptPrefix?: string;
+  nextPaymentReceiptNumber?: number;
+  paymentVoucherPrefix?: string;
+  nextPaymentVoucherNumber?: number;
+  contraVoucherPrefix?: string;
+  nextContraVoucherNumber?: number;
+  voucherUnifiedPrefix?: string;
+  nextUnifiedVoucherNumber?: number;
+
   defaultTerms: string;
   defaultNotes: string;
   enableEinvoice: boolean;
