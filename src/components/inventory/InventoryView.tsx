@@ -473,16 +473,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by product name, SKU, HSN, or scan barcode..."
-              className="w-full pl-9 pr-24 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className={`w-full pl-9 ${searchQuery ? 'pr-32' : 'pr-24'} py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20`}
             />
-            <button
-              onClick={() => setIsScannerOpen(true)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-950/80 hover:bg-indigo-200 dark:hover:bg-indigo-900 rounded-lg transition-colors cursor-pointer"
-              title="Open Barcode Scanner"
-            >
-              <Scan className="w-3.5 h-3.5" />
-              <span>Scan</span>
-            </button>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                onClick={() => setIsScannerOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-950/80 hover:bg-indigo-200 dark:hover:bg-indigo-900 rounded-lg transition-colors cursor-pointer"
+                title="Open Barcode Scanner"
+              >
+                <Scan className="w-3.5 h-3.5" />
+                <span>Scan</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">

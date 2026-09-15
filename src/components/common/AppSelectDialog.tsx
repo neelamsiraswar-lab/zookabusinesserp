@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, 
   X, 
@@ -48,18 +48,9 @@ export function AppSelectDialog<T = string | number>({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('ALL');
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
-    } else {
-      setSearchQuery('');
-      setSelectedGroup('ALL');
-    }
-  }, [isOpen]);
+  const optionsContainerRef = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(() => {
     const set = new Set<string>();
@@ -88,10 +79,78 @@ export function AppSelectDialog<T = string | number>({
     return list;
   }, [options, selectedGroup, searchQuery]);
 
+  useEffect(() => {
+    if (isOpen) {
+      const idx = filteredOptions.findIndex(opt => opt.value === selectedValue);
+      setHighlightedIndex(idx >= 0 ? idx : 0);
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    } else {
+      setSearchQuery('');
+      setSelectedGroup('ALL');
+      setHighlightedIndex(-1);
+    }
+  }, [isOpen, selectedValue]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (isOpen && highlightedIndex >= 0 && optionsContainerRef.current) {
+      const optionElements = optionsContainerRef.current.querySelectorAll('[data-dialog-option]');
+      const targetElement = optionElements[highlightedIndex] as HTMLElement;
+      if (targetElement) {
+        targetElement.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [highlightedIndex, isOpen]);
+
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (filteredOptions.length === 0) return;
+      setHighlightedIndex(prev => {
+        let next = prev + 1;
+        while (next < filteredOptions.length && filteredOptions[next].disabled) {
+          next++;
+        }
+        return next < filteredOptions.length ? next : prev;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (filteredOptions.length === 0) return;
+      setHighlightedIndex(prev => {
+        let next = prev - 1;
+        while (next >= 0 && filteredOptions[next].disabled) {
+          next--;
+        }
+        return next >= 0 ? next : prev;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+        const option = filteredOptions[highlightedIndex];
+        if (!option.disabled) {
+          onSelect(option.value, option);
+          onClose();
+        }
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onKeyDown={handleKeyDown}
+    >
       <div 
         className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
         style={{ boxShadow: `0 20px 40px -15px ${palette.ringHex}, 0 10px 20px -10px rgba(0,0,0,0.15)` }}
@@ -121,6 +180,7 @@ export function AppSelectDialog<T = string | number>({
             type="button"
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+            aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
           </button>
@@ -130,21 +190,28 @@ export function AppSelectDialog<T = string | number>({
         {(showSearch || groups.length > 0) && (
           <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2.5">
             {showSearch && (
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <div className="relative flex items-center">
+                <Search className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" />
                 <input
                   ref={searchInputRef}
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setHighlightedIndex(0);
+                  }}
                   placeholder={searchPlaceholder}
                   className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    onClick={() => {
+                      setSearchQuery('');
+                      searchInputRef.current?.focus();
+                    }}
+                    className="absolute right-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded cursor-pointer"
+                    title="Clear search"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -156,7 +223,10 @@ export function AppSelectDialog<T = string | number>({
               <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
                 <button
                   type="button"
-                  onClick={() => setSelectedGroup('ALL')}
+                  onClick={() => {
+                    setSelectedGroup('ALL');
+                    setHighlightedIndex(0);
+                  }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-all ${
                     selectedGroup === 'ALL'
                       ? 'text-white shadow-xs'
@@ -170,7 +240,10 @@ export function AppSelectDialog<T = string | number>({
                   <button
                     key={grp}
                     type="button"
-                    onClick={() => setSelectedGroup(grp)}
+                    onClick={() => {
+                      setSelectedGroup(grp);
+                      setHighlightedIndex(0);
+                    }}
                     className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-all ${
                       selectedGroup === grp
                         ? 'text-white shadow-xs'
@@ -187,19 +260,25 @@ export function AppSelectDialog<T = string | number>({
         )}
 
         {/* Options List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1.5 max-h-[50vh] bg-slate-50/50 dark:bg-slate-950/40">
+        <div 
+          ref={optionsContainerRef}
+          className="flex-1 overflow-y-auto p-3 space-y-1.5 max-h-[50vh] bg-slate-50/50 dark:bg-slate-950/40"
+        >
           {filteredOptions.length === 0 ? (
             <div className="text-center py-8 text-xs text-slate-400">
               No matching options found
             </div>
           ) : (
-            filteredOptions.map((option) => {
+            filteredOptions.map((option, idx) => {
               const isSelected = selectedValue === option.value;
+              const isHighlighted = idx === highlightedIndex;
               const Icon = option.icon;
 
               return (
                 <div
                   key={String(option.value)}
+                  data-dialog-option
+                  onMouseEnter={() => !option.disabled && setHighlightedIndex(idx)}
                   onClick={() => {
                     if (!option.disabled) {
                       onSelect(option.value, option);
@@ -211,6 +290,8 @@ export function AppSelectDialog<T = string | number>({
                       ? 'bg-indigo-50/90 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 shadow-xs'
                       : option.disabled
                       ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                      : isHighlighted
+                      ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-2xs'
                       : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-xs'
                   }`}
                   style={isSelected ? { borderColor: palette.hex } : undefined}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { getThemePalette } from '../../utils/themeColors';
 
 export interface PaginationProps {
   currentPage: number;
@@ -22,6 +24,9 @@ export const Pagination: React.FC<PaginationProps> = ({
   itemLabel = 'items',
   className = ''
 }) => {
+  const { currentCompany } = useApp();
+  const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
+
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
@@ -135,9 +140,10 @@ export const Pagination: React.FC<PaginationProps> = ({
                 onClick={() => onPageChange(pageNum)}
                 className={`min-w-[28px] h-7 px-2 flex items-center justify-center rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold border border-indigo-600'
+                    ? 'text-white shadow-xs font-bold'
                     : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
                 }`}
+                style={isActive ? { backgroundColor: palette.hex, borderColor: palette.hex } : undefined}
               >
                 {pageNum}
               </button>
