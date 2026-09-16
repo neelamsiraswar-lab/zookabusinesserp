@@ -308,9 +308,12 @@ interface AppContextType {
   isAuthenticated: boolean;
   isSessionLocked: boolean;
   isAuthModalOpen: boolean;
+  isAuthModalMinimized: boolean;
   authModalTargetUser: AppUser | null;
   openAuthModal: (targetUser?: AppUser) => void;
   closeAuthModal: () => void;
+  minimizeAuthModal: () => void;
+  restoreAuthModal: () => void;
   lockSession: () => void;
   unlockSession: (passwordOrPin: string) => { success: boolean; error?: string };
   authenticateAndSwitchUser: (userId: string, passwordOrPin: string) => { success: boolean; error?: string };
@@ -644,6 +647,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isSessionLocked, setIsSessionLocked] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isAuthModalMinimized, setIsAuthModalMinimized] = useState<boolean>(false);
   const [authModalTargetUser, setAuthModalTargetUser] = useState<AppUser | null>(null);
 
   const superAdminUser: AppUser = useMemo(() => ({
@@ -2228,12 +2232,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const openAuthModal = (targetUser?: AppUser) => {
     setAuthModalTargetUser(targetUser || null);
+    setIsAuthModalMinimized(false);
     setIsAuthModalOpen(true);
   };
 
   const closeAuthModal = () => {
     setIsAuthModalOpen(false);
+    setIsAuthModalMinimized(false);
     setAuthModalTargetUser(null);
+  };
+
+  const minimizeAuthModal = () => {
+    setIsAuthModalMinimized(true);
+  };
+
+  const restoreAuthModal = () => {
+    setIsAuthModalMinimized(false);
   };
 
   const logout = () => {
@@ -2245,6 +2259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(false);
     setIsSessionLocked(false);
     setIsAuthModalOpen(false);
+    setIsAuthModalMinimized(false);
     setAuthModalTargetUser(null);
 
     // Reset default active tab back to dashboard
@@ -5508,9 +5523,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logoutSuperAdmin,
         isSessionLocked,
         isAuthModalOpen,
+        isAuthModalMinimized,
         authModalTargetUser,
         openAuthModal,
         closeAuthModal,
+        minimizeAuthModal,
+        restoreAuthModal,
         lockSession,
         unlockSession,
         authenticateAndSwitchUser,
