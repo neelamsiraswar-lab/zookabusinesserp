@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getThemePalette } from '../../utils/themeColors';
+import { DesktopModal } from './DesktopModal';
 
 export interface AppDialogOption<T = string | number> {
   value: T;
@@ -147,45 +148,37 @@ export function AppSelectDialog<T = string | number>({
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
-      onKeyDown={handleKeyDown}
-    >
-      <div 
-        className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
-        style={{ boxShadow: `0 20px 40px -15px ${palette.ringHex}, 0 10px 20px -10px rgba(0,0,0,0.15)` }}
-      >
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {title}
-              </h3>
-              <span 
-                className="px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow-2xs"
-                style={{ backgroundColor: palette.hex }}
-              >
-                App Format
-              </span>
-            </div>
-            {subtitle && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {subtitle}
-              </p>
-            )}
-          </div>
-
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      title={title}
+      badge={
+        <span 
+          className="px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow-2xs"
+          style={{ backgroundColor: palette.hex }}
+        >
+          Select
+        </span>
+      }
+      subtitle={subtitle}
+      bodyClassName="p-0 overflow-y-auto flex flex-col flex-1"
+      footer={
+        <div className="flex items-center justify-between text-xs w-full">
+          <span className="text-slate-400">
+            {filteredOptions.length} available
+          </span>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-            aria-label="Close dialog"
+            className="px-3 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg font-semibold cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            Cancel
           </button>
         </div>
-
+      }
+    >
+      <div onKeyDown={handleKeyDown} className="flex flex-col flex-1">
         {/* Search & Filters */}
         {(showSearch || groups.length > 0) && (
           <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2.5">
@@ -347,21 +340,7 @@ export function AppSelectDialog<T = string | number>({
             })
           )}
         </div>
-
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 flex items-center justify-between text-xs">
-          <span className="text-slate-400">
-            {filteredOptions.length} available
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg font-semibold cursor-pointer"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
-    </div>
+    </DesktopModal>
   );
 }

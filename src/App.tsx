@@ -228,7 +228,7 @@ const MainContent: React.FC = () => {
           onOpenSuperAdminPortal={() => setActiveTab('super_admin_dashboard')}
         />
 
-        <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 w-full max-w-[1720px] 2xl:max-w-[1920px] mx-auto transition-all duration-200">
           <AnimatePresence mode="wait" initial={false}>
             {/* If Print view is active, show the printable document overlay */}
             {selectedInvoiceIdForPrint ? (

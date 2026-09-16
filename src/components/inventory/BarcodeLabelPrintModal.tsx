@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Product, BusinessProfile } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { BarcodeSvg } from '../common/BarcodeSvg';
-import { Printer, X, Tag, FileText, Check } from 'lucide-react';
+import { DesktopModal } from '../common/DesktopModal';
+import { Printer, Tag } from 'lucide-react';
 
 interface BarcodeLabelPrintModalProps {
   isOpen: boolean;
@@ -34,35 +35,38 @@ export const BarcodeLabelPrintModal: React.FC<BarcodeLabelPrintModalProps> = ({
   const barcodeValue = product.barcode || product.sku;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto modal-overlay">
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl max-w-[96vw] sm:max-w-xl md:max-w-2xl lg:max-w-3xl w-full overflow-hidden flex flex-col max-h-[95dvh] sm:max-h-[92dvh] my-auto">
-        {/* Top Header */}
-        <div className="p-3.5 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-900 text-white shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-2xl bg-indigo-600 text-white shrink-0">
-              <Tag className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-white truncate">
-                Print Product Barcode Labels
-              </h2>
-              <p className="text-[11px] sm:text-xs text-slate-400 truncate">
-                {product.name} ({barcodeValue})
-              </p>
-            </div>
-          </div>
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="3xl"
+      allowMaximize={true}
+      title="Print Product Barcode Labels"
+      subtitle={`${product.name} (${barcodeValue})`}
+      icon={<Tag className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+      iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+      bodyClassName="p-4 sm:p-6 space-y-4 sm:space-y-6 bg-slate-50/50 dark:bg-slate-900/50"
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
 
           <button
-            onClick={onClose}
-            className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer shrink-0"
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <Printer className="w-4 h-4" />
+            <span>Print {labelCopies} Barcode Labels</span>
           </button>
         </div>
-
-        {/* Options & Sheet Layout */}
-        <div className="p-4 sm:p-6 overflow-y-auto modal-content-scroll space-y-4 sm:space-y-6 flex-1 bg-slate-50/50">
-          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+      }
+    >
+      <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Sheet Format</label>
               <select
@@ -163,26 +167,6 @@ export const BarcodeLabelPrintModal: React.FC<BarcodeLabelPrintModalProps> = ({
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Action Footer */}
-        <div className="p-4 border-t border-slate-200 bg-white flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print {labelCopies} Barcode Labels</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

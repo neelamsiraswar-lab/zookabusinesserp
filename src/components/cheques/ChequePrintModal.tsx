@@ -22,6 +22,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { DesktopModal } from '../common/DesktopModal';
 
 interface ChequePrintModalProps {
   isOpen: boolean;
@@ -332,43 +333,66 @@ export const ChequePrintModal: React.FC<ChequePrintModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto animate-fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
-        
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold">
-              <Printer className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">
-                  Print Cheque #{cheque.chequeNumber}
-                </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                  {cheque.bankName}
-                </span>
-                {cheque.status === 'PRINTED' && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                    ✓ Printed
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500">
-                CTS-2010 Indian Banking Standard Cheque Printing & Alignment
-              </p>
-            </div>
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="4xl"
+      allowMaximize={true}
+      title={`Print Cheque #${cheque.chequeNumber}`}
+      badge={
+        <div className="flex items-center gap-1.5">
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+            {cheque.bankName}
+          </span>
+          {cheque.status === 'PRINTED' && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+              ✓ Printed
+            </span>
+          )}
+        </div>
+      }
+      subtitle="CTS-2010 Indian Banking Standard Cheque Printing & Alignment"
+      icon={<Printer className="w-5 h-5 text-blue-600" />}
+      iconBgColor="bg-blue-600/10"
+      bodyClassName="overflow-y-auto flex-1 flex flex-col"
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <div className="text-xs text-slate-500">
+            Cheque Amount: <strong className="text-slate-800 dark:text-slate-200 text-sm font-mono">{formatINR(cheque.amount)}</strong>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition"
+            >
+              Close
+            </button>
 
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isExportingPdf}
+              className="px-4 py-2 text-sm font-semibold text-blue-700 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 rounded-xl transition flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isExportingPdf ? 'Generating PDF...' : 'Download PDF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDirectPrint}
+              className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print Cheque Now</span>
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="flex-1 flex flex-col">
         {/* Toolbar Controls */}
         <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3 text-xs">
           
@@ -711,44 +735,7 @@ export const ChequePrintModal: React.FC<ChequePrintModalProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between">
-          <div className="text-xs text-slate-500">
-            Cheque Amount: <strong className="text-slate-800 dark:text-slate-200 text-sm font-mono">{formatINR(cheque.amount)}</strong>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition"
-            >
-              Close
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={isExportingPdf}
-              className="px-4 py-2 text-sm font-semibold text-blue-700 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 rounded-xl transition flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              <span>{isExportingPdf ? 'Generating PDF...' : 'Download PDF'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDirectPrint}
-              className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print Cheque Now</span>
-            </button>
-          </div>
-        </div>
-
       </div>
-    </div>
+    </DesktopModal>
   );
 };

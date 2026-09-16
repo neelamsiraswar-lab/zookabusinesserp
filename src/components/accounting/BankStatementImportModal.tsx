@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { useApp } from '../../context/AppContext';
 import { 
   BankStatementAutoEntry, 
@@ -743,68 +744,49 @@ export const BankStatementImportModal: React.FC<BankStatementImportModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto modal-overlay animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-[98vw] md:max-w-5xl lg:max-w-6xl my-auto flex flex-col max-h-[96dvh] sm:max-h-[92dvh] overflow-hidden">
-        
-        {/* =========================================================================
-            MODAL HEADER & WIZARD STEP INDICATOR
-           ========================================================================= */}
-        <div className="p-3.5 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-850/80 shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30 shrink-0">
-              <Landmark className="w-5 h-5 sm:w-6 sm:h-6" />
+    <>
+      <DesktopModal
+        isOpen={isOpen}
+        onClose={onClose}
+        size="3xl"
+        title="Bank Statement Auto Entry & Reconciliation"
+        subtitle="Import CSV bank statement, auto-classify Receipts, Vendor Payments, Expenses & Contra Transfers directly into Bank Ledger."
+        icon={<Landmark className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-600/10 dark:bg-indigo-600/20"
+        badge={
+          <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+            AI Engine
+          </span>
+        }
+        headerActions={
+          <div className="hidden sm:flex items-center gap-2 text-xs font-bold">
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+              currentStep === 1 
+                ? 'bg-indigo-600 text-white shadow-xs' 
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}>
+              <span>1. Upload Statement</span>
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-lg font-extrabold text-slate-900 dark:text-white truncate">
-                  Bank Statement Auto Entry & Reconciliation
-                </h2>
-                <span className="px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  AI Engine
-                </span>
-              </div>
-              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
-                Import CSV bank statement, auto-classify Receipts, Vendor Payments, Expenses & Contra Transfers directly into Bank Ledger.
-              </p>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+              currentStep === 2 
+                ? 'bg-indigo-600 text-white shadow-xs' 
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}>
+              <span>2. Review & Match ({parsedEntries.length})</span>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+              currentStep === 3 
+                ? 'bg-emerald-600 text-white shadow-xs' 
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}>
+              <span>3. Complete</span>
             </div>
           </div>
-
-          <div className="flex items-center gap-4">
-            {/* Step Indicators */}
-            <div className="hidden sm:flex items-center gap-2 text-xs font-bold">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                currentStep === 1 
-                  ? 'bg-indigo-600 text-white shadow-xs' 
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-              }`}>
-                <span>1. Upload Statement</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                currentStep === 2 
-                  ? 'bg-indigo-600 text-white shadow-xs' 
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-              }`}>
-                <span>2. Review & Match ({parsedEntries.length})</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                currentStep === 3 
-                  ? 'bg-emerald-600 text-white shadow-xs' 
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-              }`}>
-                <span>3. Complete</span>
-              </div>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+        }
+        bodyClassName="flex flex-col flex-1 min-h-0 overflow-hidden"
+      >
 
         {/* =========================================================================
             STEP 1: UPLOAD / PASTE STATEMENT & BANK ACCOUNT SELECTOR
@@ -1422,76 +1404,69 @@ export const BankStatementImportModal: React.FC<BankStatementImportModalProps> =
             </div>
           </div>
         )}
-      </div>
+      </DesktopModal>
 
       {/* Quick Add Bank Account Modal */}
-      {showNewBankModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-2xs overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-700 shadow-2xl max-w-[96vw] sm:max-w-md w-full space-y-4 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700 shrink-0">
-              <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                <Landmark className="w-4 h-4 text-indigo-600" />
-                <span>Create Bank Account Ledger Head</span>
-              </h4>
-              <button onClick={() => setShowNewBankModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <DesktopModal
+        isOpen={showNewBankModal}
+        onClose={() => setShowNewBankModal(false)}
+        size="md"
+        title="Create Bank Account Ledger Head"
+        icon={<Landmark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/40"
+        bodyClassName="p-4 sm:p-5 space-y-3 text-xs"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setShowNewBankModal(false)}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateBankAccount}
+              disabled={!newBankName.trim()}
+              className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow cursor-pointer disabled:opacity-50"
+            >
+              Create Account Head
+            </button>
+          </div>
+        }
+      >
+        <div>
+          <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Bank Name & Branch:</label>
+          <input
+            type="text"
+            placeholder="e.g. ICICI Current Bank Account - Connaught Place"
+            value={newBankName}
+            onChange={e => setNewBankName(e.target.value)}
+            className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Bank Name & Branch:</label>
-                <input
-                  type="text"
-                  placeholder="e.g. ICICI Current Bank Account - Connaught Place"
-                  value={newBankName}
-                  onChange={e => setNewBankName(e.target.value)}
-                  className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Account Code:</label>
-                  <input
-                    type="text"
-                    value={newBankCode}
-                    onChange={e => setNewBankCode(e.target.value)}
-                    className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Opening Balance (₹):</label>
-                  <input
-                    type="number"
-                    value={newBankOpeningBal}
-                    onChange={e => setNewBankOpeningBal(parseFloat(e.target.value) || 0)}
-                    className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setShowNewBankModal(false)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateBankAccount}
-                disabled={!newBankName.trim()}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow cursor-pointer disabled:opacity-50"
-              >
-                Create Account Head
-              </button>
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Account Code:</label>
+            <input
+              type="text"
+              value={newBankCode}
+              onChange={e => setNewBankCode(e.target.value)}
+              className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Opening Balance (₹):</label>
+            <input
+              type="number"
+              value={newBankOpeningBal}
+              onChange={e => setNewBankOpeningBal(parseFloat(e.target.value) || 0)}
+              className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+            />
           </div>
         </div>
-      )}
-    </div>
+      </DesktopModal>
+    </>
   );
 };

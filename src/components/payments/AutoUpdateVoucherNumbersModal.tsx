@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { PaymentRecord, PaymentType } from '../../types';
 import { formatVoucherSequence } from '../../utils/voucherNumberUtils';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { DesktopModal } from '../common/DesktopModal';
 import { 
   Hash, 
   X, 
@@ -146,42 +147,54 @@ export const AutoUpdateVoucherNumbersModal: React.FC<AutoUpdateVoucherNumbersMod
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div 
-        id="auto-resequence-vouchers-modal"
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
-      >
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 border border-teal-200/50 dark:border-teal-800/50">
-              <Receipt className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Auto-Resequence Payment Vouchers</span>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
-                  Sequential Audit
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Fix duplicate numbers, missing sequences, and enforce chronological voucher numbering
-              </p>
-            </div>
-          </div>
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      id="auto-resequence-vouchers-modal"
+      size="xl"
+      title="Auto-Resequence Payment Vouchers"
+      subtitle="Fix duplicate numbers, missing sequences, and enforce chronological voucher numbering"
+      badge={
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+          Sequential Audit
+        </span>
+      }
+      icon={<Receipt className="w-5 h-5" />}
+      iconBgColor="bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 border border-teal-200/50 dark:border-teal-800/50"
+      bodyClassName="space-y-6 text-xs"
+      footer={
+        <>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            disabled={isApplying}
+            className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            Cancel
           </button>
-        </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-          
-          {/* Voucher Type Selector (if separate series) */}
+          <button
+            type="button"
+            onClick={handleApplyResequence}
+            disabled={isApplying || previewData.totalCount === 0}
+            className="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:pointer-events-none rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
+            {isApplying ? (
+              <>
+                <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                <span>Applying Sequence...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Apply Sequential Numbering</span>
+              </>
+            )}
+          </button>
+        </>
+      }
+    >
+      {/* Voucher Type Selector (if separate series) */}
           {!isUnified && (
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5">
@@ -384,39 +397,6 @@ export const AutoUpdateVoucherNumbersModal: React.FC<AutoUpdateVoucherNumbersMod
               <span className="font-bold">Permanent Sequential Re-assignment:</span> Resequencing will rename existing voucher numbers in the database to align with the new sequence. Linked invoice references and ledger amounts will remain untouched.
             </div>
           </div>
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isApplying}
-            className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="button"
-            onClick={handleApplyResequence}
-            disabled={isApplying || previewData.totalCount === 0}
-            className="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:pointer-events-none rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
-          >
-            {isApplying ? (
-              <>
-                <RotateCcw className="w-3.5 h-3.5 animate-spin" />
-                <span>Applying Sequence...</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                <span>Apply Sequential Numbering</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

@@ -15,6 +15,7 @@ import {
 import { ChequeRecord, BusinessProfile } from '../../types';
 import { generateChequeWhatsAppText } from '../../utils/chequeReminders';
 import { formatINR, formatDate } from '../../utils/formatters';
+import { DesktopModal } from '../common/DesktopModal';
 
 export type ChequeReminderType = 'DUE_TODAY' | 'UPCOMING_PDC' | 'BOUNCED' | 'CLEARANCE_NOTICE';
 
@@ -86,37 +87,19 @@ export const ChequeReminderDrawerModal: React.FC<ChequeReminderDrawerModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto animate-scale-in">
-        
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-emerald-50/60 dark:bg-emerald-950/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-              <MessageSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Cheque Reminder & Notification
-              </h2>
-              <p className="text-xs text-slate-500">
-                Send instant WhatsApp / SMS / Email notice to party
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          
-          {/* Cheque Summary Pill */}
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
+    <DesktopModal
+      isOpen={isOpen && !!cheque}
+      onClose={onClose}
+      size="lg"
+      title="Cheque Reminder & Notification"
+      subtitle="Send instant WhatsApp / SMS / Email notice to party"
+      icon={<MessageSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />}
+      iconBgColor="bg-emerald-50 dark:bg-emerald-950/60"
+      bodyClassName="p-5 space-y-4 overflow-y-auto flex-1"
+    >
+      <div className="space-y-4">
+        {/* Cheque Summary Pill */}
+        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
             <div>
               <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 font-mono">
                 <Landmark className="w-3.5 h-3.5 text-blue-600" />
@@ -259,8 +242,6 @@ export const ChequeReminderDrawerModal: React.FC<ChequeReminderDrawerModalProps>
             </button>
           </div>
         </div>
-
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

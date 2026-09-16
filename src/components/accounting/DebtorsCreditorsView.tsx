@@ -4,6 +4,7 @@ import { Party, Invoice, PurchaseBill, PaymentRecord } from '../../types';
 import { formatCurrency, formatINR, formatDate } from '../../utils/formatters';
 import { ClientStatementModal } from '../parties/ClientStatementModal';
 import { Pagination } from '../common/Pagination';
+import { DesktopModal } from '../common/DesktopModal';
 import { 
   Users, 
   Search, 
@@ -1275,61 +1276,59 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
           MODAL 1: DETAILED DOUBLE-ENTRY LEDGER STATEMENT MODAL
          ========================================================================= */}
       {selectedPartyForLedger && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="p-4 md:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/60">
-              <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${
-                  selectedPartyForLedger.type === 'VENDOR' 
-                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400' 
-                    : 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
-                }`}>
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-base md:text-lg text-slate-900 dark:text-white">
-                      {selectedPartyForLedger.name}
-                    </h3>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                      selectedPartyForLedger.type === 'CUSTOMER' 
-                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                        : selectedPartyForLedger.type === 'VENDOR'
-                          ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                          : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                    }`}>
-                      {selectedPartyForLedger.type === 'CUSTOMER' ? 'Sundry Debtor (Customer)' : selectedPartyForLedger.type === 'VENDOR' ? 'Sundry Creditor (Vendor)' : 'Dual Role (Customer & Vendor)'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    General Ledger Statement of Accounts • {selectedPartyForLedger.phone || 'No phone'} • {selectedPartyForLedger.gstin ? `GSTIN: ${selectedPartyForLedger.gstin}` : 'Unregistered'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const pid = selectedPartyForLedger.id;
-                    setSelectedPartyForLedger(null);
-                    setStatementPartyId(pid);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all cursor-pointer"
-                  title="Print / Download PDF Statement"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Statement</span>
-                </button>
-                <button
-                  onClick={() => setSelectedPartyForLedger(null)}
-                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+        <DesktopModal
+          isOpen={!!selectedPartyForLedger}
+          onClose={() => setSelectedPartyForLedger(null)}
+          size="4xl"
+          allowMaximize={true}
+          title={selectedPartyForLedger.name}
+          badge={
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+              selectedPartyForLedger.type === 'CUSTOMER' 
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                : selectedPartyForLedger.type === 'VENDOR'
+                  ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                  : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+            }`}>
+              {selectedPartyForLedger.type === 'CUSTOMER' ? 'Sundry Debtor (Customer)' : selectedPartyForLedger.type === 'VENDOR' ? 'Sundry Creditor (Vendor)' : 'Dual Role (Customer & Vendor)'}
+            </span>
+          }
+          subtitle={`General Ledger Statement of Accounts • ${selectedPartyForLedger.phone || 'No phone'} • ${selectedPartyForLedger.gstin ? `GSTIN: ${selectedPartyForLedger.gstin}` : 'Unregistered'}`}
+          icon={<FileText className="w-5 h-5" />}
+          iconBgColor={
+            selectedPartyForLedger.type === 'VENDOR' 
+              ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400' 
+              : 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+          }
+          headerActions={
+            <button
+              onClick={() => {
+                const pid = selectedPartyForLedger.id;
+                setSelectedPartyForLedger(null);
+                setStatementPartyId(pid);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all cursor-pointer"
+              title="Print / Download PDF Statement"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Statement</span>
+            </button>
+          }
+          bodyClassName="p-0 overflow-y-auto flex flex-col flex-1"
+          footer={
+            <div className="flex items-center justify-between text-xs w-full">
+              <span className="text-slate-500 dark:text-slate-400">
+                {filteredLedgerPostings.length} Vouchers posted to this sub-ledger
+              </span>
+              <button
+                onClick={() => setSelectedPartyForLedger(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded-xl cursor-pointer"
+              >
+                Close Statement
+              </button>
             </div>
-
+          }
+        >
             {/* Modal Sub-Header: Search & Running Balance Summary */}
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 text-xs">
               <div className="relative flex-1 max-w-sm">
@@ -1451,21 +1450,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Modal Footer */}
-            <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs">
-              <span className="text-slate-500 dark:text-slate-400">
-                {filteredLedgerPostings.length} Vouchers posted to this sub-ledger
-              </span>
-              <button
-                onClick={() => setSelectedPartyForLedger(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded-xl cursor-pointer"
-              >
-                Close Statement
-              </button>
-            </div>
-          </div>
-        </div>
+        </DesktopModal>
       )}
 
       {/* =========================================================================

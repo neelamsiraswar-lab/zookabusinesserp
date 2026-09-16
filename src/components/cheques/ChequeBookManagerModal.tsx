@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChequeBook } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { formatChequeNumber } from '../../utils/chequeConstants';
+import { DesktopModal } from '../common/DesktopModal';
 import { 
   X, 
   BookOpen, 
@@ -84,36 +85,30 @@ export const ChequeBookManagerModal: React.FC<ChequeBookManagerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto animate-fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
-        
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-600/10 text-purple-600 flex items-center justify-center font-bold">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">
-                Bank Cheque Books Register
-              </h3>
-              <p className="text-xs text-slate-500">
-                Track cheque book series, available leaves & sequential issuance
-              </p>
-            </div>
+    <>
+      <DesktopModal
+        isOpen={isOpen}
+        onClose={onClose}
+        size="3xl"
+        allowMaximize={true}
+        title="Bank Cheque Books Register"
+        subtitle="Track cheque book series, available leaves & sequential issuance"
+        icon={<BookOpen className="w-5 h-5 text-purple-600" />}
+        iconBgColor="bg-purple-600/10"
+        bodyClassName="p-6 overflow-y-auto flex-1 space-y-6"
+        footer={
+          <div className="flex justify-end w-full">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition"
+            >
+              Close
+            </button>
           </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          
+        }
+      >
+        <div className="space-y-6">
           {/* Top action */}
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
@@ -336,45 +331,22 @@ export const ChequeBookManagerModal: React.FC<ChequeBookManagerModalProps> = ({
               })
             )}
           </div>
-
         </div>
-
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition"
-          >
-            Close
-          </button>
-        </div>
-
-      </div>
+      </DesktopModal>
 
       {/* Delete Confirmation Modal */}
       {bookToDelete && (
-        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 flex items-center justify-center font-bold">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                  Delete Cheque Book Series?
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {bookToDelete.bankName} • Series #{bookToDelete.startChequeNo} - #{bookToDelete.endChequeNo}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Are you sure you want to remove this cheque book? Any already recorded cheques in this series will remain in your register.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2">
+        <DesktopModal
+          isOpen={!!bookToDelete}
+          onClose={() => setBookToDelete(null)}
+          size="sm"
+          title="Delete Cheque Book Series?"
+          subtitle={`${bookToDelete.bankName} • Series #${bookToDelete.startChequeNo} - #${bookToDelete.endChequeNo}`}
+          icon={<Trash2 className="w-5 h-5 text-rose-600" />}
+          iconBgColor="bg-rose-100 dark:bg-rose-950/50"
+          bodyClassName="p-6 space-y-4 flex-1"
+          footer={
+            <div className="flex justify-end gap-2 w-full">
               <button
                 type="button"
                 onClick={() => setBookToDelete(null)}
@@ -392,9 +364,13 @@ export const ChequeBookManagerModal: React.FC<ChequeBookManagerModalProps> = ({
                 <span>Delete Cheque Book</span>
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Are you sure you want to remove this cheque book? Any already recorded cheques in this series will remain in your register.
+          </p>
+        </DesktopModal>
       )}
-    </div>
+    </>
   );
 };

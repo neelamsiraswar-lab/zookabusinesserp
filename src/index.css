@@ -54,20 +54,44 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom dark scrollbar styling */
+/* Custom sleek desktop scrollbar styling for both light and dark modes */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
 .dark ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 .dark ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: transparent;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+  background: rgba(71, 85, 105, 0.55);
+  border-radius: 9999px;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: rgba(100, 116, 139, 0.85);
+}
+
+/* Custom desktop scrollbar helper */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(71, 85, 105, 0.55) transparent;
 }
 
 /* Device-responsive modal & dialog helpers */

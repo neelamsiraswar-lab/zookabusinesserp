@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { Party } from '../../types';
 import { formatCurrency, validateGstin } from '../../utils/formatters';
 import { INDIAN_STATES } from '../../utils/constants';
@@ -549,38 +550,68 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto modal-overlay">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-[98vw] md:max-w-4xl lg:max-w-5xl my-auto flex flex-col max-h-[96dvh] sm:max-h-[92dvh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        
-        {/* Header */}
-        <div className="px-4 py-3.5 sm:px-6 sm:py-4.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 text-cyan-300 border border-indigo-400/20 flex items-center justify-center shadow-xs shrink-0">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold flex items-center gap-2 truncate">
-                <span>Bulk CSV Contacts Upload</span>
-                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold bg-cyan-400/20 text-cyan-300 rounded-full border border-cyan-400/30">
-                  Contacts
-                </span>
-              </h2>
-              <p className="text-[11px] sm:text-xs text-slate-300 truncate">
-                Import client directories, vendor accounts, GSTIN master data, credit terms & opening ledgers in bulk.
-              </p>
-            </div>
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="3xl"
+      title="Bulk CSV Contacts Upload"
+      subtitle="Import client directories, vendor accounts, GSTIN master data, credit terms & opening ledgers in bulk."
+      icon={<Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+      iconBgColor="bg-indigo-500/10 dark:bg-indigo-500/20"
+      badge={
+        <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold bg-cyan-400/20 text-cyan-700 dark:text-cyan-300 rounded-full border border-cyan-400/30">
+          Contacts
+        </span>
+      }
+      headerActions={
+        <button
+          onClick={handleDownloadSampleTemplate}
+          className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold hover:underline cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Download Sample CSV</span>
+        </button>
+      }
+      bodyClassName="flex flex-col flex-1 min-h-0 overflow-hidden"
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            {activeStep === 'PREVIEW' ? (
+              <span>
+                File: <strong className="text-slate-800 dark:text-slate-200">{fileName}</strong> • Ready to import{' '}
+                <strong className="text-emerald-700 dark:text-emerald-400">{validRowsCount}</strong> contacts
+              </span>
+            ) : (
+              <span>Rapid CSV bulk loader for customer, vendor and ledger setups</span>
+            )}
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
 
+            {activeStep === 'PREVIEW' && (
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={validRowsCount === 0}
+                className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-600/30 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Import {validRowsCount} Contacts</span>
+              </button>
+            )}
+          </div>
+        </div>
+      }
+    >
         {/* Stepper / Subheader */}
-        <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+        <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
           <div className="flex items-center gap-6">
             <button
               onClick={() => setActiveStep('UPLOAD')}
@@ -613,14 +644,6 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
               <span>Review & Validation ({parsedRows.length} Contacts)</span>
             </button>
           </div>
-
-          <button
-            onClick={handleDownloadSampleTemplate}
-            className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold hover:underline cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download Sample Contacts CSV Template</span>
-          </button>
         </div>
 
         {/* Modal Body */}
@@ -949,44 +972,6 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <div className="text-xs text-slate-500 dark:text-slate-400">
-            {activeStep === 'PREVIEW' ? (
-              <span>
-                File: <strong className="text-slate-800 dark:text-slate-200">{fileName}</strong> • Ready to import{' '}
-                <strong className="text-emerald-700 dark:text-emerald-400">{validRowsCount}</strong> contacts
-              </span>
-            ) : (
-              <span>Rapid CSV bulk loader for customer, vendor and ledger setups</span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-
-            {activeStep === 'PREVIEW' && (
-              <button
-                type="button"
-                onClick={handleConfirmImport}
-                disabled={validRowsCount === 0}
-                className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-600/30 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Import {validRowsCount} Contacts</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

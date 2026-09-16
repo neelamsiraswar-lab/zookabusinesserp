@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { useApp } from '../../context/AppContext';
 import { Party } from '../../types';
 import { formatCurrency, formatDate, validateGstin } from '../../utils/formatters';
@@ -553,19 +554,17 @@ export const PartiesView: React.FC = () => {
       </div>
 
       {/* Add / Edit Party Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="w-full max-w-[96vw] sm:max-w-md md:max-w-lg bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                {editingParty ? 'Edit Contact Profile' : 'Add New Customer / Vendor'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveParty} className="mt-4 space-y-3.5 text-xs">
+      <DesktopModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        size="lg"
+        title={editingParty ? 'Edit Contact Profile' : 'Add New Customer / Vendor'}
+        subtitle={editingParty ? 'Update contact details, GSTIN, credit limits and opening balances' : 'Create a new customer or vendor ledger profile'}
+        icon={<Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-3.5"
+      >
+        <form onSubmit={handleSaveParty} className="space-y-3.5 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Party Type</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -817,9 +816,7 @@ export const PartiesView: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </DesktopModal>
 
       {/* Client Statement of Account Modal */}
       {isStatementOpen && (

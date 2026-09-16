@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { 
   X, 
   Send, 
@@ -208,69 +209,116 @@ export const ShareInvoiceModal: React.FC<ShareInvoiceModalProps> = ({
     setActiveTab('DISPATCH');
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
-        
-        {/* Modal Header */}
-        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/90">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-              <Send className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Dispatch Tax Invoice
-                </h3>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 font-mono">
-                  {invoice.invoiceNumber}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                1-Click WhatsApp & Email share with payment links and customized templates
-              </p>
-            </div>
-          </div>
+  if (!invoice) return null;
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-xl text-xs font-semibold">
+  return (
+    <DesktopModal
+      isOpen={isOpen && !!invoice}
+      onClose={onClose}
+      size="2xl"
+      title="Dispatch Tax Invoice"
+      subtitle="1-Click WhatsApp & Email share with payment links and customized templates"
+      icon={<Send className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />}
+      iconBgColor="bg-emerald-500/10 dark:bg-emerald-500/20"
+      badge={
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 font-mono">
+          {invoice.invoiceNumber}
+        </span>
+      }
+      headerActions={
+        <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-xl text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setActiveTab('DISPATCH')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              activeTab === 'DISPATCH'
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Send
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('CONFIG')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+              activeTab === 'CONFIG'
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            <span>Templates</span>
+          </button>
+        </div>
+      }
+      bodyClassName="p-6 space-y-5"
+      footer={
+        <div className="flex items-center justify-between w-full gap-3">
+          {activeTab === 'DISPATCH' ? (
+            <>
+              <button
+                type="button"
+                onClick={handleCopyMessage}
+                className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                {copiedText ? <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedText ? 'Copied to Clipboard' : 'Copy Text'}</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                {activeChannel === 'WHATSAPP' ? (
+                  <button
+                    type="button"
+                    onClick={handleSendWhatsApp}
+                    className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-600/20"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Send on WhatsApp</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-indigo-600/20"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>Compose Email</span>
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-between w-full">
               <button
                 type="button"
                 onClick={() => setActiveTab('DISPATCH')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'DISPATCH'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               >
-                Send
+                Back to Dispatch
               </button>
+
               <button
                 type="button"
-                onClick={() => setActiveTab('CONFIG')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
-                  activeTab === 'CONFIG'
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                onClick={handleSaveSettings}
+                className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
               >
-                <Settings2 className="w-3.5 h-3.5" />
-                <span>Templates</span>
+                <Check className="w-4 h-4" />
+                <span>Save Template Changes</span>
               </button>
             </div>
-
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          )}
         </div>
-
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+      }
+    >
           {activeTab === 'DISPATCH' ? (
             <>
               {/* Channel Selector Cards */}
@@ -567,74 +615,6 @@ export const ShareInvoiceModal: React.FC<ShareInvoiceModalProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Modal Footer Actions */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 flex items-center justify-between gap-3">
-          {activeTab === 'DISPATCH' ? (
-            <>
-              <button
-                type="button"
-                onClick={handleCopyMessage}
-                className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                {copiedText ? <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedText ? 'Copied to Clipboard' : 'Copy Text'}</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-
-                {activeChannel === 'WHATSAPP' ? (
-                  <button
-                    type="button"
-                    onClick={handleSendWhatsApp}
-                    className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-600/20"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>Send on WhatsApp</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSendEmail}
-                    className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-indigo-600/20"
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span>Compose Email</span>
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-between w-full">
-              <button
-                type="button"
-                onClick={() => setActiveTab('DISPATCH')}
-                className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-              >
-                Back to Dispatch
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveSettings}
-                className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
-              >
-                <Check className="w-4 h-4" />
-                <span>Save Template Changes</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

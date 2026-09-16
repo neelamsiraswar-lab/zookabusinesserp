@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { useApp } from '../../context/AppContext';
 import { Pagination } from '../common/Pagination';
 import { 
@@ -2503,410 +2504,376 @@ export const AccountingView: React.FC = () => {
       {/* =========================================================================
           LEDGER MASTER (ADD / EDIT ACCOUNT HEAD) MODAL
          ========================================================================= */}
-      {showAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-w-[96vw] sm:max-w-md md:max-w-lg w-full text-xs space-y-4 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <FolderPlus className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    {editingAccountId ? 'Edit Ledger Account' : 'Create New Ledger Account'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {editingAccountId ? 'Update account code, group or opening balance' : 'Add custom ledger head to Chart of Accounts'}
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => {
-                  setShowAccountModal(false);
-                  setEditingAccountId(null);
-                }} 
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer p-1"
+      <DesktopModal
+        isOpen={showAccountModal}
+        onClose={() => {
+          setShowAccountModal(false);
+          setEditingAccountId(null);
+        }}
+        size="lg"
+        title={editingAccountId ? 'Edit Ledger Account' : 'Create New Ledger Account'}
+        subtitle={editingAccountId ? 'Update account code, group or opening balance' : 'Add custom ledger head to Chart of Accounts'}
+        icon={<FolderPlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-4"
+      >
+        <form onSubmit={handleSaveAccount} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account Category *</label>
+              <select
+                value={accCategory}
+                onChange={e => handleCategoryChange(e.target.value as any)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
               >
-                <X className="w-5 h-5" />
-              </button>
+                <option value="ASSET">ASSET (Current / Fixed Assets / Bank)</option>
+                <option value="LIABILITY">LIABILITY (Duties, Loans, Creditors)</option>
+                <option value="EQUITY">EQUITY (Capital & Reserves)</option>
+                <option value="INCOME">INCOME (Sales & Other Incomes)</option>
+                <option value="EXPENSE">EXPENSE (Direct & Indirect Expenses)</option>
+              </select>
             </div>
 
-            <form onSubmit={handleSaveAccount} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account Category *</label>
-                  <select
-                    value={accCategory}
-                    onChange={e => handleCategoryChange(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
-                  >
-                    <option value="ASSET">ASSET (Current / Fixed Assets / Bank)</option>
-                    <option value="LIABILITY">LIABILITY (Duties, Loans, Creditors)</option>
-                    <option value="EQUITY">EQUITY (Capital & Reserves)</option>
-                    <option value="INCOME">INCOME (Sales & Other Incomes)</option>
-                    <option value="EXPENSE">EXPENSE (Direct & Indirect Expenses)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account Code *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 5040"
-                    value={accCode}
-                    onChange={e => setAccCode(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account Head Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. State Bank of India A/c, Staff Salary, Travelling Expenses"
-                  value={accName}
-                  onChange={e => setAccName(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Sub-Group / Classification</label>
-                <select
-                  value={accSubCategory}
-                  onChange={e => setAccSubCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  {(SUBCATEGORY_OPTIONS[accCategory] || []).map(sub => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Opening Balance (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={accOpeningBalance || ''}
-                    onChange={e => setAccOpeningBalance(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Opening Balance Type</label>
-                  <select
-                    value={accOpeningType}
-                    onChange={e => setAccOpeningType(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
-                  >
-                    <option value="Dr">Debit (Dr)</option>
-                    <option value="Cr">Credit (Cr)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Description / Notes</label>
-                <input
-                  type="text"
-                  placeholder="Optional account description or purpose"
-                  value={accDescription}
-                  onChange={e => setAccDescription(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAccountModal(false);
-                    setEditingAccountId(null);
-                  }}
-                  className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow cursor-pointer transition-all"
-                >
-                  {editingAccountId ? 'Save Changes' : 'Create Ledger Account'}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account Code *</label>
+              <input
+                type="text"
+                placeholder="e.g. 5040"
+                value={accCode}
+                onChange={e => setAccCode(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold"
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Account Head Name *</label>
+            <input
+              type="text"
+              placeholder="e.g. State Bank of India A/c, Staff Salary, Travelling Expenses"
+              value={accName}
+              onChange={e => setAccName(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Sub-Group / Classification</label>
+            <select
+              value={accSubCategory}
+              onChange={e => setAccSubCategory(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              {(SUBCATEGORY_OPTIONS[accCategory] || []).map(sub => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Opening Balance (₹)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={accOpeningBalance || ''}
+                onChange={e => setAccOpeningBalance(parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Opening Balance Type</label>
+              <select
+                value={accOpeningType}
+                onChange={e => setAccOpeningType(e.target.value as any)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+              >
+                <option value="Dr">Debit (Dr)</option>
+                <option value="Cr">Credit (Cr)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Description / Notes</label>
+            <input
+              type="text"
+              placeholder="Optional account description or purpose"
+              value={accDescription}
+              onChange={e => setAccDescription(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAccountModal(false);
+                setEditingAccountId(null);
+              }}
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow cursor-pointer transition-all"
+            >
+              {editingAccountId ? 'Save Changes' : 'Create Ledger Account'}
+            </button>
+          </div>
+        </form>
+      </DesktopModal>
 
       {/* =========================================================================
           DELETE ACCOUNT CONFIRMATION MODAL
          ========================================================================= */}
-      {accountToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-w-[96vw] sm:max-w-md w-full text-xs space-y-4 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                  Delete Ledger Account "{accountToDelete.name}"?
-                </h3>
-                <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
-                  Are you sure you want to remove account <span className="font-mono font-bold text-slate-800 dark:text-slate-200">[{accountToDelete.code}] {accountToDelete.name}</span> from the Chart of Accounts?
-                </p>
-              </div>
-            </div>
+      <DesktopModal
+        isOpen={Boolean(accountToDelete)}
+        onClose={() => setAccountToDelete(null)}
+        size="md"
+        title={accountToDelete ? `Delete Ledger Account "${accountToDelete.name}"?` : 'Delete Ledger Account'}
+        subtitle="Remove account head from Chart of Accounts"
+        icon={<AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />}
+        iconBgColor="bg-rose-100 dark:bg-rose-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-4"
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setAccountToDelete(null)}
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDeleteAccount}
+              className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow cursor-pointer transition-all"
+            >
+              Yes, Delete Account
+            </button>
+          </div>
+        }
+      >
+        {accountToDelete && (
+          <div className="space-y-4">
+            <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
+              Are you sure you want to remove account <span className="font-mono font-bold text-slate-800 dark:text-slate-200">[{accountToDelete.code}] {accountToDelete.name}</span> from the Chart of Accounts?
+            </p>
 
-            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] space-y-1">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1">
               <div><span className="font-semibold text-slate-500 dark:text-slate-400">Classification:</span> <span className="text-slate-800 dark:text-slate-200">{accountToDelete.category} ({accountToDelete.subCategory || 'General'})</span></div>
               <div><span className="font-semibold text-slate-500 dark:text-slate-400">Current Balance:</span> <span className="font-mono font-bold text-slate-900 dark:text-white">{formatINR(Math.abs(accountToDelete.balance))}</span></div>
             </div>
-
-            <div className="pt-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setAccountToDelete(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteAccount}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow cursor-pointer transition-all"
-              >
-                Yes, Delete Account
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </DesktopModal>
 
       {/* =========================================================================
           CREATE / EDIT JOURNAL VOUCHER MODAL
          ========================================================================= */}
-      {showJvModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-w-[98vw] md:max-w-xl lg:max-w-2xl w-full text-xs space-y-4 max-h-[96dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <Receipt className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    {editingJvId ? `Edit Journal Voucher (${editingJvNumber})` : 'New General Journal Entry'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {editingJvId ? 'Update accounting ledger accounts, amounts and narration' : 'Post a double-entry ledger adjustment'}
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => {
-                  setShowJvModal(false);
-                  setEditingJvId(null);
-                }} 
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer p-1"
+      <DesktopModal
+        isOpen={showJvModal}
+        onClose={() => {
+          setShowJvModal(false);
+          setEditingJvId(null);
+        }}
+        size="xl"
+        title={editingJvId ? `Edit Journal Voucher (${editingJvNumber})` : 'New General Journal Entry'}
+        subtitle={editingJvId ? 'Update accounting ledger accounts, amounts and narration' : 'Post a double-entry ledger adjustment'}
+        icon={<Receipt className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-4"
+      >
+        <form onSubmit={handleSaveJv} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Voucher Date *</label>
+              <input
+                type="date"
+                value={jvDate}
+                onChange={e => setJvDate(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Reference / Bill / Cheque #</label>
+              <input
+                type="text"
+                placeholder="e.g. CHQ-99128, ADJ-04"
+                value={jvReference}
+                onChange={e => setJvReference(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Narration / Description *</label>
+            <input
+              type="text"
+              placeholder="Being amount transferred / adjusted towards..."
+              value={jvDescription}
+              onChange={e => setJvDescription(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* Debit / Credit Lines */}
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-800 dark:text-slate-200">Accounting Ledger Lines</label>
+              <button
+                type="button"
+                onClick={handleAddJvLine}
+                className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <Plus className="w-3.5 h-3.5" /> Add Row
               </button>
             </div>
 
-            <form onSubmit={handleSaveJv} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Voucher Date *</label>
-                  <input
-                    type="date"
-                    value={jvDate}
-                    onChange={e => setJvDate(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
+            <div className="space-y-2">
+              {jvLines.map((line, idx) => (
+                <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <select
+                    value={line.accountId}
+                    onChange={e => handleUpdateJvLine(idx, 'accountId', e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg font-medium text-slate-800 dark:text-slate-200 text-xs"
+                  >
+                    {dynamicAccountHeads.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.code} - {acc.name} ({acc.category})
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <div className="w-28">
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Debit (Dr)"
+                      value={line.debit || ''}
+                      onChange={e => handleUpdateJvLine(idx, 'debit', e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-right font-mono text-xs font-semibold text-blue-700 dark:text-blue-400"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Reference / Bill / Cheque #</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. CHQ-99128, ADJ-04"
-                    value={jvReference}
-                    onChange={e => setJvReference(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                  />
-                </div>
-              </div>
+                  <div className="w-28">
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Credit (Cr)"
+                      value={line.credit || ''}
+                      onChange={e => handleUpdateJvLine(idx, 'credit', e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-right font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Narration / Description *</label>
-                <input
-                  type="text"
-                  placeholder="Being amount transferred / adjusted towards..."
-                  value={jvDescription}
-                  onChange={e => setJvDescription(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              {/* Debit / Credit Lines */}
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-800 dark:text-slate-200">Accounting Ledger Lines</label>
                   <button
                     type="button"
-                    onClick={handleAddJvLine}
-                    className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                    onClick={() => handleRemoveJvLine(idx)}
+                    disabled={jvLines.length <= 2}
+                    className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-30 cursor-pointer"
+                    title="Remove row"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add Row
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-
-                <div className="space-y-2">
-                  {jvLines.map((line, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <select
-                        value={line.accountId}
-                        onChange={e => handleUpdateJvLine(idx, 'accountId', e.target.value)}
-                        className="flex-1 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg font-medium text-slate-800 dark:text-slate-200 text-xs"
-                      >
-                        {dynamicAccountHeads.map(acc => (
-                          <option key={acc.id} value={acc.id}>
-                            {acc.code} - {acc.name} ({acc.category})
-                          </option>
-                        ))}
-                      </select>
-                      
-                      <div className="w-28">
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Debit (Dr)"
-                          value={line.debit || ''}
-                          onChange={e => handleUpdateJvLine(idx, 'debit', e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-right font-mono text-xs font-semibold text-blue-700 dark:text-blue-400"
-                        />
-                      </div>
-
-                      <div className="w-28">
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="Credit (Cr)"
-                          value={line.credit || ''}
-                          onChange={e => handleUpdateJvLine(idx, 'credit', e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-right font-mono text-xs font-semibold text-emerald-700 dark:text-emerald-400"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveJvLine(idx)}
-                        disabled={jvLines.length <= 2}
-                        className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-30 cursor-pointer"
-                        title="Remove row"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Balance Checker */}
-              <div className={`p-3 rounded-xl flex items-center justify-between text-xs font-bold ${
-                isJvBalanced ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {isJvBalanced ? <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />}
-                  <span>{isJvBalanced ? 'Voucher is Balanced (Debit = Credit)' : 'Voucher is Unbalanced! Debits must equal Credits.'}</span>
-                </div>
-                <div className="space-x-4 font-mono">
-                  <span>Dr: {formatINR(totalDebit)}</span>
-                  <span>Cr: {formatINR(totalCredit)}</span>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowJvModal(false);
-                    setEditingJvId(null);
-                  }}
-                  className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!isJvBalanced}
-                  className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow cursor-pointer transition-all"
-                >
-                  {editingJvId ? 'Update Journal Voucher' : 'Post Journal Voucher'}
-                </button>
-              </div>
-            </form>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+
+          {/* Balance Checker */}
+          <div className={`p-3 rounded-xl flex items-center justify-between text-xs font-bold ${
+            isJvBalanced ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {isJvBalanced ? <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />}
+              <span>{isJvBalanced ? 'Voucher is Balanced (Debit = Credit)' : 'Voucher is Unbalanced! Debits must equal Credits.'}</span>
+            </div>
+            <div className="space-x-4 font-mono">
+              <span>Dr: {formatINR(totalDebit)}</span>
+              <span>Cr: {formatINR(totalCredit)}</span>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowJvModal(false);
+                setEditingJvId(null);
+              }}
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!isJvBalanced}
+              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow cursor-pointer transition-all"
+            >
+              {editingJvId ? 'Update Journal Voucher' : 'Post Journal Voucher'}
+            </button>
+          </div>
+        </form>
+      </DesktopModal>
 
       {/* =========================================================================
           DELETE JV CONFIRMATION MODAL
          ========================================================================= */}
-      {entryToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-w-[96vw] sm:max-w-md w-full text-xs space-y-4 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                  Delete Journal Entry {entryToDelete.entryNumber}?
-                </h3>
-                <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
-                  Are you sure you want to delete this journal voucher? This will remove the debit and credit postings from the General Ledger.
-                </p>
-              </div>
-            </div>
+      <DesktopModal
+        isOpen={Boolean(entryToDelete)}
+        onClose={() => setEntryToDelete(null)}
+        size="md"
+        title={entryToDelete ? `Delete Journal Entry ${entryToDelete.entryNumber}?` : 'Delete Journal Entry'}
+        subtitle="Remove voucher and postings from General Ledger"
+        icon={<AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />}
+        iconBgColor="bg-rose-100 dark:bg-rose-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-4"
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setEntryToDelete(null)}
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDeleteJv}
+              className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow cursor-pointer transition-all"
+            >
+              Yes, Delete Voucher
+            </button>
+          </div>
+        }
+      >
+        {entryToDelete && (
+          <div className="space-y-4">
+            <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
+              Are you sure you want to delete this journal voucher? This will remove the debit and credit postings from the General Ledger.
+            </p>
 
-            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] space-y-1">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1">
               <div className="font-bold text-slate-800 dark:text-slate-200">"{entryToDelete.description}"</div>
               <div className="text-slate-500 dark:text-slate-400 font-mono">
                 Date: {entryToDelete.date} | Lines: {entryToDelete.lines.length} | Amount: {formatINR(entryToDelete.lines.reduce((s, l) => s + l.debit, 0))}
               </div>
             </div>
-
-            <div className="pt-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEntryToDelete(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteJv}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow cursor-pointer transition-all"
-              >
-                Yes, Delete Voucher
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </DesktopModal>
 
       {/* =========================================================================
           BANK STATEMENT AUTO ENTRY & RECONCILIATION MODAL

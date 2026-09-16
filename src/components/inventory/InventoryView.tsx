@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { useApp } from '../../context/AppContext';
 import { Product, GstTaxRate } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
@@ -1403,19 +1404,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
       </div>
 
       {/* Add / Edit Product Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="w-full max-w-[96vw] sm:max-w-lg md:max-w-xl bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                {editingProduct ? 'Edit Catalog Item' : 'Add New Item / Service'}
-              </h3>
-              <button onClick={() => setIsCreateModalOpen(false)} className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProduct} className="mt-4 space-y-4 text-xs">
+      <DesktopModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        size="lg"
+        title={editingProduct ? 'Edit Catalog Item' : 'Add New Item / Service'}
+        subtitle={editingProduct ? 'Update item pricing, taxes, HSN and stock tracking' : 'Add a product or service to your business inventory'}
+        icon={<Package className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-4"
+      >
+        <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Item / Service Name *</label>
@@ -1671,67 +1670,65 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </DesktopModal>
 
       {/* Stock Adjustment Modal */}
-      {adjustingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="w-full max-w-[96vw] sm:max-w-md bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
-              Adjust Physical Stock Count
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Item: <strong className="text-slate-800 dark:text-slate-200">{adjustingProduct.name}</strong> (Current: {adjustingProduct.currentStock} {adjustingProduct.unit})
-            </p>
+      <DesktopModal
+        isOpen={!!adjustingProduct}
+        onClose={() => setAdjustingProduct(null)}
+        size="md"
+        title="Adjust Physical Stock Count"
+        subtitle={adjustingProduct ? `Item: ${adjustingProduct.name} (Current: ${adjustingProduct.currentStock} ${adjustingProduct.unit})` : ''}
+        icon={<PackagePlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-4"
+      >
+        {adjustingProduct && (
+          <form onSubmit={handleConfirmStockAdjust} className="space-y-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">New Verified Physical Count</label>
+              <input
+                type="number"
+                min="0"
+                value={newStockQty}
+                onChange={(e) => setNewStockQty(parseInt(e.target.value) || 0)}
+                className="w-full px-3 py-2 text-base font-mono font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none"
+                required
+              />
+            </div>
 
-            <form onSubmit={handleConfirmStockAdjust} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">New Verified Physical Count</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={newStockQty}
-                  onChange={(e) => setNewStockQty(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 text-base font-mono font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none"
-                  required
-                />
-              </div>
+            <div>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Reason for Adjustment</label>
+              <select
+                value={adjustReason}
+                onChange={(e) => setAdjustReason(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none"
+              >
+                <option value="Physical audit verification">Physical audit verification</option>
+                <option value="Damaged / Expired goods write-off">Damaged / Expired goods write-off</option>
+                <option value="Stock received without invoice">Stock received without invoice</option>
+                <option value="Correction of clerical counting error">Correction of clerical counting error</option>
+              </select>
+            </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Reason for Adjustment</label>
-                <select
-                  value={adjustReason}
-                  onChange={(e) => setAdjustReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none"
-                >
-                  <option value="Physical audit verification">Physical audit verification</option>
-                  <option value="Damaged / Expired goods write-off">Damaged / Expired goods write-off</option>
-                  <option value="Stock received without invoice">Stock received without invoice</option>
-                  <option value="Correction of clerical counting error">Correction of clerical counting error</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setAdjustingProduct(null)}
-                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
-                >
-                  Apply Stock Update
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setAdjustingProduct(null)}
+                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+              >
+                Apply Stock Update
+              </button>
+            </div>
+          </form>
+        )}
+      </DesktopModal>
 
       {/* Barcode Scanner Modal */}
       <BarcodeScannerModal

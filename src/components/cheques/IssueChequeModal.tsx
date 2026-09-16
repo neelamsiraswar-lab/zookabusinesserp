@@ -17,6 +17,7 @@ import {
   formatChequeNumber,
   getNextChequeNumber
 } from '../../utils/chequeConstants';
+import { DesktopModal } from '../common/DesktopModal';
 import { 
   X, 
   Printer, 
@@ -217,38 +218,50 @@ export const IssueChequeModal: React.FC<IssueChequeModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto animate-fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[94vh]">
-        
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-              <Landmark className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">
-                Issue & Print Cheque
-              </h3>
-              <p className="text-xs text-slate-500">
-                CTS-2010 Cheque generation with automatic client ledger & banking entries
-              </p>
-            </div>
-          </div>
-
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="4xl"
+      allowMaximize={true}
+      title="Issue & Print Cheque"
+      subtitle="CTS-2010 Cheque generation with automatic client ledger & banking entries"
+      icon={<Landmark className="w-5 h-5 text-white" />}
+      iconBgColor="bg-blue-600 shadow-md shadow-blue-500/20"
+      bodyClassName="p-6 overflow-y-auto flex-1 space-y-6"
+      footer={
+        <div className="flex items-center justify-between w-full">
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition"
           >
-            <X className="w-5 h-5" />
+            Cancel
           </button>
-        </div>
 
-        {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          
-          {/* Top Bar: Cheque Type & Cheque Book */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={(e) => handleSubmit(e, false)}
+              className="px-5 py-2.5 text-sm font-bold text-slate-700 bg-white border border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl shadow-sm transition"
+            >
+              Save Cheque Entry
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => handleSubmit(e, true)}
+              className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Save & Print Cheque</span>
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* Top Bar: Cheque Type & Cheque Book */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             {/* Cheque Type */}
             <div>
@@ -596,40 +609,7 @@ export const IssueChequeModal: React.FC<IssueChequeModalProps> = ({
               </div>
             </label>
           </div>
-
         </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition"
-          >
-            Cancel
-          </button>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={(e) => handleSubmit(e, false)}
-              className="px-5 py-2.5 text-sm font-bold text-slate-700 bg-white border border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl shadow-sm transition"
-            >
-              Save Cheque Entry
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => handleSubmit(e, true)}
-              className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Save & Print Cheque</span>
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

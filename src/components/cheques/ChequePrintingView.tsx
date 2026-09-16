@@ -34,6 +34,7 @@ import {
 import { 
   ChequeReturnMemoModal 
 } from './ChequeReturnMemoModal';
+import { DesktopModal } from '../common/DesktopModal';
 import { 
   Landmark, 
   Plus, 
@@ -1214,27 +1215,17 @@ export const ChequePrintingView: React.FC = () => {
 
       {/* CHEQUE DELETION MODAL */}
       {chequeToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 flex items-center justify-center font-bold">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                  Remove Cheque #{chequeToDelete.chequeNumber}?
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {chequeToDelete.payeeName} • {formatINR(chequeToDelete.amount)}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Are you sure you want to delete this cheque from the register? This action cannot be undone.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2">
+        <DesktopModal
+          isOpen={!!chequeToDelete}
+          onClose={() => setChequeToDelete(null)}
+          size="sm"
+          title={`Remove Cheque #${chequeToDelete.chequeNumber}?`}
+          subtitle={`${chequeToDelete.payeeName} • ${formatINR(chequeToDelete.amount)}`}
+          icon={<Trash2 className="w-5 h-5 text-rose-600" />}
+          iconBgColor="bg-rose-100 dark:bg-rose-950/50"
+          bodyClassName="p-6 space-y-4 flex-1"
+          footer={
+            <div className="flex justify-end gap-2 w-full">
               <button
                 type="button"
                 onClick={() => setChequeToDelete(null)}
@@ -1255,33 +1246,27 @@ export const ChequePrintingView: React.FC = () => {
                 <span>Delete Cheque</span>
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Are you sure you want to delete this cheque from the register? This action cannot be undone.
+          </p>
+        </DesktopModal>
       )}
 
       {/* CHEQUE BOOK DELETION MODAL */}
       {bookToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 flex items-center justify-center font-bold">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
-                  Delete Cheque Book Series?
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {bookToDelete.bankName} • #{bookToDelete.startChequeNo} - #{bookToDelete.endChequeNo}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Are you sure you want to remove this cheque book? Any already recorded cheques in this series will remain in your register.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2">
+        <DesktopModal
+          isOpen={!!bookToDelete}
+          onClose={() => setBookToDelete(null)}
+          size="sm"
+          title="Delete Cheque Book Series?"
+          subtitle={`${bookToDelete.bankName} • #${bookToDelete.startChequeNo} - #${bookToDelete.endChequeNo}`}
+          icon={<Trash2 className="w-5 h-5 text-rose-600" />}
+          iconBgColor="bg-rose-100 dark:bg-rose-950/50"
+          bodyClassName="p-6 space-y-4 flex-1"
+          footer={
+            <div className="flex justify-end gap-2 w-full">
               <button
                 type="button"
                 onClick={() => setBookToDelete(null)}
@@ -1302,8 +1287,12 @@ export const ChequePrintingView: React.FC = () => {
                 <span>Delete Cheque Book</span>
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Are you sure you want to remove this cheque book? Any already recorded cheques in this series will remain in your register.
+          </p>
+        </DesktopModal>
       )}
 
     </div>

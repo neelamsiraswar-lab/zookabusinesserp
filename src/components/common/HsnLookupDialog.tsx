@@ -16,6 +16,7 @@ import { COMMON_HSN_CODES } from '../../utils/constants';
 import { CustomHsnCode } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { getThemePalette } from '../../utils/themeColors';
+import { DesktopModal } from './DesktopModal';
 
 export interface HsnLookupItem {
   id?: string;
@@ -152,48 +153,56 @@ export const HsnLookupDialog: React.FC<HsnLookupDialogProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-      <div 
-        className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
-        style={{ boxShadow: `0 20px 40px -15px ${palette.ringHex}, 0 10px 20px -10px rgba(0,0,0,0.15)` }}
-      >
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-xs"
-              style={{ backgroundColor: palette.lightHex, color: palette.textHex }}
-            >
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  HSN / SAC Code Directory
-                </h3>
-                <span 
-                  className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-2xs"
-                  style={{ backgroundColor: palette.hex }}
-                >
-                  App Dialog Format
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Browse official GST tariff codes with full descriptions & applicable tax slabs.
-              </p>
-            </div>
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="2xl"
+      allowMaximize={true}
+      title="HSN / SAC Code Directory"
+      badge={
+        <span 
+          className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-2xs"
+          style={{ backgroundColor: palette.hex }}
+        >
+          GST Directory
+        </span>
+      }
+      subtitle="Browse official GST tariff codes with full descriptions & applicable tax slabs"
+      icon={<FileText className="w-5 h-5" />}
+      iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+      bodyClassName="p-0 overflow-y-auto flex flex-col flex-1"
+      footer={
+        <div className="flex items-center justify-between text-xs w-full">
+          <div className="text-slate-500 dark:text-slate-400">
+            Showing <strong className="text-slate-800 dark:text-slate-200">{filteredEntries.length}</strong> of {allHsnEntries.length} codes
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-            aria-label="Close dialog"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          <div className="flex items-center gap-2">
+            {onOpenCustomManager && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenCustomManager();
+                }}
+                className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Manage Custom Codes</span>
+              </button>
+            )}
 
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      }
+    >
         {/* Search Bar & Actions */}
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
           <div className="relative">
@@ -343,38 +352,6 @@ export const HsnLookupDialog: React.FC<HsnLookupDialogProps> = ({
             })
           )}
         </div>
-
-        {/* Footer with Directory Management & Status */}
-        <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 flex items-center justify-between text-xs">
-          <div className="text-slate-500 dark:text-slate-400">
-            Showing <strong className="text-slate-800 dark:text-slate-200">{filteredEntries.length}</strong> of {allHsnEntries.length} codes
-          </div>
-
-          <div className="flex items-center gap-2">
-            {onOpenCustomManager && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenCustomManager();
-                }}
-                className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
-              >
-                <FolderPlus className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Manage Custom Codes</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition-colors cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { BankStatementImportModal } from '../accounting/BankStatementImportModal';
 import { AutoUpdateVoucherNumbersModal } from './AutoUpdateVoucherNumbersModal';
+import { DesktopModal } from '../common/DesktopModal';
 import { getNextAvailableVoucherNumber } from '../../utils/voucherNumberUtils';
 
 export const PaymentsView: React.FC = () => {
@@ -1212,46 +1213,24 @@ export const PaymentsView: React.FC = () => {
       </div>
 
       {/* RECORD / EDIT PAYMENT MODAL */}
-      {isRecordModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-[96vw] sm:max-w-lg md:max-w-xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[95dvh] sm:max-h-[90dvh] my-auto">
-            {/* Modal Header */}
-            <div className={`p-3.5 sm:p-4 border-b flex items-center justify-between shrink-0 ${
-              formData.type === 'PAYMENT_IN' ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/50' :
-              formData.type === 'PAYMENT_OUT' ? 'bg-rose-50/70 dark:bg-rose-950/40 border-rose-100 dark:border-rose-900/50' : 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900/50'
-            }`}>
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold shrink-0 ${
-                  formData.type === 'PAYMENT_IN' ? 'bg-emerald-600' :
-                  formData.type === 'PAYMENT_OUT' ? 'bg-rose-600' : 'bg-blue-600'
-                }`}>
-                  {formData.type === 'PAYMENT_IN' ? <ArrowDownLeft className="w-4 h-4" /> :
-                   formData.type === 'PAYMENT_OUT' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowLeftRight className="w-4 h-4" />}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate">
-                    {editingPayment ? 'Edit Payment Voucher' : 
-                     formData.type === 'PAYMENT_IN' ? 'Record Payment Received (Money In)' :
-                     formData.type === 'PAYMENT_OUT' ? 'Record Payment Made (Money Out)' : 'Record Contra Bank/Cash Transfer'}
-                  </h3>
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                    {formData.type === 'PAYMENT_IN' ? 'Log customer payment against sales invoice or advance' :
-                     formData.type === 'PAYMENT_OUT' ? 'Log payment disbursed to supplier or vendor bill' : 'Transfer money between Bank and Cash accounts'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsRecordModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSubmitForm} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* Voucher Number */}
+      <DesktopModal
+        isOpen={isRecordModalOpen}
+        onClose={() => setIsRecordModalOpen(false)}
+        size="xl"
+        title={editingPayment ? 'Edit Payment Voucher' : 
+          formData.type === 'PAYMENT_IN' ? 'Record Payment Received (Money In)' :
+          formData.type === 'PAYMENT_OUT' ? 'Record Payment Made (Money Out)' : 'Record Contra Bank/Cash Transfer'}
+        subtitle={formData.type === 'PAYMENT_IN' ? 'Log customer payment against sales invoice or advance' :
+          formData.type === 'PAYMENT_OUT' ? 'Log payment disbursed to supplier or vendor bill' : 'Transfer money between Bank and Cash accounts'}
+        icon={formData.type === 'PAYMENT_IN' ? <ArrowDownLeft className="w-4 h-4" /> :
+          formData.type === 'PAYMENT_OUT' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowLeftRight className="w-4 h-4" />}
+        iconBgColor={formData.type === 'PAYMENT_IN' ? 'bg-emerald-600 text-white' :
+          formData.type === 'PAYMENT_OUT' ? 'bg-rose-600 text-white' : 'bg-blue-600 text-white'}
+        bodyClassName="p-0"
+      >
+        <form onSubmit={handleSubmitForm} className="p-5 space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Voucher Number */}
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Voucher Number *</label>
                   <input
@@ -1472,13 +1451,13 @@ export const PaymentsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsRecordModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`px-5 py-2 rounded-xl text-white font-semibold text-xs shadow-sm hover:shadow transition-all ${
+                  className={`px-5 py-2 rounded-xl text-white font-semibold text-xs shadow-sm hover:shadow transition-all cursor-pointer ${
                     formData.type === 'PAYMENT_IN' ? 'bg-emerald-600 hover:bg-emerald-700' :
                     formData.type === 'PAYMENT_OUT' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700'
                   }`}
@@ -1487,188 +1466,206 @@ export const PaymentsView: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </DesktopModal>
 
       {/* PRINTABLE VOUCHER MODAL */}
-      {voucherToPrint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-[96vw] sm:max-w-xl md:max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[95dvh] sm:max-h-[95vh] my-auto">
-            {/* Modal Controls */}
-            <div className="p-3.5 bg-slate-800 dark:bg-slate-950 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <Receipt className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="font-bold text-xs sm:text-sm truncate">
-                  {voucherToPrint.type === 'PAYMENT_IN' ? 'Receipt Voucher' : 
-                   voucherToPrint.type === 'PAYMENT_OUT' ? 'Payment Voucher' : 'Contra Voucher'}
-                </span>
-                <span className="text-xs text-slate-400 font-mono truncate">({voucherToPrint.voucherNumber})</span>
+      <DesktopModal
+        isOpen={!!voucherToPrint}
+        onClose={() => setVoucherToPrint(null)}
+        size="2xl"
+        title={voucherToPrint?.type === 'PAYMENT_IN' ? 'Receipt Voucher' : 
+          voucherToPrint?.type === 'PAYMENT_OUT' ? 'Payment Voucher' : 'Contra Voucher'}
+        badge={voucherToPrint ? (
+          <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700">
+            {voucherToPrint.voucherNumber}
+          </span>
+        ) : undefined}
+        icon={<Receipt className="w-5 h-5 text-emerald-500" />}
+        headerActions={
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer shadow-sm"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print</span>
+          </button>
+        }
+        bodyClassName="bg-slate-100 dark:bg-slate-950 p-4 sm:p-6"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Desktop window supports maximize & instant print
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setVoucherToPrint(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer shadow-sm flex items-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Voucher</span>
+              </button>
+            </div>
+          </div>
+        }
+      >
+        {voucherToPrint && (
+          <div id="printable-voucher-content" className="p-6 bg-white text-slate-800 text-xs font-sans space-y-4 rounded-xl border border-slate-200 shadow-md max-w-3xl mx-auto">
+            {/* Document Header */}
+            <div className="border-b-2 border-slate-800 pb-3 flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">{business.tradeName || business.name}</h2>
+                <p className="text-[11px] text-slate-600">{business.address}, {business.city}, {business.state} - {business.pincode}</p>
+                <div className="flex items-center gap-3 mt-1 text-[11px] font-mono text-slate-700">
+                  <span><strong>GSTIN:</strong> {business.gstin}</span>
+                  <span><strong>PAN:</strong> {business.pan}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print</span>
-                </button>
-                <button
-                  onClick={() => setVoucherToPrint(null)}
-                  className="p-1.5 rounded-lg bg-slate-700 dark:bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+              <div className="text-right">
+                <div className={`inline-block px-3 py-1 rounded text-xs font-black uppercase tracking-wider ${
+                  voucherToPrint.type === 'PAYMENT_IN' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                  voucherToPrint.type === 'PAYMENT_OUT' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
+                  'bg-blue-100 text-blue-800 border border-blue-300'
+                }`}>
+                  {voucherToPrint.type === 'PAYMENT_IN' ? 'RECEIPT VOUCHER' :
+                   voucherToPrint.type === 'PAYMENT_OUT' ? 'PAYMENT VOUCHER' : 'CONTRA VOUCHER'}
+                </div>
+                <div className="mt-1 font-mono font-bold text-slate-900 text-sm">{voucherToPrint.voucherNumber}</div>
+                <div className="text-[11px] text-slate-500">Date: {formatDate(voucherToPrint.date, 'long')}</div>
               </div>
             </div>
 
-            {/* Printable Document Layout */}
-            <div id="printable-voucher-content" className="p-4 sm:p-6 overflow-y-auto modal-content-scroll flex-1 bg-white text-slate-800 text-xs font-sans space-y-4">
-              {/* Document Header */}
-              <div className="border-b-2 border-slate-800 pb-3 flex justify-between items-start">
-                <div>
-                  <h2 className="text-lg font-black text-slate-900">{business.tradeName || business.name}</h2>
-                  <p className="text-[11px] text-slate-600">{business.address}, {business.city}, {business.state} - {business.pincode}</p>
-                  <div className="flex items-center gap-3 mt-1 text-[11px] font-mono text-slate-700">
-                    <span><strong>GSTIN:</strong> {business.gstin}</span>
-                    <span><strong>PAN:</strong> {business.pan}</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`inline-block px-3 py-1 rounded text-xs font-black uppercase tracking-wider ${
-                    voucherToPrint.type === 'PAYMENT_IN' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                    voucherToPrint.type === 'PAYMENT_OUT' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
-                    'bg-blue-100 text-blue-800 border border-blue-300'
-                  }`}>
-                    {voucherToPrint.type === 'PAYMENT_IN' ? 'RECEIPT VOUCHER' :
-                     voucherToPrint.type === 'PAYMENT_OUT' ? 'PAYMENT VOUCHER' : 'CONTRA VOUCHER'}
-                  </div>
-                  <div className="mt-1 font-mono font-bold text-slate-900 text-sm">{voucherToPrint.voucherNumber}</div>
-                  <div className="text-[11px] text-slate-500">Date: {formatDate(voucherToPrint.date, 'long')}</div>
-                </div>
+            {/* Receipt Body */}
+            <div className="space-y-3.5 py-2">
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-500 font-medium">
+                  {voucherToPrint.type === 'PAYMENT_IN' ? 'Received with thanks from:' : 'Paid to (Beneficiary):'}
+                </span>
+                <span className="font-bold text-slate-900 text-sm">{voucherToPrint.partyName}</span>
               </div>
 
-              {/* Receipt Body */}
-              <div className="space-y-3.5 py-2">
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-500 font-medium">
-                    {voucherToPrint.type === 'PAYMENT_IN' ? 'Received with thanks from:' : 'Paid to (Beneficiary):'}
-                  </span>
-                  <span className="font-bold text-slate-900 text-sm">{voucherToPrint.partyName}</span>
-                </div>
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-500 font-medium">Amount Received / Disbursed:</span>
+                <span className="font-black text-slate-900 text-base">{formatINR(voucherToPrint.amount)}</span>
+              </div>
 
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-500 font-medium">Amount Received / Disbursed:</span>
-                  <span className="font-black text-slate-900 text-base">{formatINR(voucherToPrint.amount)}</span>
-                </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <span className="text-slate-500 text-[11px] block font-medium">Amount in Words:</span>
+                <span className="font-bold text-indigo-900 text-xs italic">
+                  {numberToIndianWords(voucherToPrint.amount)}
+                </span>
+              </div>
 
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-                  <span className="text-slate-500 text-[11px] block font-medium">Amount in Words:</span>
-                  <span className="font-bold text-indigo-900 text-xs italic">
-                    {numberToIndianWords(voucherToPrint.amount)}
-                  </span>
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div>
+                  <span className="text-slate-500 block">Payment Mode:</span>
+                  <span className="font-semibold text-slate-900">{voucherToPrint.paymentMethod.replace('_', ' ')}</span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-1">
+                {voucherToPrint.referenceNo && (
                   <div>
-                    <span className="text-slate-500 block">Payment Mode:</span>
-                    <span className="font-semibold text-slate-900">{voucherToPrint.paymentMethod.replace('_', ' ')}</span>
+                    <span className="text-slate-500 block">Reference / Cheque No:</span>
+                    <span className="font-mono font-bold text-slate-900">{voucherToPrint.referenceNo}</span>
                   </div>
-                  {voucherToPrint.referenceNo && (
-                    <div>
-                      <span className="text-slate-500 block">Reference / Cheque No:</span>
-                      <span className="font-mono font-bold text-slate-900">{voucherToPrint.referenceNo}</span>
-                    </div>
-                  )}
-                  {voucherToPrint.linkedInvoiceNumber && (
-                    <div>
-                      <span className="text-slate-500 block">Settled Against Invoice:</span>
-                      <span className="font-mono font-bold text-indigo-600">{voucherToPrint.linkedInvoiceNumber}</span>
-                    </div>
-                  )}
-                  {voucherToPrint.linkedBillNumber && (
-                    <div>
-                      <span className="text-slate-500 block">Settled Against Purchase Bill:</span>
-                      <span className="font-mono font-bold text-amber-700">{voucherToPrint.linkedBillNumber}</span>
-                    </div>
-                  )}
-                  {voucherToPrint.bankAccountName && (
-                    <div>
-                      <span className="text-slate-500 block">Bank Account:</span>
-                      <span className="font-semibold text-slate-800">{voucherToPrint.bankAccountName}</span>
-                    </div>
-                  )}
-                </div>
-
-                {voucherToPrint.notes && (
-                  <div className="border-t border-slate-100 pt-2">
-                    <span className="text-slate-500 block">Narration / Remarks:</span>
-                    <p className="text-slate-700 italic">{voucherToPrint.notes}</p>
+                )}
+                {voucherToPrint.linkedInvoiceNumber && (
+                  <div>
+                    <span className="text-slate-500 block">Settled Against Invoice:</span>
+                    <span className="font-mono font-bold text-indigo-600">{voucherToPrint.linkedInvoiceNumber}</span>
+                  </div>
+                )}
+                {voucherToPrint.linkedBillNumber && (
+                  <div>
+                    <span className="text-slate-500 block">Settled Against Purchase Bill:</span>
+                    <span className="font-mono font-bold text-amber-700">{voucherToPrint.linkedBillNumber}</span>
+                  </div>
+                )}
+                {voucherToPrint.bankAccountName && (
+                  <div>
+                    <span className="text-slate-500 block">Bank Account:</span>
+                    <span className="font-semibold text-slate-800">{voucherToPrint.bankAccountName}</span>
                   </div>
                 )}
               </div>
 
-              {/* Signatures */}
-              <div className="pt-8 flex justify-between items-end border-t border-slate-200 mt-6">
-                <div className="text-center w-40">
-                  <div className="border-b border-slate-400 pb-8"></div>
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold mt-1">Receiver's Signature</div>
+              {voucherToPrint.notes && (
+                <div className="border-t border-slate-100 pt-2">
+                  <span className="text-slate-500 block">Narration / Remarks:</span>
+                  <p className="text-slate-700 italic">{voucherToPrint.notes}</p>
                 </div>
+              )}
+            </div>
 
-                <div className="text-center w-48">
-                  {business.signatureUrl ? (
-                    <img
-                      src={business.signatureUrl}
-                      alt="Authorized Signature"
-                      className="h-12 max-w-[140px] mx-auto object-contain mb-1"
-                    />
-                  ) : (
-                    <div className="border-b border-slate-400 pb-8"></div>
-                  )}
-                  <div className="font-bold text-slate-900 text-xs">For {business.tradeName || business.name}</div>
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold">
-                    {business.signatoryDesignation || 'Authorized Signatory'}
-                  </div>
+            {/* Signatures */}
+            <div className="pt-8 flex justify-between items-end border-t border-slate-200 mt-6">
+              <div className="text-center w-40">
+                <div className="border-b border-slate-400 pb-8"></div>
+                <div className="text-[10px] text-slate-500 uppercase font-semibold mt-1">Receiver's Signature</div>
+              </div>
+
+              <div className="text-center w-48">
+                {business.signatureUrl ? (
+                  <img
+                    src={business.signatureUrl}
+                    alt="Authorized Signature"
+                    className="h-12 max-w-[140px] mx-auto object-contain mb-1"
+                  />
+                ) : (
+                  <div className="border-b border-slate-400 pb-8"></div>
+                )}
+                <div className="font-bold text-slate-900 text-xs">For {business.tradeName || business.name}</div>
+                <div className="text-[10px] text-slate-500 uppercase font-semibold">
+                  {business.signatoryDesignation || 'Authorized Signatory'}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </DesktopModal>
 
       {/* DELETE CONFIRMATION MODAL */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-[96vw] sm:max-w-sm rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-5 text-center space-y-4 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto border border-slate-200 dark:border-slate-800">
-            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">Delete Payment Record?</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Are you sure you want to delete this payment voucher? This action cannot be undone.
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
+      <DesktopModal
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        size="sm"
+        title="Delete Payment Record?"
+        icon={<Trash2 className="w-5 h-5 text-rose-600" />}
+        iconBgColor="bg-rose-100 dark:bg-rose-950/60"
+        footer={
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <button
+              onClick={() => setDeleteConfirmId(null)}
+              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (deleteConfirmId) {
                   deletePayment(deleteConfirmId);
                   setDeleteConfirmId(null);
-                }}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold cursor-pointer"
-              >
-                Delete Record
-              </button>
-            </div>
+                }
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold cursor-pointer"
+            >
+              Delete Record
+            </button>
           </div>
+        }
+      >
+        <div className="text-center py-2 space-y-2">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Are you sure you want to delete this payment voucher? This action cannot be undone.
+          </p>
         </div>
-      )}
+      </DesktopModal>
 
       {/* Bank Statement Auto Entry Modal */}
       <BankStatementImportModal

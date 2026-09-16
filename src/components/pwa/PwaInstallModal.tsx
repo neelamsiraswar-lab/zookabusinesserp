@@ -16,6 +16,7 @@ import {
   Layers
 } from 'lucide-react';
 import { usePWA } from '../../hooks/usePWA';
+import { DesktopModal } from '../common/DesktopModal';
 
 interface PwaInstallModalProps {
   isOpen: boolean;
@@ -44,43 +45,38 @@ export const PwaInstallModal: React.FC<PwaInstallModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/70 backdrop-blur-xs animate-fadeIn overflow-y-auto modal-overlay">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl max-w-[96vw] sm:max-w-md md:max-w-lg w-full max-h-[95dvh] sm:max-h-[90dvh] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col my-auto">
-        {/* Modal Header */}
-        <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 p-4 sm:p-6 text-white overflow-hidden shrink-0">
-          {/* Background Ambient Glow */}
-          <div className="absolute -right-8 -top-8 w-40 h-40 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
-
-          <button
-            onClick={onClose}
-            className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 p-1.5 sm:p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 hover:text-white transition-colors cursor-pointer shrink-0"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-
-          <div className="flex items-center gap-3 sm:gap-4 pr-8">
-            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-white p-1.5 sm:p-2 shadow-lg ring-4 ring-white/10 flex items-center justify-center shrink-0">
-              <img src="/favicon.svg" alt="Zooka Business" className="w-full h-full object-contain" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base sm:text-xl font-black tracking-tight text-white truncate">Install Zooka Business</h3>
-                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 rounded-full">
-                  PWA Ready
-                </span>
-              </div>
-              <p className="text-[11px] sm:text-xs text-indigo-100/90 mt-0.5 truncate">
-                Enterprise GST Accounting, POS Billing & Offline Engine
-              </p>
-            </div>
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="lg"
+      title="Install Zooka Business"
+      badge={
+        <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-full">
+          PWA Ready
+        </span>
+      }
+      subtitle="Enterprise GST Accounting, POS Billing & Offline Engine"
+      icon={<Download className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+      iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+      bodyClassName="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1"
+      footer={
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 w-full">
+          <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>Version: PWA v1.1 • Offline Ready</span>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold transition-colors cursor-pointer"
+          >
+            Close
+          </button>
         </div>
-
-        {/* Modal Body */}
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 flex-1 overflow-y-auto modal-content-scroll">
-          {/* Feature Highlights Grid */}
+      }
+    >
+      <div className="space-y-4 sm:space-y-5">
+        {/* Feature Highlights Grid */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
               <div className="flex items-center gap-2 text-indigo-600 dark:text-cyan-400 font-bold text-xs">
@@ -202,22 +198,6 @@ export const PwaInstallModal: React.FC<PwaInstallModalProps> = ({ isOpen, onClos
             </div>
           )}
         </div>
-
-        {/* Modal Footer */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-1.5 font-mono text-[11px]">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Version: PWA v1.1 • Offline Ready</span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold transition-colors cursor-pointer"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

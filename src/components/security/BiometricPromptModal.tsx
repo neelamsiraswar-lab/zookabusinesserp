@@ -21,6 +21,7 @@ import {
   isRunningInIframe
 } from '../../services/biometricAuthService';
 import { BiometricSecurityConfig } from '../../types';
+import { DesktopModal } from '../common/DesktopModal';
 
 interface BiometricPromptModalProps {
   isOpen: boolean;
@@ -142,22 +143,24 @@ export const BiometricPromptModal: React.FC<BiometricPromptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Glow Header Accent */}
-        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-cyan-500 via-indigo-500 to-sky-400" />
-
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="p-6 sm:p-8 text-center space-y-5">
-          {/* Animated Biometric Scanning Ring */}
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="sm"
+      title="Biometric Security Shield"
+      subtitle={actionTitle}
+      icon={<Fingerprint className="w-5 h-5 text-indigo-600 dark:text-cyan-400" />}
+      iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+      bodyClassName="p-6 text-center space-y-5 overflow-y-auto flex-1"
+      footer={
+        <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 w-full">
+          <Lock className="w-3 h-3 text-cyan-500" />
+          <span>FIDO2 / W3C WebAuthn Biometric Enclave Protection</span>
+        </div>
+      }
+    >
+      <div className="text-center space-y-5">
+        {/* Animated Biometric Scanning Ring */}
           <div className="flex justify-center pt-2">
             <div className="relative flex items-center justify-center">
               {/* Outer Pulse Rings */}
@@ -332,14 +335,7 @@ export const BiometricPromptModal: React.FC<BiometricPromptModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* Secure Hardware Footnote */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-            <Lock className="w-3 h-3 text-cyan-500" />
-            <span>FIDO2 / W3C WebAuthn Biometric Enclave Protection</span>
-          </div>
         </div>
-      </div>
-    </div>
-  );
-};
+      </DesktopModal>
+    );
+  };

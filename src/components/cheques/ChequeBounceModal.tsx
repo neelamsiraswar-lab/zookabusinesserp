@@ -13,6 +13,7 @@ import {
 import { ChequeRecord, ChequeBouncePayload, BusinessProfile } from '../../types';
 import { formatINR, formatDate } from '../../utils/formatters';
 import { RBI_CTS_RETURN_REASONS } from '../../utils/chequeReminders';
+import { DesktopModal } from '../common/DesktopModal';
 
 interface ChequeBounceModalProps {
   isOpen: boolean;
@@ -71,35 +72,19 @@ export const ChequeBounceModal: React.FC<ChequeBounceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto animate-scale-in">
-        
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-rose-50/70 dark:bg-rose-950/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Record Cheque Bounce / Return
-              </h2>
-              <p className="text-xs text-slate-500">
-                Log bank return memo, penalty fees, and ledger reversal
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <DesktopModal
+      isOpen={isOpen && !!cheque}
+      onClose={onClose}
+      size="lg"
+      title="Record Cheque Bounce / Return"
+      subtitle="Log bank return memo, penalty fees, and ledger reversal"
+      icon={<AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />}
+      iconBgColor="bg-rose-50 dark:bg-rose-950/60"
+      bodyClassName="p-5 space-y-4 overflow-y-auto flex-1"
+    >
+      <div>
         {/* Cheque Info Header */}
-        <div className="p-5 space-y-4">
+        <div className="space-y-4">
           <div className="p-3.5 bg-rose-50/40 dark:bg-rose-950/20 rounded-xl border border-rose-200/60 dark:border-rose-900/40 flex items-center justify-between text-xs">
             <div className="space-y-1">
               <div className="font-mono font-bold text-rose-600 dark:text-rose-400 text-sm flex items-center gap-1.5">
@@ -286,8 +271,7 @@ export const ChequeBounceModal: React.FC<ChequeBounceModalProps> = ({
             </div>
           </form>
         </div>
-
       </div>
-    </div>
+    </DesktopModal>
   );
 };

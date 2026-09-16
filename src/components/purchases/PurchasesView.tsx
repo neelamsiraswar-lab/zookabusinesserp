@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { useApp } from '../../context/AppContext';
 import { PurchaseBill, PurchaseBillItem, Expense, GstTaxRate, PaymentMethod, Product } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -995,42 +996,24 @@ export const PurchasesView: React.FC = () => {
         const modalTotalUnits = pItems.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-3 md:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in overflow-hidden modal-overlay">
-            <div className="w-full max-w-full sm:max-w-xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl flex flex-col h-[98dvh] sm:h-auto sm:max-h-[92dvh] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
-              
-              {/* Sticky Modal Header */}
-              <div className="shrink-0 px-3.5 py-3 sm:px-6 sm:py-4 border-b border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/60 shadow-2xs">
-                    <PackagePlus className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
-                        Add Stock by Inward Purchase Bill
-                      </h3>
-                      <span className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold rounded-full border border-emerald-200 dark:border-emerald-800">
-                        ⚡ Auto-Increments Stock
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      Record supplier inward invoice, allocate expenses, and update inventory counts
-                    </p>
-                  </div>
-                </div>
-
-                <button 
-                  type="button"
-                  onClick={() => setIsPurchaseModalOpen(false)} 
-                  className="p-1.5 sm:p-2 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-                  aria-label="Close modal"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Scrollable Form Body + Sticky Footer */}
-              <form onSubmit={handleSavePurchaseBill} className="flex flex-col flex-1 overflow-hidden min-h-0">
+          <DesktopModal
+            isOpen={isPurchaseModalOpen}
+            onClose={() => setIsPurchaseModalOpen(false)}
+            size="3xl"
+            allowMaximize={true}
+            title="Add Stock by Inward Purchase Bill"
+            badge={
+              <span className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold rounded-full border border-emerald-200 dark:border-emerald-800">
+                ⚡ Auto-Increments Stock
+              </span>
+            }
+            subtitle="Record supplier inward invoice, allocate expenses, and update inventory counts"
+            icon={<PackagePlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+            iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+            bodyClassName="p-0 overflow-hidden flex flex-col flex-1 min-h-0"
+          >
+            {/* Scrollable Form Body + Sticky Footer */}
+            <form onSubmit={handleSavePurchaseBill} className="flex flex-col flex-1 overflow-hidden min-h-0">
                 <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-5 space-y-4 sm:space-y-5 modal-content-scroll text-xs">
                   
                   {/* Supplier & Bill Header Details */}
@@ -2277,59 +2260,59 @@ export const PurchasesView: React.FC = () => {
                   </div>
                 </div>
               </form>
-
-            </div>
-          </div>
+          </DesktopModal>
         );
       })()}
 
       {/* Bill View Details Modal */}
-      {selectedBillForView && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in overflow-hidden modal-overlay">
-          <div className="w-full max-w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-[90dvh] sm:h-auto sm:max-h-[88dvh] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Header */}
-            <div className="shrink-0 px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md flex items-center justify-between gap-3">
+      <DesktopModal
+        isOpen={!!selectedBillForView}
+        onClose={() => setSelectedBillForView(null)}
+        size="2xl"
+        title={selectedBillForView?.billNumber}
+        badge={
+          selectedBillForView ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800">
+              {selectedBillForView.status}
+            </span>
+          ) : undefined
+        }
+        subtitle={selectedBillForView ? `Supplier: ${selectedBillForView.vendorName} • Ref: ${selectedBillForView.vendorInvoiceNumber}` : ''}
+        icon={<Receipt className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 space-y-4 text-xs"
+        footer={
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setSelectedBillForView(null)}
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {selectedBillForView && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/60 dark:border-slate-700">
               <div>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>{selectedBillForView.billNumber}</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800">
-                    {selectedBillForView.status}
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Supplier: {selectedBillForView.vendorName} • Ref: {selectedBillForView.vendorInvoiceNumber}
-                </p>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Bill Date:</span>
+                <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{formatDate(selectedBillForView.billDate)}</div>
               </div>
-              <button 
-                type="button"
-                onClick={() => setSelectedBillForView(null)} 
-                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">GSTIN:</span>
+                <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedBillForView.vendorGstin || 'Unregistered'}</div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Supply Type:</span>
+                <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedBillForView.isInterState ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)'}</div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">ITC Claim:</span>
+                <div className="font-semibold text-emerald-700 dark:text-emerald-300 mt-0.5">{selectedBillForView.itcEligibility.replace(/_/g, ' ')}</div>
+              </div>
             </div>
-
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 space-y-4 modal-content-scroll text-xs">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/60 dark:border-slate-700">
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Bill Date:</span>
-                  <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{formatDate(selectedBillForView.billDate)}</div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">GSTIN:</span>
-                  <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedBillForView.vendorGstin || 'Unregistered'}</div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Supply Type:</span>
-                  <div className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedBillForView.isInterState ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)'}</div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">ITC Claim:</span>
-                  <div className="font-semibold text-emerald-700 dark:text-emerald-300 mt-0.5">{selectedBillForView.itcEligibility.replace(/_/g, ' ')}</div>
-                </div>
-              </div>
 
               {/* Items Table */}
               <div>
@@ -2414,31 +2397,23 @@ export const PurchasesView: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Footer */}
-            <div className="shrink-0 px-4 py-3 sm:px-6 sm:py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedBillForView(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </DesktopModal>
 
       {/* Log Expense Modal */}
-      {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="w-full max-w-[96vw] sm:max-w-md bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll my-auto">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">Record Operating Expense</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Post direct or indirect business expenses</p>
-
-            <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Expense Category</label>
+      <DesktopModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        size="md"
+        title="Record Operating Expense"
+        subtitle="Post direct or indirect business expenses with ITC tracking"
+        icon={<DollarSign className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-3"
+      >
+        <form onSubmit={handleSaveExpense} className="space-y-3 text-xs">
+          <div>
+            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Expense Category</label>
                 <select
                   value={expenseCategory}
                   onChange={(e) => setExpenseCategory(e.target.value)}
@@ -2577,9 +2552,7 @@ export const PurchasesView: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </DesktopModal>
 
       {/* HSN / SAC Code App Lookup Dialog */}
       <HsnLookupDialog
@@ -2621,33 +2594,17 @@ export const PurchasesView: React.FC = () => {
       )}
 
       {/* Quick Add Product to Inventory Catalog Modal */}
-      {isQuickAddProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in overflow-y-auto modal-overlay">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-6 max-h-[92dvh] overflow-y-auto modal-content-scroll my-auto space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400">
-                  <PackagePlus className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Add Product to Catalog
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Create item in inventory and immediately link to inward purchase bill
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsQuickAddProductModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveQuickProduct} className="space-y-3.5 text-xs">
+      <DesktopModal
+        isOpen={isQuickAddProductModalOpen}
+        onClose={() => setIsQuickAddProductModalOpen(false)}
+        size="lg"
+        title="Add Product to Catalog"
+        subtitle="Create item in inventory and immediately link to inward purchase bill"
+        icon={<PackagePlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-6 text-xs space-y-4"
+      >
+        <form onSubmit={handleSaveQuickProduct} className="space-y-3.5 text-xs">
               <div className="space-y-1">
                 <label className="block font-bold text-slate-700 dark:text-slate-300">
                   Product / Item Name *
@@ -2852,9 +2809,7 @@ export const PurchasesView: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </DesktopModal>
 
       {/* HSN Lookup Dialog for Quick Add Product */}
       <HsnLookupDialog

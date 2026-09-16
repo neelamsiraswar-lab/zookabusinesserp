@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Product } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { BarcodeSvg } from '../common/BarcodeSvg';
+import { DesktopModal } from '../common/DesktopModal';
 import { 
   Scan, 
   Camera, 
-  X, 
   Plus, 
   Minus, 
   FileText, 
@@ -219,37 +219,40 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto modal-overlay">
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl max-w-[96vw] sm:max-w-xl md:max-w-2xl w-full overflow-hidden flex flex-col max-h-[95dvh] sm:max-h-[90dvh] my-auto">
-        {/* Header */}
-        <div className="p-3.5 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-2xl bg-indigo-500/20 text-cyan-300 border border-indigo-500/30 shrink-0">
-              <Scan className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold tracking-tight text-white flex items-center gap-2 truncate">
-                <span>Barcode Stock Scanner & Lookup</span>
-                <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
-                  Live
-                </span>
-              </h2>
-              <p className="text-[11px] sm:text-xs text-slate-300 truncate">
-                Scan barcode to locate stock, view inventory or add directly to invoice
-              </p>
-            </div>
+    <DesktopModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="2xl"
+      allowMaximize={true}
+      title="Barcode Stock Scanner & Lookup"
+      badge={
+        <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 font-mono font-bold">
+          Live
+        </span>
+      }
+      subtitle="Scan barcode to locate stock, view inventory or add directly to invoice"
+      icon={<Scan className="w-5 h-5 text-indigo-600 dark:text-indigo-400 animate-pulse" />}
+      iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+      bodyClassName="p-0 overflow-y-auto flex flex-col flex-1"
+      footer={
+        <div className="flex items-center justify-between w-full text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span>Scanner Engine Active</span>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer shrink-0"
+            className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-semibold transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            Close Scanner
           </button>
         </div>
-
+      }
+    >
         {/* Mode Selector Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50 text-xs font-semibold">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-semibold">
           <button
             onClick={() => {
               setActiveMode('HANDHELD');
@@ -568,22 +571,6 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             </div>
           ) : null}
         </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span>Scanner Engine Active</span>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-semibold transition-colors cursor-pointer"
-          >
-            Close Scanner
-          </button>
-        </div>
-      </div>
-    </div>
+    </DesktopModal>
   );
 };

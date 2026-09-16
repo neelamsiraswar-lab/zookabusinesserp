@@ -15,8 +15,7 @@ import {
   User, 
   ChevronRight,
   Fingerprint,
-  HelpCircle,
-  Minimize2
+  HelpCircle
 } from 'lucide-react';
 
 export const UserAuthModal: React.FC = () => {
@@ -25,11 +24,8 @@ export const UserAuthModal: React.FC = () => {
     currentUser, 
     superAdminUser,
     isAuthModalOpen, 
-    isAuthModalMinimized,
     authModalTargetUser, 
     closeAuthModal, 
-    minimizeAuthModal,
-    restoreAuthModal,
     authenticateAndSwitchUser,
     business 
   } = useApp();
@@ -76,41 +72,6 @@ export const UserAuthModal: React.FC = () => {
 
   if (!isAuthModalOpen) return null;
 
-  if (isAuthModalMinimized) {
-    return (
-      <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-        <div className="flex items-center gap-3 px-4 py-3 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-cyan-300">
-            <Lock className="w-4 h-4" />
-          </div>
-          <div className="text-left">
-            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-              <span>Workspace Login</span>
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-            </div>
-            <div className="text-[10px] text-slate-400">Minimized • Click to expand</div>
-          </div>
-          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-700">
-            <button
-              onClick={restoreAuthModal}
-              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-              title="Expand Login Modal"
-            >
-              <span>Expand</span>
-            </button>
-            <button
-              onClick={closeAuthModal}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-              title="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const isTargetingSuperAdmin = 
     selectedUserId === DEFAULT_SUPER_ADMIN.id || 
     selectedUserId === 'usr-super-admin' || 
@@ -152,24 +113,13 @@ export const UserAuthModal: React.FC = () => {
             ? 'bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950' 
             : 'bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900'
         }`}>
-          <div className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 flex items-center gap-1.5">
-            <button
-              onClick={minimizeAuthModal}
-              className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer"
-              aria-label="Minimize"
-              title="Minimize Login Modal"
-            >
-              <Minimize2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={closeAuthModal}
-              className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer"
-              aria-label="Close"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={closeAuthModal}
+            className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shadow-inner shrink-0 ${

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { DesktopModal } from '../common/DesktopModal';
 import { useApp } from '../../context/AppContext';
 import { Party, Invoice, PurchaseBill, PaymentMethod, PaymentType, PaymentRecord } from '../../types';
 import { formatCurrency, formatDate, normalizeSignatureUrl } from '../../utils/formatters';
@@ -1670,193 +1671,188 @@ Transactions: ${entries.length} records`;
         </div>
 
         {/* Quick Payment Modal (Money In / Money Out) */}
-        {isRecordPaymentOpen && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in overflow-y-auto modal-overlay print:hidden">
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-5 max-w-[96vw] sm:max-w-md w-full max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto modal-content-scroll text-xs space-y-3.5 my-auto">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 shrink-0">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-slate-900 text-sm">Record Payment / Transaction</h4>
-                  <span className="text-[10px] font-semibold text-slate-500">({currentParty.name})</span>
-                </div>
-                <button onClick={() => setIsRecordPaymentOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer p-1">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+        <DesktopModal
+          isOpen={isRecordPaymentOpen}
+          onClose={() => setIsRecordPaymentOpen(false)}
+          size="md"
+          title="Record Payment / Transaction"
+          subtitle={currentParty.name}
+          icon={paymentType === 'PAYMENT_IN' ? <ArrowDownLeft className="w-5 h-5 text-emerald-600" /> : <ArrowUpRight className="w-5 h-5 text-rose-600" />}
+          iconBgColor={paymentType === 'PAYMENT_IN' ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'bg-rose-50 dark:bg-rose-950/40'}
+          bodyClassName="p-4 sm:p-5 text-xs space-y-3.5"
+        >
+          {/* Toggle Money In / Money Out */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setPaymentType('PAYMENT_IN');
+                if (unpaidInvoices.length > 0) {
+                  setSelectedInvoiceForPayment(unpaidInvoices[0].id);
+                  setPaymentAmount(unpaidInvoices[0].amountDue);
+                } else {
+                  setSelectedInvoiceForPayment('');
+                  setPaymentAmount(Math.max(0, closingBalance));
+                }
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2 font-bold rounded-lg transition-all cursor-pointer ${
+                paymentType === 'PAYMENT_IN'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <ArrowDownLeft className="w-3.5 h-3.5" />
+              <span>Money In (Receipt)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPaymentType('PAYMENT_OUT');
+                if (unpaidBills.length > 0) {
+                  setSelectedBillForPayment(unpaidBills[0].id);
+                  setPaymentAmount(unpaidBills[0].amountDue !== undefined ? unpaidBills[0].amountDue : unpaidBills[0].grandTotal);
+                } else {
+                  setSelectedBillForPayment('');
+                  setPaymentAmount(closingBalance < 0 ? Math.abs(closingBalance) : 0);
+                }
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2 font-bold rounded-lg transition-all cursor-pointer ${
+                paymentType === 'PAYMENT_OUT'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              <span>Money Out (Disbursement)</span>
+            </button>
+          </div>
 
-              {/* Toggle Money In / Money Out */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentType('PAYMENT_IN');
-                    if (unpaidInvoices.length > 0) {
-                      setSelectedInvoiceForPayment(unpaidInvoices[0].id);
-                      setPaymentAmount(unpaidInvoices[0].amountDue);
-                    } else {
-                      setSelectedInvoiceForPayment('');
-                      setPaymentAmount(Math.max(0, closingBalance));
-                    }
+          <form onSubmit={handleSavePayment} className="space-y-3">
+            {/* Date Input */}
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Transaction Date *</label>
+              <input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                required
+              />
+            </div>
+
+            {/* Linked Document Selection */}
+            {paymentType === 'PAYMENT_IN' ? (
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Settle Against Invoice</label>
+                <select
+                  value={selectedInvoiceForPayment}
+                  onChange={(e) => {
+                    setSelectedInvoiceForPayment(e.target.value);
+                    const inv = invoices.find(i => i.id === e.target.value);
+                    if (inv) setPaymentAmount(inv.amountDue);
                   }}
-                  className={`flex items-center justify-center gap-1.5 py-2 font-bold rounded-lg transition-all cursor-pointer ${
-                    paymentType === 'PAYMENT_IN'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                  }`}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
                 >
-                  <ArrowDownLeft className="w-3.5 h-3.5" />
-                  <span>Money In (Receipt)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentType('PAYMENT_OUT');
-                    if (unpaidBills.length > 0) {
-                      setSelectedBillForPayment(unpaidBills[0].id);
-                      setPaymentAmount(unpaidBills[0].amountDue !== undefined ? unpaidBills[0].amountDue : unpaidBills[0].grandTotal);
-                    } else {
-                      setSelectedBillForPayment('');
-                      setPaymentAmount(closingBalance < 0 ? Math.abs(closingBalance) : 0);
-                    }
-                  }}
-                  className={`flex items-center justify-center gap-1.5 py-2 font-bold rounded-lg transition-all cursor-pointer ${
-                    paymentType === 'PAYMENT_OUT'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                  }`}
-                >
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                  <span>Money Out (Disbursement)</span>
-                </button>
+                  <option value="">-- Direct / On-Account Advance Receipt --</option>
+                  {unpaidInvoices.map(inv => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.invoiceNumber} — Due: {formatCurrency(inv.amountDue, business.currencySymbol)}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  {selectedInvoiceForPayment ? 'Will settle selected invoice balance.' : 'Will record on-account receipt in client ledger.'}
+                </span>
               </div>
+            ) : (
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Disburse Against Purchase Bill</label>
+                <select
+                  value={selectedBillForPayment}
+                  onChange={(e) => {
+                    setSelectedBillForPayment(e.target.value);
+                    const bill = purchaseBills.find(b => b.id === e.target.value);
+                    if (bill) setPaymentAmount(bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal);
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                >
+                  <option value="">-- Direct / On-Account Disbursement --</option>
+                  {unpaidBills.map(bill => (
+                    <option key={bill.id} value={bill.id}>
+                      {bill.billNumber} — Due: {formatCurrency(bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal, business.currencySymbol)}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  {selectedBillForPayment ? 'Will settle selected purchase bill.' : 'Will record on-account payment in vendor ledger.'}
+                </span>
+              </div>
+            )}
 
-              <form onSubmit={handleSavePayment} className="space-y-3">
-                {/* Date Input */}
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Transaction Date *</label>
-                  <input
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    required
-                  />
-                </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Amount (₹) *</label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={paymentAmount || ''}
+                onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                placeholder="Enter amount"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold font-mono text-sm"
+                required
+              />
+            </div>
 
-                {/* Linked Document Selection */}
-                {paymentType === 'PAYMENT_IN' ? (
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Settle Against Invoice</label>
-                    <select
-                      value={selectedInvoiceForPayment}
-                      onChange={(e) => {
-                        setSelectedInvoiceForPayment(e.target.value);
-                        const inv = invoices.find(i => i.id === e.target.value);
-                        if (inv) setPaymentAmount(inv.amountDue);
-                      }}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    >
-                      <option value="">-- Direct / On-Account Advance Receipt --</option>
-                      {unpaidInvoices.map(inv => (
-                        <option key={inv.id} value={inv.id}>
-                          {inv.invoiceNumber} — Due: {formatCurrency(inv.amountDue, business.currencySymbol)}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-[10px] text-slate-500 mt-1 block">
-                      {selectedInvoiceForPayment ? 'Will settle selected invoice balance.' : 'Will record on-account receipt in client ledger.'}
-                    </span>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Disburse Against Purchase Bill</label>
-                    <select
-                      value={selectedBillForPayment}
-                      onChange={(e) => {
-                        setSelectedBillForPayment(e.target.value);
-                        const bill = purchaseBills.find(b => b.id === e.target.value);
-                        if (bill) setPaymentAmount(bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal);
-                      }}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    >
-                      <option value="">-- Direct / On-Account Disbursement --</option>
-                      {unpaidBills.map(bill => (
-                        <option key={bill.id} value={bill.id}>
-                          {bill.billNumber} — Due: {formatCurrency(bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal, business.currencySymbol)}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-[10px] text-slate-500 mt-1 block">
-                      {selectedBillForPayment ? 'Will settle selected purchase bill.' : 'Will record on-account payment in vendor ledger.'}
-                    </span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Amount (₹) *</label>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={paymentAmount || ''}
-                    onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-                    placeholder="Enter amount"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold font-mono text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Payment Mode</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {(['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE'] as const).map(m => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setPaymentMethod(m)}
-                        className={`py-1.5 text-[11px] rounded-xl font-bold transition-all cursor-pointer ${
-                          paymentMethod === m
-                            ? 'bg-slate-900 text-white shadow-xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {m === 'BANK_TRANSFER' ? 'BANK' : m}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Notes / Transaction Reference</label>
-                  <input
-                    type="text"
-                    value={paymentNotes}
-                    onChange={(e) => setPaymentNotes(e.target.value)}
-                    placeholder="e.g. UTR / IMPS ref / Cheque #12345"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Payment Mode</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE'] as const).map(m => (
                   <button
+                    key={m}
                     type="button"
-                    onClick={() => setIsRecordPaymentOpen(false)}
-                    className="px-3.5 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={`px-4 py-2 font-bold text-white rounded-xl shadow-md cursor-pointer transition-all ${
-                      paymentType === 'PAYMENT_IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                    onClick={() => setPaymentMethod(m)}
+                    className={`py-1.5 text-[11px] rounded-xl font-bold transition-all cursor-pointer ${
+                      paymentMethod === m
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    Confirm {paymentType === 'PAYMENT_IN' ? 'Money In' : 'Money Out'}
+                    {m === 'BANK_TRANSFER' ? 'BANK' : m}
                   </button>
-                </div>
-              </form>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Notes / Transaction Reference</label>
+              <input
+                type="text"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                placeholder="e.g. UTR / IMPS ref / Cheque #12345"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsRecordPaymentOpen(false)}
+                className="px-3.5 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={`px-4 py-2 font-bold text-white rounded-xl shadow-md cursor-pointer transition-all ${
+                  paymentType === 'PAYMENT_IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                Confirm {paymentType === 'PAYMENT_IN' ? 'Money In' : 'Money Out'}
+              </button>
+            </div>
+          </form>
+        </DesktopModal>
       </div>
     </div>
   );
