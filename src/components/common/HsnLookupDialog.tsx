@@ -55,8 +55,8 @@ export const HsnLookupDialog: React.FC<HsnLookupDialogProps> = ({
   onOpenCustomManager,
   currentCode = ''
 }) => {
-  const { customHsnCodes, currentCompany } = useApp();
-  const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
+  const { customHsnCodes, currentCompany, business } = useApp();
+  const palette = getThemePalette(business?.themeColor || currentCompany?.themeColor || 'indigo');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');

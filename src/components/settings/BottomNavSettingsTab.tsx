@@ -71,7 +71,7 @@ export const BottomNavSettingsTab: React.FC<BottomNavSettingsTabProps> = ({ onSa
   });
 
   // Effective color palette for the bottom navigation
-  const effectiveThemeColor = (config.color && config.color !== 'auto') ? config.color : (currentCompany?.themeColor || 'indigo');
+  const effectiveThemeColor = (config.color && config.color !== 'auto') ? config.color : (business?.themeColor || currentCompany?.themeColor || 'indigo');
   const palette = getThemePalette(effectiveThemeColor);
 
   // Simulated active tab in preview

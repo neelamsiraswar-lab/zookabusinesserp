@@ -251,6 +251,13 @@ interface AppContextType {
   updateAccountHead: (id: string, updates: Partial<AccountHead>) => void;
   deleteAccountHead: (id: string) => boolean;
   clearAllLedgerData: () => Promise<void>;
+  syncAllTransactionsToAccounting: (showNotification?: boolean) => Promise<{
+    invoicesSynced: number;
+    billsSynced: number;
+    paymentsSynced: number;
+    expensesSynced: number;
+    totalSynced: number;
+  }>;
   importBankStatementAutoEntries: (
     entries: BankStatementAutoEntry[],
     targetBankAccountId: string,
@@ -3068,6 +3075,518 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  // Helper to generate a double-entry JournalEntry for any PaymentRecord (Receipt, Payment, Contra)
+  const generateJournalEntryForPayment = (payment: PaymentRecord): JournalEntry => {
+    const isMoneyIn = payment.type === 'PAYMENT_IN';
+    const isMoneyOut = payment.type === 'PAYMENT_OUT';
+    const isContra = payment.type === 'CONTRA_TRANSFER';
+
+    // Identify Cash / Bank account head
+    const cashAccount = accountHeads.find(a => a.id === 'acc-1' || a.name.toLowerCase().includes('cash')) || {
+      id: 'acc-1',
+      name: 'Cash in Hand'
+    };
+    const bankAccount = (payment.bankAccountId && accountHeads.find(a => a.id === payment.bankAccountId)) ||
+      accountHeads.find(a => a.id === 'acc-2' || a.type === 'BANK' || a.name.toLowerCase().includes('bank')) || {
+      id: 'acc-2',
+      name: payment.bankAccountName || 'Main Current Bank Account'
+    };
+
+    const liquidAccount = payment.paymentMethod === 'CASH' ? cashAccount : bankAccount;
+
+    // Party account head or sub-ledger
+    const partySubLedgerId = payment.partyId ? `party-${payment.partyId}` : (isMoneyIn ? 'acc-3' : 'acc-8');
+    const partyAccountName = payment.partyName || (isMoneyIn ? 'Sundry Debtors' : 'Sundry Creditors');
+
+    let lines: JournalEntry['lines'] = [];
+    let description = '';
+
+    if (isMoneyIn) {
+      // Receipt (Money In): Debit Cash/Bank, Credit Client/Debtor
+      lines = [
+        {
+          accountId: liquidAccount.id,
+          accountName: liquidAccount.name,
+          debit: payment.amount,
+          credit: 0
+        },
+        {
+          accountId: partySubLedgerId,
+          accountName: partyAccountName,
+          debit: 0,
+          credit: payment.amount
+        }
+      ];
+      description = `Receipt Voucher ${payment.voucherNumber}: Received ${business.currencySymbol}${payment.amount.toLocaleString('en-IN')} from ${partyAccountName} via ${payment.paymentMethod || 'UPI/Cash'}${payment.linkedInvoiceNumber ? ` against Inv #${payment.linkedInvoiceNumber}` : ''}${payment.referenceNo ? ` (Ref: ${payment.referenceNo})` : ''}${payment.notes ? ` - ${payment.notes}` : ''}`;
+    } else if (isMoneyOut) {
+      // Payment (Money Out): Debit Vendor/Creditor, Credit Cash/Bank
+      lines = [
+        {
+          accountId: partySubLedgerId,
+          accountName: partyAccountName,
+          debit: payment.amount,
+          credit: 0
+        },
+        {
+          accountId: liquidAccount.id,
+          accountName: liquidAccount.name,
+          debit: 0,
+          credit: payment.amount
+        }
+      ];
+      description = `Payment Voucher ${payment.voucherNumber}: Disbursed ${business.currencySymbol}${payment.amount.toLocaleString('en-IN')} to ${partyAccountName} via ${payment.paymentMethod || 'Bank'}${payment.linkedBillNumber ? ` against Bill #${payment.linkedBillNumber}` : ''}${payment.referenceNo ? ` (Ref: ${payment.referenceNo})` : ''}${payment.notes ? ` - ${payment.notes}` : ''}`;
+    } else if (isContra) {
+      // Contra Transfer between liquid accounts
+      const fromAccId = payment.fromAccount?.includes('acc-') ? (payment.fromAccount.match(/acc-\d+/)?.[0] || 'acc-1') : 'acc-1';
+      const toAccId = payment.toAccount?.includes('acc-') ? (payment.toAccount.match(/acc-\d+/)?.[0] || 'acc-2') : 'acc-2';
+      const fromAcc = accountHeads.find(a => a.id === fromAccId) || { id: fromAccId, name: payment.fromAccount || 'Cash in Hand' };
+      const toAcc = accountHeads.find(a => a.id === toAccId) || { id: toAccId, name: payment.toAccount || 'Bank Account' };
+
+      lines = [
+        {
+          accountId: toAcc.id,
+          accountName: toAcc.name,
+          debit: payment.amount,
+          credit: 0
+        },
+        {
+          accountId: fromAcc.id,
+          accountName: fromAcc.name,
+          debit: 0,
+          credit: payment.amount
+        }
+      ];
+      description = `Contra Transfer ${payment.voucherNumber}: Transfer ${business.currencySymbol}${payment.amount.toLocaleString('en-IN')} from ${fromAcc.name} to ${toAcc.name}${payment.referenceNo ? ` (Ref: ${payment.referenceNo})` : ''}`;
+    }
+
+    return {
+      id: 'je-pay-' + payment.id,
+      entryNumber: `JV-${payment.voucherNumber}`,
+      date: payment.date || new Date().toISOString().split('T')[0],
+      description,
+      reference: `PAYMENT:${payment.id}`,
+      lines,
+      createdAt: new Date().toISOString()
+    };
+  };
+
+  // Helper to generate a double-entry JournalEntry for a Sales Invoice
+  const generateJournalEntryForInvoice = (invoice: Invoice): JournalEntry => {
+    const customerSubLedgerId = invoice.customerId ? `party-${invoice.customerId}` : 'acc-3';
+    const customerAccountName = invoice.customerName || 'Sundry Debtors';
+
+    const lines: JournalEntry['lines'] = [
+      {
+        accountId: customerSubLedgerId,
+        accountName: customerAccountName,
+        debit: Number(invoice.grandTotal) || 0,
+        credit: 0
+      },
+      {
+        accountId: 'acc-14',
+        accountName: 'Sales Revenue (Goods & Services)',
+        debit: 0,
+        credit: Number(invoice.subTotalTaxable) || 0
+      }
+    ];
+
+    if ((invoice.totalCgst || 0) > 0) {
+      lines.push({
+        accountId: 'acc-9',
+        accountName: 'Output Tax Liability CGST',
+        debit: 0,
+        credit: Number(invoice.totalCgst)
+      });
+    }
+
+    if ((invoice.totalSgst || 0) > 0) {
+      lines.push({
+        accountId: 'acc-10',
+        accountName: 'Output Tax Liability SGST',
+        debit: 0,
+        credit: Number(invoice.totalSgst)
+      });
+    }
+
+    if ((invoice.totalIgst || 0) > 0) {
+      lines.push({
+        accountId: 'acc-11',
+        accountName: 'Output Tax Liability IGST',
+        debit: 0,
+        credit: Number(invoice.totalIgst)
+      });
+    }
+
+    // Double-entry balancing verification and round-off adjustment
+    const totalDebit = lines.reduce((s, l) => s + (l.debit || 0), 0);
+    const totalCredit = lines.reduce((s, l) => s + (l.credit || 0), 0);
+    const diff = Math.round((totalDebit - totalCredit) * 100) / 100;
+    if (Math.abs(diff) >= 0.01) {
+      if (diff > 0) {
+        lines.push({
+          accountId: 'acc-13',
+          accountName: 'Round Off / Retained Earnings',
+          debit: 0,
+          credit: diff
+        });
+      } else {
+        lines.push({
+          accountId: 'acc-13',
+          accountName: 'Round Off / Retained Earnings',
+          debit: Math.abs(diff),
+          credit: 0
+        });
+      }
+    }
+
+    return {
+      id: 'je-inv-' + invoice.id,
+      entryNumber: `JV-INV-${invoice.invoiceNumber}`,
+      date: invoice.invoiceDate || new Date().toISOString().split('T')[0],
+      description: `Sales Invoice #${invoice.invoiceNumber}: Billed ${business.currencySymbol}${(invoice.grandTotal || 0).toLocaleString('en-IN')} to ${customerAccountName} (${invoice.items?.length || 0} items)`,
+      reference: `INVOICE:${invoice.id}`,
+      lines,
+      createdAt: invoice.createdAt || new Date().toISOString()
+    };
+  };
+
+  // Helper to generate a double-entry JournalEntry for a Purchase Bill
+  const generateJournalEntryForPurchaseBill = (bill: PurchaseBill): JournalEntry => {
+    const vendorSubLedgerId = bill.vendorId ? `party-${bill.vendorId}` : 'acc-8';
+    const vendorAccountName = bill.vendorName || 'Sundry Creditors';
+
+    const lines: JournalEntry['lines'] = [
+      {
+        accountId: 'acc-15',
+        accountName: 'Cost of Goods Sold (Purchases)',
+        debit: Number(bill.subTotalTaxable) || 0,
+        credit: 0
+      }
+    ];
+
+    if ((bill.totalCgst || 0) > 0) {
+      lines.push({
+        accountId: 'acc-5',
+        accountName: 'Input Tax Credit CGST',
+        debit: Number(bill.totalCgst),
+        credit: 0
+      });
+    }
+
+    if ((bill.totalSgst || 0) > 0) {
+      lines.push({
+        accountId: 'acc-6',
+        accountName: 'Input Tax Credit SGST',
+        debit: Number(bill.totalSgst),
+        credit: 0
+      });
+    }
+
+    if ((bill.totalIgst || 0) > 0) {
+      lines.push({
+        accountId: 'acc-7',
+        accountName: 'Input Tax Credit IGST',
+        debit: Number(bill.totalIgst),
+        credit: 0
+      });
+    }
+
+    lines.push({
+      accountId: vendorSubLedgerId,
+      accountName: vendorAccountName,
+      debit: 0,
+      credit: Number(bill.grandTotal) || 0
+    });
+
+    // Double-entry balancing verification
+    const totalDebit = lines.reduce((s, l) => s + (l.debit || 0), 0);
+    const totalCredit = lines.reduce((s, l) => s + (l.credit || 0), 0);
+    const diff = Math.round((totalDebit - totalCredit) * 100) / 100;
+    if (Math.abs(diff) >= 0.01) {
+      if (diff > 0) {
+        lines.push({
+          accountId: 'acc-13',
+          accountName: 'Round Off / Retained Earnings',
+          debit: 0,
+          credit: diff
+        });
+      } else {
+        lines.push({
+          accountId: 'acc-13',
+          accountName: 'Round Off / Retained Earnings',
+          debit: Math.abs(diff),
+          credit: 0
+        });
+      }
+    }
+
+    return {
+      id: 'je-bill-' + bill.id,
+      entryNumber: `JV-BILL-${bill.billNumber}`,
+      date: bill.billDate || new Date().toISOString().split('T')[0],
+      description: `Purchase Bill #${bill.billNumber}: Inward supply of ${business.currencySymbol}${(bill.grandTotal || 0).toLocaleString('en-IN')} from ${vendorAccountName}${bill.vendorInvoiceNumber ? ` (Ref: ${bill.vendorInvoiceNumber})` : ''}`,
+      reference: `BILL:${bill.id}`,
+      lines,
+      createdAt: bill.createdAt || new Date().toISOString()
+    };
+  };
+
+  // Helper to generate a double-entry JournalEntry for an Expense Record
+  const generateJournalEntryForExpense = (expense: Expense): JournalEntry => {
+    let targetHeadId = 'acc-16';
+    let targetHeadName = 'Rent & Office Expenses';
+
+    const catLower = (expense.category || '').toLowerCase();
+    if (catLower.includes('freight') || catLower.includes('courier') || catLower.includes('logistics') || catLower.includes('shipping')) {
+      targetHeadId = 'acc-17';
+      targetHeadName = 'Freight & Courier Outward';
+    } else if (catLower.includes('electric') || catLower.includes('utility') || catLower.includes('fuel') || catLower.includes('power')) {
+      targetHeadId = 'acc-18';
+      targetHeadName = 'Utility & Electricity Expenses';
+    } else if (catLower.includes('salar') || catLower.includes('staff') || catLower.includes('wage') || catLower.includes('payroll')) {
+      targetHeadId = 'acc-19';
+      targetHeadName = 'Salaries & Staff Benefits';
+    } else {
+      const matched = accountHeads.find(a => a.category === 'EXPENSE' && a.name.toLowerCase().includes(catLower));
+      if (matched) {
+        targetHeadId = matched.id;
+        targetHeadName = matched.name;
+      }
+    }
+
+    const cashAccount = accountHeads.find(a => a.id === 'acc-1' || a.name.toLowerCase().includes('cash')) || {
+      id: 'acc-1',
+      name: 'Cash in Hand'
+    };
+    const bankAccount = accountHeads.find(a => a.id === 'acc-2' || a.type === 'BANK' || a.name.toLowerCase().includes('bank')) || {
+      id: 'acc-2',
+      name: 'HDFC Bank'
+    };
+
+    const liquidAccount = expense.paymentMethod === 'CASH' ? cashAccount : bankAccount;
+
+    const hasGst = Boolean(expense.hasGstBill && (expense.gstAmount || 0) > 0);
+    const netExpense = hasGst ? Math.max(0, (expense.amount || 0) - (expense.gstAmount || 0)) : (expense.amount || 0);
+
+    const lines: JournalEntry['lines'] = [
+      {
+        accountId: targetHeadId,
+        accountName: targetHeadName,
+        debit: netExpense,
+        credit: 0
+      }
+    ];
+
+    if (hasGst) {
+      const halfGst = Math.round(((expense.gstAmount || 0) / 2) * 100) / 100;
+      const otherHalfGst = Math.round(((expense.gstAmount || 0) - halfGst) * 100) / 100;
+      lines.push({
+        accountId: 'acc-5',
+        accountName: 'Input Tax Credit CGST',
+        debit: halfGst,
+        credit: 0
+      });
+      lines.push({
+        accountId: 'acc-6',
+        accountName: 'Input Tax Credit SGST',
+        debit: otherHalfGst,
+        credit: 0
+      });
+    }
+
+    lines.push({
+      accountId: liquidAccount.id,
+      accountName: liquidAccount.name,
+      debit: 0,
+      credit: Number(expense.amount) || 0
+    });
+
+    return {
+      id: 'je-exp-' + expense.id,
+      entryNumber: `JV-EXP-${expense.referenceNo || expense.id.slice(0, 8).toUpperCase()}`,
+      date: expense.date || new Date().toISOString().split('T')[0],
+      description: `Expense Voucher: ${expense.category} payment of ${business.currencySymbol}${(expense.amount || 0).toLocaleString('en-IN')} to ${expense.payee || 'Vendor'}${expense.notes ? ` (${expense.notes})` : ''}`,
+      reference: `EXPENSE:${expense.id}`,
+      lines,
+      createdAt: expense.createdAt || new Date().toISOString()
+    };
+  };
+
+  // Synchronize all accounting transactions into double-entry books (Invoices, Bills, Payments, Expenses)
+  const syncAllTransactionsToAccounting = async (showNotification: boolean = true): Promise<{
+    invoicesSynced: number;
+    billsSynced: number;
+    paymentsSynced: number;
+    expensesSynced: number;
+    totalSynced: number;
+  }> => {
+    try {
+      const validInvoices = invoices.filter(i => i.status !== 'CANCELLED');
+      const validBills = purchaseBills;
+      const validExpenses = expenses;
+
+      const newOrUpdatedJvs: JournalEntry[] = [];
+      const newPaymentsToAdd: PaymentRecord[] = [];
+      const currentPayments = [...payments];
+
+      // 1. Process Sales Invoices
+      validInvoices.forEach(inv => {
+        const invJv = generateJournalEntryForInvoice(inv);
+        newOrUpdatedJvs.push(invJv);
+
+        // If invoice was paid or partially paid, ensure payment receipt record exists
+        if ((inv.amountPaid || 0) > 0) {
+          const payRecId = 'pay-rec-inv-' + inv.id;
+          let existingPay = currentPayments.find(p => p.id === payRecId || (p.linkedInvoiceId === inv.id && p.type === 'PAYMENT_IN'));
+          if (!existingPay) {
+            const nextVoucher = getNextAvailableVoucherNumber(currentPayments, business, 'PAYMENT_IN');
+            existingPay = {
+              id: payRecId,
+              voucherNumber: nextVoucher.voucherNumber,
+              type: 'PAYMENT_IN',
+              date: inv.invoiceDate || new Date().toISOString().split('T')[0],
+              partyId: inv.customerId,
+              partyName: inv.customerName || 'Customer',
+              partyType: 'CUSTOMER',
+              amount: inv.amountPaid,
+              paymentMethod: inv.paymentMethod || 'CASH',
+              linkedInvoiceId: inv.id,
+              linkedInvoiceNumber: inv.invoiceNumber,
+              notes: `Immediate receipt on Invoice #${inv.invoiceNumber}`,
+              createdAt: new Date().toISOString()
+            };
+            currentPayments.push(existingPay);
+            newPaymentsToAdd.push(existingPay);
+          }
+          const payJv = generateJournalEntryForPayment(existingPay);
+          newOrUpdatedJvs.push(payJv);
+        }
+      });
+
+      // 2. Process Purchase Bills
+      validBills.forEach(bill => {
+        const billJv = generateJournalEntryForPurchaseBill(bill);
+        newOrUpdatedJvs.push(billJv);
+
+        // If purchase bill had amount paid, ensure payment out record exists
+        if ((bill.amountPaid || 0) > 0) {
+          const payRecId = 'pay-rec-pb-' + bill.id;
+          let existingPay = currentPayments.find(p => p.id === payRecId || (p.linkedBillId === bill.id && p.type === 'PAYMENT_OUT'));
+          if (!existingPay) {
+            const nextVoucher = getNextAvailableVoucherNumber(currentPayments, business, 'PAYMENT_OUT');
+            existingPay = {
+              id: payRecId,
+              voucherNumber: nextVoucher.voucherNumber,
+              type: 'PAYMENT_OUT',
+              date: bill.billDate || new Date().toISOString().split('T')[0],
+              partyId: bill.vendorId,
+              partyName: bill.vendorName || 'Vendor',
+              partyType: 'VENDOR',
+              amount: bill.amountPaid,
+              paymentMethod: bill.paymentMethod || 'BANK_TRANSFER',
+              linkedBillId: bill.id,
+              linkedBillNumber: bill.billNumber,
+              notes: `Immediate payment on Bill #${bill.billNumber}`,
+              createdAt: new Date().toISOString()
+            };
+            currentPayments.push(existingPay);
+            newPaymentsToAdd.push(existingPay);
+          }
+          const payJv = generateJournalEntryForPayment(existingPay);
+          newOrUpdatedJvs.push(payJv);
+        }
+      });
+
+      // 3. Process standalone / existing payments
+      currentPayments.forEach(p => {
+        const isCovered = newOrUpdatedJvs.some(j => j.reference === `PAYMENT:${p.id}` || j.id === `je-pay-${p.id}`);
+        if (!isCovered) {
+          const payJv = generateJournalEntryForPayment(p);
+          newOrUpdatedJvs.push(payJv);
+        }
+      });
+
+      // 4. Process Expenses
+      validExpenses.forEach(exp => {
+        const expJv = generateJournalEntryForExpense(exp);
+        newOrUpdatedJvs.push(expJv);
+      });
+
+      // 5. Preserve manual journal entries (entries not auto-generated from transactions)
+      const manualJvs = journalEntries.filter(j => {
+        if (!j.reference) return true;
+        if (j.reference.startsWith('INVOICE:') || j.reference.startsWith('BILL:') || j.reference.startsWith('EXPENSE:') || j.reference.startsWith('PAYMENT:')) {
+          return false;
+        }
+        return true;
+      });
+
+      // 6. Merge & deduplicate by ID
+      const jvMap = new Map<string, JournalEntry>();
+      [...manualJvs, ...newOrUpdatedJvs].forEach(j => {
+        jvMap.set(j.id, j);
+      });
+      const finalJvs = Array.from(jvMap.values());
+      finalJvs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Update state and persistence
+      setJournalEntries(finalJvs);
+      localStorage.setItem(STORAGE_PREFIX + 'journalEntries', JSON.stringify(finalJvs));
+      localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_journalEntries`, JSON.stringify(finalJvs));
+
+      if (newPaymentsToAdd.length > 0) {
+        setPayments(currentPayments);
+        localStorage.setItem(STORAGE_PREFIX + 'payments', JSON.stringify(currentPayments));
+        localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_payments`, JSON.stringify(currentPayments));
+        newPaymentsToAdd.forEach(p => {
+          cloudDb.syncEntityDoc('payments', currentCompanyId, p).catch(console.warn);
+        });
+      }
+
+      // Sync whole collection to Firestore
+      cloudDb.syncEntireCollection('journalEntries', currentCompanyId, finalJvs).catch(console.warn);
+
+      const counts = {
+        invoicesSynced: validInvoices.length,
+        billsSynced: validBills.length,
+        paymentsSynced: currentPayments.length,
+        expensesSynced: validExpenses.length,
+        totalSynced: finalJvs.length
+      };
+
+      if (showNotification) {
+        showToast(
+          'success',
+          'Accounting Synchronized',
+          `Synced ${finalJvs.length} double-entry vouchers (${counts.invoicesSynced} Invoices, ${counts.billsSynced} Bills, ${counts.paymentsSynced} Payments, ${counts.expensesSynced} Expenses).`
+        );
+      }
+
+      return counts;
+    } catch (err) {
+      console.error('Error during syncAllTransactionsToAccounting:', err);
+      if (showNotification) {
+        showToast('error', 'Sync Failed', 'Failed to synchronize accounting transactions.');
+      }
+      return {
+        invoicesSynced: 0,
+        billsSynced: 0,
+        paymentsSynced: 0,
+        expensesSynced: 0,
+        totalSynced: 0
+      };
+    }
+  };
+
+  // Auto-reconcile and ensure all transactions are synchronized to accounting books
+  useEffect(() => {
+    if (!currentCompanyId) return;
+    const timer = setTimeout(() => {
+      syncAllTransactionsToAccounting(false).catch(console.warn);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [currentCompanyId, invoices.length, purchaseBills.length, payments.length, expenses.length]);
+
   const createInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>): Invoice => {
     // Single Unified Serial Number Rule for both Tax Invoice and POS Billing
     let invoiceNumber = invoiceData.invoiceNumber?.trim();
@@ -3268,6 +3787,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    // If invoice had upfront payment, auto-record payment record & auto-post double-entry journal voucher
+    if (newInvoice.amountPaid > 0) {
+      const nextVoucherInfo = getNextAvailableVoucherNumber(payments, business, 'PAYMENT_IN');
+      const invPayRec: PaymentRecord = {
+        id: 'pay-rec-inv-' + newInvoice.id,
+        voucherNumber: nextVoucherInfo.voucherNumber,
+        type: 'PAYMENT_IN',
+        date: newInvoice.invoiceDate || new Date().toISOString().split('T')[0],
+        partyId: newInvoice.customerId,
+        partyName: newInvoice.customerName || 'Customer',
+        partyType: 'CUSTOMER',
+        amount: newInvoice.amountPaid,
+        paymentMethod: newInvoice.paymentMethod || 'CASH',
+        linkedInvoiceId: newInvoice.id,
+        linkedInvoiceNumber: newInvoice.invoiceNumber,
+        notes: `Immediate receipt on ${newInvoice.invoiceType === 'POS_SALE' ? 'POS Counter Sale' : 'Tax Invoice'} #${newInvoice.invoiceNumber}`,
+        createdAt: new Date().toISOString()
+      };
+      setPayments(prev => [invPayRec, ...prev]);
+      cloudDb.syncEntityDoc('payments', currentCompanyId, invPayRec).catch(console.warn);
+
+      try {
+        const invJv = generateJournalEntryForPayment(invPayRec);
+        setJournalEntries(prev => [invJv, ...prev]);
+        cloudDb.syncEntityDoc('journalEntries', currentCompanyId, invJv).catch(console.warn);
+      } catch (e) {
+        console.warn('Error auto-creating journal entry for invoice payment:', e);
+      }
+    }
+
+    // Auto-post double-entry Journal Voucher for Sales Invoice
+    if (newInvoice.status !== 'CANCELLED') {
+      try {
+        const salesJv = generateJournalEntryForInvoice(newInvoice);
+        setJournalEntries(prev => [salesJv, ...prev.filter(j => j.reference !== `INVOICE:${newInvoice.id}`)]);
+        cloudDb.syncEntityDoc('journalEntries', currentCompanyId, salesJv).catch(console.warn);
+      } catch (e) {
+        console.warn('Error auto-creating journal entry for sales invoice:', e);
+      }
+    }
+
     showToast('success', 'Invoice Generated', `${newInvoice.invoiceNumber} created for ${business.currencySymbol}${newInvoice.grandTotal.toLocaleString('en-IN')}`);
     return newInvoice;
   };
@@ -3382,6 +3942,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updatedAt: new Date().toISOString()
         };
         cloudDb.syncEntityDoc('invoices', currentCompanyId, updated).catch(console.warn);
+
+        // Keep accounting journal entry updated
+        if (updated.status === 'CANCELLED') {
+          setJournalEntries(jvs => jvs.filter(j => j.reference !== `INVOICE:${id}`));
+          cloudDb.deleteEntityDoc('journalEntries', currentCompanyId, `je-inv-${id}`).catch(console.warn);
+        } else {
+          try {
+            const updatedJv = generateJournalEntryForInvoice(updated);
+            setJournalEntries(jvs => [updatedJv, ...jvs.filter(j => j.reference !== `INVOICE:${id}`)]);
+            cloudDb.syncEntityDoc('journalEntries', currentCompanyId, updatedJv).catch(console.warn);
+          } catch (e) {
+            console.warn('Error updating journal entry for invoice:', e);
+          }
+        }
+
         return updated;
       }
       return inv;
@@ -3436,9 +4011,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // 3. Remove invoice record
+    // 3. Remove invoice record and linked accounting entries
     setInvoices(prev => prev.filter(i => i.id !== id));
     cloudDb.deleteEntityDoc('invoices', currentCompanyId, id).catch(console.warn);
+    setJournalEntries(prev => prev.filter(j => j.reference !== `INVOICE:${id}` && j.reference !== `PAYMENT:pay-rec-inv-${id}`));
+    cloudDb.deleteEntityDoc('journalEntries', currentCompanyId, `je-inv-${id}`).catch(console.warn);
     showToast('info', 'Invoice Deleted', `${target.invoiceNumber || 'Invoice'} deleted. Stock and balances updated.`);
   };
 
@@ -3493,6 +4070,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         setPayments(p => [pRec, ...p]);
         cloudDb.syncEntityDoc('payments', currentCompanyId, pRec).catch(console.warn);
+
+        // Auto-create Double-Entry Journal Voucher (Receipt)
+        try {
+          const invPaymentJv = generateJournalEntryForPayment(pRec);
+          setJournalEntries(prev => [invPaymentJv, ...prev.filter(j => j.id !== invPaymentJv.id && j.reference !== `PAYMENT:${pRec.id}`)]);
+          cloudDb.syncEntityDoc('journalEntries', currentCompanyId, invPaymentJv).catch(console.warn);
+        } catch (jeErr) {
+          console.warn('Error auto-creating journal entry for invoice payment:', jeErr);
+        }
 
         // Advance voucher number setting
         const parsedVch = parseVoucherNumber(vchNo);
@@ -3993,6 +4579,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    // If purchase bill had immediate payment, auto-record payment record & auto-post double-entry journal voucher
+    if (newBill.amountPaid > 0) {
+      const nextVoucherInfo = getNextAvailableVoucherNumber(payments, business, 'PAYMENT_OUT');
+      const billPayRec: PaymentRecord = {
+        id: 'pay-rec-pb-' + newBill.id,
+        voucherNumber: nextVoucherInfo.voucherNumber,
+        type: 'PAYMENT_OUT',
+        date: newBill.billDate || new Date().toISOString().split('T')[0],
+        partyId: newBill.vendorId,
+        partyName: newBill.vendorName || 'Vendor',
+        partyType: 'VENDOR',
+        amount: newBill.amountPaid,
+        paymentMethod: newBill.paymentMethod || 'BANK_TRANSFER',
+        linkedBillId: newBill.id,
+        linkedBillNumber: newBill.billNumber,
+        notes: `Immediate payment on Purchase Bill #${newBill.billNumber}`,
+        createdAt: new Date().toISOString()
+      };
+      setPayments(prev => [billPayRec, ...prev]);
+      cloudDb.syncEntityDoc('payments', currentCompanyId, billPayRec).catch(console.warn);
+
+      try {
+        const billJv = generateJournalEntryForPayment(billPayRec);
+        setJournalEntries(prev => [billJv, ...prev]);
+        cloudDb.syncEntityDoc('journalEntries', currentCompanyId, billJv).catch(console.warn);
+      } catch (e) {
+        console.warn('Error auto-creating journal entry for purchase bill payment:', e);
+      }
+    }
+
+    // Auto-post double-entry Journal Voucher for Purchase Bill
+    try {
+      const billJv = generateJournalEntryForPurchaseBill(newBill);
+      setJournalEntries(prev => [billJv, ...prev.filter(j => j.reference !== `BILL:${newBill.id}`)]);
+      cloudDb.syncEntityDoc('journalEntries', currentCompanyId, billJv).catch(console.warn);
+    } catch (e) {
+      console.warn('Error auto-creating journal entry for purchase bill:', e);
+    }
+
     showToast('success', 'Purchase Bill Logged', `Bill ${newBill.billNumber} recorded.`);
     return newBill;
   };
@@ -4193,6 +4818,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (b.id === id) {
         const updated = { ...b, ...billData };
         cloudDb.syncEntityDoc('purchaseBills', currentCompanyId, updated).catch(console.warn);
+
+        try {
+          const updatedJv = generateJournalEntryForPurchaseBill(updated);
+          setJournalEntries(jvs => [updatedJv, ...jvs.filter(j => j.reference !== `BILL:${id}`)]);
+          cloudDb.syncEntityDoc('journalEntries', currentCompanyId, updatedJv).catch(console.warn);
+        } catch (e) {
+          console.warn('Error updating journal entry for bill:', e);
+        }
+
         return updated;
       }
       return b;
@@ -4253,33 +4887,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // 3. Remove purchase bill record
+    // 3. Remove purchase bill record and linked accounting entries
     setPurchaseBills(prev => prev.filter(b => b.id !== id));
     cloudDb.deleteEntityDoc('purchaseBills', currentCompanyId, id).catch(console.warn);
+    setJournalEntries(prev => prev.filter(j => j.reference !== `BILL:${id}` && j.reference !== `PAYMENT:pay-rec-pb-${id}`));
+    cloudDb.deleteEntityDoc('journalEntries', currentCompanyId, `je-bill-${id}`).catch(console.warn);
     showToast('info', 'Purchase Bill Removed', `Bill ${target.billNumber || ''} deleted. Stock and payables updated.`);
   };
 
-  const recordPurchasePayment = (id: string, amount: number, method: PaymentMethod) => {
-    setPurchaseBills(prev => prev.map(bill => {
-      if (bill.id === id) {
-        const newPaid = (bill.amountPaid || 0) + amount;
-        const newDue = Math.max(0, bill.grandTotal - newPaid);
-        const newStatus: InvoiceStatus = newDue === 0 ? 'PAID' : 'PARTIALLY_PAID';
+  const recordPurchasePayment = (id: string, amount: number, method: PaymentMethod, notes?: string) => {
+    const targetBill = purchaseBills.find(b => b.id === id);
+    if (!targetBill) return;
 
-        const updated: PurchaseBill = {
-          ...bill,
-          amountPaid: newPaid,
-          amountDue: newDue,
-          status: newStatus,
-          paymentMethod: method
-        };
-
-        cloudDb.syncEntityDoc('purchaseBills', currentCompanyId, updated).catch(console.warn);
-        return updated;
-      }
-      return bill;
-    }));
-    showToast('success', 'Vendor Payment Recorded', `Paid ${business.currencySymbol}${amount}.`);
+    createPayment({
+      voucherNumber: '',
+      type: 'PAYMENT_OUT',
+      date: new Date().toISOString().split('T')[0],
+      partyId: targetBill.vendorId,
+      partyName: targetBill.vendorName,
+      partyType: 'VENDOR',
+      amount,
+      paymentMethod: method,
+      linkedBillId: targetBill.id,
+      linkedBillNumber: targetBill.billNumber,
+      notes: notes || `Payment recorded for Purchase Bill #${targetBill.billNumber}`
+    });
   };
 
   // Payments Ledger
@@ -4395,20 +5027,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    showToast('success', 'Payment Voucher Created', `Voucher ${newPayment.voucherNumber} for ${business.currencySymbol}${newPayment.amount} saved.`);
+    // Auto-create Double-Entry Journal Voucher for this payment/receipt transaction
+    try {
+      const newJournalEntry = generateJournalEntryForPayment(newPayment);
+      setJournalEntries(prev => [newJournalEntry, ...prev.filter(j => j.id !== newJournalEntry.id && j.reference !== `PAYMENT:${newPayment.id}`)]);
+      cloudDb.syncEntityDoc('journalEntries', currentCompanyId, newJournalEntry).catch(console.warn);
+    } catch (jeErr) {
+      console.warn('Error auto-creating journal entry for payment:', jeErr);
+    }
+
+    showToast('success', 'Payment Voucher Created', `Voucher ${newPayment.voucherNumber} for ${business.currencySymbol}${newPayment.amount.toLocaleString('en-IN')} saved & posted to journal.`);
     return newPayment;
   };
 
   const updatePayment = (id: string, updates: Partial<PaymentRecord>) => {
+    let updatedPaymentRef: PaymentRecord | null = null;
     setPayments(prev => prev.map(p => {
       if (p.id === id) {
         const updated = { ...p, ...updates };
+        updatedPaymentRef = updated;
         cloudDb.syncEntityDoc('payments', currentCompanyId, updated).catch(console.warn);
         return updated;
       }
       return p;
     }));
-    showToast('success', 'Payment Updated', 'Payment voucher record updated.');
+
+    if (updatedPaymentRef) {
+      const refreshedPayment = updatedPaymentRef as PaymentRecord;
+      try {
+        const updatedJV = generateJournalEntryForPayment(refreshedPayment);
+        setJournalEntries(prev => {
+          const matchIdx = prev.findIndex(j => j.reference === `PAYMENT:${id}` || j.id === `je-pay-${id}` || j.entryNumber === `JV-${refreshedPayment.voucherNumber}`);
+          if (matchIdx !== -1) {
+            return prev.map((j, idx) => idx === matchIdx ? { ...j, ...updatedJV, id: j.id } : j);
+          }
+          return [updatedJV, ...prev];
+        });
+        cloudDb.syncEntityDoc('journalEntries', currentCompanyId, updatedJV).catch(console.warn);
+      } catch (err) {
+        console.warn('Error updating linked journal entry for payment:', err);
+      }
+    }
+    showToast('success', 'Payment Updated', 'Payment voucher record and auto-posted journal entry updated.');
   };
 
   const deletePayment = (id: string) => {
@@ -4471,10 +5131,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return bill;
         }));
       }
+
+      // Also delete linked auto-created Journal Entry
+      setJournalEntries(prev => prev.filter(j => j.reference !== `PAYMENT:${id}` && j.id !== `je-pay-${id}` && (!target || j.entryNumber !== `JV-${target.voucherNumber}`)));
+      cloudDb.deleteEntityDoc('journalEntries', currentCompanyId, `je-pay-${id}`).catch(console.warn);
     }
     setPayments(prev => prev.filter(p => p.id !== id));
     cloudDb.deleteEntityDoc('payments', currentCompanyId, id).catch(console.warn);
-    showToast('info', 'Payment Deleted', `Voucher ${target?.voucherNumber || ''} removed.`);
+    showToast('info', 'Payment Deleted', `Voucher ${target?.voucherNumber || ''} and its journal entry removed.`);
   };
 
   // Expenses
@@ -4486,6 +5150,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setExpenses(prev => [newExpense, ...prev]);
     cloudDb.syncEntityDoc('expenses', currentCompanyId, newExpense).catch(console.warn);
+
+    try {
+      const expJv = generateJournalEntryForExpense(newExpense);
+      setJournalEntries(prev => [expJv, ...prev]);
+      cloudDb.syncEntityDoc('journalEntries', currentCompanyId, expJv).catch(console.warn);
+    } catch (e) {
+      console.warn('Error auto-creating journal entry for expense:', e);
+    }
+
     showToast('success', 'Expense Recorded', `Logged ${business.currencySymbol}${newExpense.amount} for ${newExpense.category}.`);
     return newExpense;
   };
@@ -4494,6 +5167,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = expenses.find(e => e.id === id);
     setExpenses(prev => prev.filter(e => e.id !== id));
     cloudDb.deleteEntityDoc('expenses', currentCompanyId, id).catch(console.warn);
+    setJournalEntries(prev => prev.filter(j => j.reference !== `EXPENSE:${id}`));
+    cloudDb.deleteEntityDoc('journalEntries', currentCompanyId, `je-exp-${id}`).catch(console.warn);
     showToast('info', 'Expense Removed', `Expense for ${target?.category || ''} deleted.`);
   };
 
@@ -5678,6 +6353,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateAccountHead,
         deleteAccountHead,
         clearAllLedgerData,
+        syncAllTransactionsToAccounting,
         importBankStatementAutoEntries,
         journalEntries,
         createJournalEntry,

@@ -42,8 +42,8 @@ export function AppDropdown<T = string>({
   align = 'left',
   size = 'md'
 }: AppDropdownProps<T>) {
-  const { currentCompany } = useApp();
-  const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
+  const { currentCompany, business } = useApp();
+  const palette = getThemePalette(business?.themeColor || currentCompany?.themeColor || 'indigo');
   
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

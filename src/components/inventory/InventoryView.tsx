@@ -380,9 +380,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
           {can('inventory', 'createProduct') && (
             <button
               onClick={handleOpenCreate}
-              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-full sm:rounded-xl shadow-sm shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
-              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Add Item</span>
             </button>
           )}
@@ -390,20 +390,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
           {/* Barcode Scanner Primary Chip */}
           <button
             onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-indigo-950 bg-gradient-to-r from-cyan-400 to-blue-400 hover:from-cyan-300 hover:to-blue-300 rounded-full sm:rounded-xl shadow-sm shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
             title="Scan barcodes to locate stock, view inventory or add directly to invoice"
           >
-            <Scan className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-950" />
+            <Scan className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Scan Barcode</span>
           </button>
 
           {can('purchases', 'view') && (
             <button
               onClick={() => setActiveTab('purchases')}
-              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 rounded-full sm:rounded-xl transition-all cursor-pointer shadow-2xs whitespace-nowrap shrink-0 active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50 border border-indigo-200/70 dark:border-indigo-800/70 rounded-xl transition-all cursor-pointer shadow-2xs whitespace-nowrap shrink-0 active:scale-95"
               title="Log a supplier purchase bill to automatically add stock"
             >
-              <PackagePlus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" />
+              <PackagePlus className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
               <span>Purchase Bill</span>
             </button>
           )}
@@ -411,10 +411,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
           {/* Custom HSN Directory Chip */}
           <button
             onClick={() => setIsCustomHsnModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 rounded-full sm:rounded-xl shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0 active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0 active:scale-95"
             title="Manage Custom HSN and SAC codes directory"
           >
-            <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" />
+            <Tag className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>HSN Directory {customHsnCodes.length > 0 && `(${customHsnCodes.length})`}</span>
           </button>
 
@@ -422,10 +422,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
           {can('inventory', 'createProduct') && (
             <button
               onClick={() => setIsBulkUploadOpen(true)}
-              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 rounded-full sm:rounded-xl shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0 active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0 active:scale-95"
               title="Bulk upload items from CSV file or Excel spreadsheet"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Import CSV</span>
             </button>
           )}
@@ -433,47 +433,47 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Items in Catalog</span>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{products.length}</div>
+            <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5 font-mono">{products.length}</div>
             <span className="text-[11px] text-slate-400 dark:text-slate-500">
               {products.filter(p => !p.isService).length} Goods • {products.filter(p => p.isService).length} Services
             </span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center">
-            <Layers className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+            <Layers className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Stock Valuation (At Cost)</span>
-            <div className="text-2xl font-bold text-indigo-900 dark:text-indigo-300 mt-1">
+            <div className="text-xl font-bold text-indigo-900 dark:text-indigo-300 mt-0.5 font-mono">
               {formatCurrency(totalInventoryValuation, business.currencySymbol)}
             </div>
             <span className="text-[11px] text-slate-400 dark:text-slate-500">Asset value on balance sheet</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Low Stock Warnings</span>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{lowStockCount}</div>
+            <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 font-mono">{lowStockCount}</div>
             <span className="text-[11px] text-slate-400 dark:text-slate-500">Below threshold alerts</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-4 h-4" />
           </div>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
@@ -482,7 +482,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by product name, SKU, HSN, or scan barcode..."
-              className={`w-full pl-9 ${searchQuery ? 'pr-32' : 'pr-24'} py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20`}
+              className={`w-full pl-9 ${searchQuery ? 'pr-32' : 'pr-24'} py-2 text-xs bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20`}
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
               {searchQuery && (
@@ -497,7 +497,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
               )}
               <button
                 onClick={() => setIsScannerOpen(true)}
-                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-950/80 hover:bg-indigo-200 dark:hover:bg-indigo-900 rounded-lg transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 hover:bg-indigo-100 dark:hover:bg-indigo-900 rounded-lg transition-colors cursor-pointer"
                 title="Open Barcode Scanner"
               >
                 <Scan className="w-3.5 h-3.5" />
@@ -510,7 +510,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none flex-1 sm:flex-none"
+              className="px-3 py-2 text-xs bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none flex-1 sm:flex-none"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat === 'ALL' ? 'All Categories' : cat}</option>
@@ -521,8 +521,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
               onClick={() => setShowLowStockOnly(!showLowStockOnly)}
               className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer whitespace-nowrap ${
                 showLowStockOnly
-                  ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  ? 'bg-amber-50/90 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300'
+                  : 'bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
               ⚠️ Low Stock ({lowStockCount})
@@ -544,7 +544,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-all shrink-0 cursor-pointer ${
               selectedCategory === 'ALL' && !showLowStockOnly && itemTypeFilter === 'ALL'
                 ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                : 'bg-slate-50/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
             }`}
           >
             <span>All Items</span>
@@ -561,7 +561,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
           <button
             type="button"
             onClick={() => setShowLowStockOnly(prev => !prev)}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border transition-all shrink-0 cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-all shrink-0 cursor-pointer ${
               showLowStockOnly
                 ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
                 : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/70 hover:bg-amber-100 dark:hover:bg-amber-900/50'
@@ -585,7 +585,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-all shrink-0 cursor-pointer ${
               itemTypeFilter === 'GOODS'
                 ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                : 'bg-slate-50/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
             }`}
           >
             <Boxes className="w-3 h-3 text-indigo-500" />
@@ -606,7 +606,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-all shrink-0 cursor-pointer ${
               itemTypeFilter === 'SERVICES'
                 ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                : 'bg-slate-50/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
             }`}
           >
             <span>Services</span>
@@ -628,7 +628,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
               className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                 selectedCategory === cat
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                  : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  : 'bg-slate-50/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
               {cat}

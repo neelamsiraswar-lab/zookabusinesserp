@@ -24,8 +24,8 @@ export const Pagination: React.FC<PaginationProps> = ({
   itemLabel = 'items',
   className = ''
 }) => {
-  const { currentCompany } = useApp();
-  const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
+  const { currentCompany, business } = useApp();
+  const palette = getThemePalette(business?.themeColor || currentCompany?.themeColor || 'indigo');
 
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);

@@ -51,7 +51,7 @@ export const MobileNav: React.FC = () => {
   const config = business.bottomNavConfig || DEFAULT_BOTTOM_NAV_CONFIG;
 
   // Auto-match active app theme color
-  const effectiveColor = (config.color && config.color !== 'auto') ? config.color : (currentCompany?.themeColor || 'indigo');
+  const effectiveColor = (config.color && config.color !== 'auto') ? config.color : (business?.themeColor || currentCompany?.themeColor || 'indigo');
   const palette = getThemePalette(effectiveColor);
 
   // Compute low stock count for badges

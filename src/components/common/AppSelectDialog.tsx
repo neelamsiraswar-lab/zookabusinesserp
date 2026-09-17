@@ -44,8 +44,8 @@ export function AppSelectDialog<T = string | number>({
   searchPlaceholder = 'Search options...',
   showSearch = true
 }: AppSelectDialogProps<T>) {
-  const { currentCompany } = useApp();
-  const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
+  const { currentCompany, business } = useApp();
+  const palette = getThemePalette(business?.themeColor || currentCompany?.themeColor || 'indigo');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('ALL');

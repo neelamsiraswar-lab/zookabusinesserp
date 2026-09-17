@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DesktopModal } from '../common/DesktopModal';
 import { useApp } from '../../context/AppContext';
 import { Pagination } from '../common/Pagination';
+import { calculateReceivablesAndPayables } from '../../utils/partyBalances';
 import { 
   BookOpen, 
   Plus, 
@@ -131,6 +132,7 @@ export const AccountingView: React.FC = () => {
     expenses,
     parties,
     payments,
+    syncAllTransactionsToAccounting,
     showToast,
     biometricConfig,
     isBiometricAccountingUnlocked,
@@ -138,6 +140,17 @@ export const AccountingView: React.FC = () => {
     unlockBiometricAccounting,
     promptBiometricVerification
   } = useApp();
+
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+
+  const handleSyncAllTransactions = async () => {
+    setIsSyncingAll(true);
+    try {
+      await syncAllTransactionsToAccounting(true);
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
 
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'debtors_creditors' | 'general_ledger' | 'daybook' | 'trial_balance' | 'pnl' | 'balance_sheet'>('overview');
   
@@ -167,6 +180,7 @@ export const AccountingView: React.FC = () => {
   // Daybook Filters
   const [daybookSearch, setDaybookSearch] = useState('');
   const [daybookAccountFilter, setDaybookAccountFilter] = useState('all');
+  const [daybookTypeFilter, setDaybookTypeFilter] = useState<'all' | 'sales' | 'purchase' | 'receipt' | 'payment' | 'contra' | 'expense' | 'journal'>('all');
 
   // Chart of Accounts Filters
   const [coaSearch, setCoaSearch] = useState('');
@@ -240,6 +254,22 @@ export const AccountingView: React.FC = () => {
           debit: isDr ? p.openingBalance : 0,
           credit: !isDr ? p.openingBalance : 0
         });
+
+        // Mirror opening balance to control head (acc-3 Debtors or acc-8 Creditors)
+        const controlHead = isDr ? 'acc-3' : 'acc-8';
+        if (map[controlHead]) {
+          map[controlHead].push({
+            id: `ctrl-op-${p.id}`,
+            date: '2026-04-01',
+            timestamp: new Date('2026-04-01T00:00:00').getTime(),
+            voucherType: 'OPENING',
+            voucherNumber: 'OP-BAL',
+            particulars: `Opening Balance b/f: ${p.name}`,
+            oppositeAccount: 'Opening Balance Suspense',
+            debit: isDr ? p.openingBalance : 0,
+            credit: !isDr ? p.openingBalance : 0
+          });
+        }
       }
     });
 
@@ -338,8 +368,14 @@ export const AccountingView: React.FC = () => {
         });
       }
 
-      // Customer Payment Receipts
-      if (inv.amountPaid > 0) {
+      // Customer Payment Receipts (Accrual settlement) - post if upfront payment exists and not already covered by a payment record in payments
+      const isAlreadyCoveredInPayments = payments.some(p => 
+        p.linkedInvoiceId === inv.id || 
+        p.id === `pay-rec-inv-${inv.id}` ||
+        (p.partyId === inv.customerId && p.amount === inv.amountPaid && p.date === invDate)
+      );
+
+      if (inv.amountPaid > 0 && !isAlreadyCoveredInPayments) {
         const payAccount = inv.paymentMethod === 'CASH' ? 'acc-1' : 'acc-2';
         const payTimestamp = invTimestamp + 1000;
 
@@ -485,8 +521,14 @@ export const AccountingView: React.FC = () => {
         });
       }
 
-      // Vendor Payments
-      if (bill.amountPaid > 0) {
+      // Vendor Payments - post if upfront payment exists and not already covered by a payment record in payments
+      const isAlreadyCoveredInPayments = payments.some(p => 
+        p.linkedBillId === bill.id || 
+        p.id === `pay-rec-pb-${bill.id}` ||
+        (p.partyId === bill.vendorId && p.amount === bill.amountPaid && p.date === billDate)
+      );
+
+      if (bill.amountPaid > 0 && !isAlreadyCoveredInPayments) {
         const payAccount = bill.paymentMethod === 'CASH' ? 'acc-1' : 'acc-2';
         const payTimestamp = billTimestamp + 2000;
 
@@ -615,31 +657,134 @@ export const AccountingView: React.FC = () => {
       }
     });
 
-    // 5. Post Manual Journal Entries (JVs)
-    journalEntries.forEach(jv => {
-      const jvDateVal = jv.date;
-      const jvTimestamp = new Date(jvDateVal + 'T14:00:00').getTime();
+    // 5. Post Payment Records & Contra Transfers (Customer Receipts, Vendor Payments, Contras)
+    // NOTE: In Ledger, do NOT post or show journal entries to completely prevent duplicity of amount!
+    payments.forEach(p => {
+      const pDate = p.date;
+      const pTimestamp = new Date(pDate + 'T13:00:00').getTime();
+      const payAccount = p.paymentMethod === 'CASH' ? 'acc-1' : (p.bankAccountId || 'acc-2');
 
-      jv.lines.forEach((line, lineIdx) => {
-        if (!map[line.accountId]) {
-          map[line.accountId] = [];
+      if (p.type === 'PAYMENT_IN') {
+        // Dr: Bank / Cash
+        if (map[payAccount]) {
+          map[payAccount].push({
+            id: `pay-rec-dr-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'PAYMENT_RECEIVED',
+            voucherNumber: p.voucherNumber || `RCPT-${p.id.slice(-6)}`,
+            particulars: `Receipt from ${p.partyName} (${p.paymentMethod || 'Bank'}) ${p.notes ? `- ${p.notes}` : ''}`,
+            oppositeAccount: 'Sundry Debtors',
+            debit: p.amount,
+            credit: 0
+          });
         }
 
-        const otherLines = jv.lines.filter((_, i) => i !== lineIdx);
-        const oppAccountName = otherLines.map(l => l.accountName).join(' / ') || 'General Journal Adjustment';
+        // Cr: Sundry Debtors
+        if (map['acc-3']) {
+          map['acc-3'].push({
+            id: `pay-rec-cr-ctrl-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'PAYMENT_RECEIVED',
+            voucherNumber: p.voucherNumber || `RCPT-${p.id.slice(-6)}`,
+            particulars: `Payment received from ${p.partyName}`,
+            oppositeAccount: p.paymentMethod === 'CASH' ? 'Cash in Hand' : 'Bank A/C',
+            debit: 0,
+            credit: p.amount
+          });
+        }
 
-        map[line.accountId].push({
-          id: `jv-${jv.id}-${lineIdx}`,
-          date: jvDateVal,
-          timestamp: jvTimestamp,
-          voucherType: 'JOURNAL_ENTRY',
-          voucherNumber: jv.entryNumber,
-          particulars: `${jv.description} ${jv.reference ? `(Ref: ${jv.reference})` : ''}`,
-          oppositeAccount: oppAccountName,
-          debit: Number(line.debit) || 0,
-          credit: Number(line.credit) || 0
-        });
-      });
+        // Cr: Specific Customer Debtor Sub-Ledger
+        if (p.partyId && map['party-' + p.partyId]) {
+          map['party-' + p.partyId].push({
+            id: `pay-rec-cr-party-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'PAYMENT_RECEIVED',
+            voucherNumber: p.voucherNumber || `RCPT-${p.id.slice(-6)}`,
+            particulars: `Payment received (${p.paymentMethod || 'Bank'}) ${p.notes ? `- ${p.notes}` : ''}`,
+            oppositeAccount: p.paymentMethod === 'CASH' ? 'Cash on Hand' : 'Bank Current A/C',
+            debit: 0,
+            credit: p.amount
+          });
+        }
+      } else if (p.type === 'PAYMENT_OUT') {
+        // Dr: Sundry Creditors
+        if (map['acc-8']) {
+          map['acc-8'].push({
+            id: `pay-out-dr-ctrl-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'VENDOR_PAYMENT',
+            voucherNumber: p.voucherNumber || `PMT-${p.id.slice(-6)}`,
+            particulars: `Payment disbursed to ${p.partyName}`,
+            oppositeAccount: p.paymentMethod === 'CASH' ? 'Cash in Hand' : 'Bank A/C',
+            debit: p.amount,
+            credit: 0
+          });
+        }
+
+        // Dr: Specific Vendor Creditor Sub-Ledger
+        if (p.partyId && map['party-' + p.partyId]) {
+          map['party-' + p.partyId].push({
+            id: `pay-out-dr-party-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'VENDOR_PAYMENT',
+            voucherNumber: p.voucherNumber || `PMT-${p.id.slice(-6)}`,
+            particulars: `Payment disbursed (${p.paymentMethod || 'Bank'}) ${p.notes ? `- ${p.notes}` : ''}`,
+            oppositeAccount: p.paymentMethod === 'CASH' ? 'Cash on Hand' : 'Bank Current A/C',
+            debit: p.amount,
+            credit: 0
+          });
+        }
+
+        // Cr: Bank / Cash
+        if (map[payAccount]) {
+          map[payAccount].push({
+            id: `pay-out-cr-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'VENDOR_PAYMENT',
+            voucherNumber: p.voucherNumber || `PMT-${p.id.slice(-6)}`,
+            particulars: `Disbursed to ${p.partyName} (${p.paymentMethod || 'Bank'}) ${p.notes ? `- ${p.notes}` : ''}`,
+            oppositeAccount: 'Sundry Creditors',
+            debit: 0,
+            credit: p.amount
+          });
+        }
+      } else if (p.type === 'CONTRA_TRANSFER') {
+        const fromAcc = p.fromAccount || (p.paymentMethod === 'CASH' ? 'acc-1' : (p.bankAccountId || 'acc-2'));
+        const toAcc = p.toAccount || (fromAcc === 'acc-1' ? 'acc-2' : 'acc-1');
+
+        if (map[toAcc]) {
+          map[toAcc].push({
+            id: `contra-dr-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'PAYMENT_RECEIVED',
+            voucherNumber: p.voucherNumber || `CONTRA-${p.id.slice(-6)}`,
+            particulars: `Transfer in from ${fromAcc === 'acc-1' ? 'Cash in Hand' : 'Bank'}`,
+            oppositeAccount: fromAcc === 'acc-1' ? 'Cash in Hand' : 'Bank A/C',
+            debit: p.amount,
+            credit: 0
+          });
+        }
+        if (map[fromAcc]) {
+          map[fromAcc].push({
+            id: `contra-cr-${p.id}`,
+            date: pDate,
+            timestamp: pTimestamp,
+            voucherType: 'VENDOR_PAYMENT',
+            voucherNumber: p.voucherNumber || `CONTRA-${p.id.slice(-6)}`,
+            particulars: `Transfer out to ${toAcc === 'acc-1' ? 'Cash in Hand' : 'Bank'}`,
+            oppositeAccount: toAcc === 'acc-1' ? 'Cash in Hand' : 'Bank A/C',
+            debit: 0,
+            credit: p.amount
+          });
+        }
+      }
     });
 
     // 6. Compute Dynamic Balances for each Account Head
@@ -722,7 +867,7 @@ export const AccountingView: React.FC = () => {
         totalCredit: totalTrialCredit
       }
     };
-  }, [baseAccountHeads, invoices, purchaseBills, expenses, journalEntries, parties]);
+  }, [baseAccountHeads, invoices, purchaseBills, expenses, payments, parties]);
 
   // Selected Account for Ledger Statement View (Supports both GL Heads and Party Sub-Ledgers)
   const currentAccount = useMemo((): AccountHead => {
@@ -752,6 +897,9 @@ export const AccountingView: React.FC = () => {
   const currentAccountPostings = useMemo(() => {
     const rawPostings = accountLedgerMap[selectedAccountId] || [];
     return rawPostings.filter(p => {
+      // In Ledger don't show journal entry because duplicity of amount
+      if (p.voucherType === 'JOURNAL_ENTRY') return false;
+
       const matchSearch = ledgerSearch.trim() === '' ||
         p.voucherNumber.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
         p.particulars.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
@@ -799,13 +947,9 @@ export const AccountingView: React.FC = () => {
   const grossProfit = totalSalesRevenue - totalPurchaseCost;
   const netProfit = grossProfit - totalExpensesAmount;
 
-  const totalReceivables = invoices
-    .filter(i => i.status === 'UNPAID' || i.status === 'PARTIALLY_PAID')
-    .reduce((sum, i) => sum + i.amountDue, 0);
-
-  const totalPayables = purchaseBills
-    .filter(b => b.status === 'UNPAID' || b.status === 'PARTIALLY_PAID')
-    .reduce((sum, b) => sum + b.amountDue, 0);
+  const { totalReceivables, totalPayables } = useMemo(() => {
+    return calculateReceivablesAndPayables(parties, invoices, purchaseBills, payments);
+  }, [parties, invoices, purchaseBills, payments]);
 
   const netGstPayable = Math.max(0, totalOutputGst - totalInputGst);
   const excessItcCarriedForward = Math.max(0, totalInputGst - totalOutputGst);
@@ -827,9 +971,26 @@ export const AccountingView: React.FC = () => {
       const matchAccount = daybookAccountFilter === 'all' ||
         entry.lines.some(l => l.accountId === daybookAccountFilter);
 
-      return matchSearch && matchAccount;
+      let matchType = true;
+      const isSales = entry.entryNumber.includes('INV') || (entry.reference?.startsWith('INVOICE:') ?? false) || entry.description.toLowerCase().includes('sales invoice');
+      const isPurchase = entry.entryNumber.includes('BILL') || (entry.reference?.startsWith('BILL:') ?? false) || entry.description.toLowerCase().includes('purchase bill');
+      const isExpense = entry.entryNumber.includes('EXP') || (entry.reference?.startsWith('EXPENSE:') ?? false) || entry.description.toLowerCase().includes('expense voucher');
+      const isReceipt = entry.entryNumber.includes('RCPT') || entry.description.toLowerCase().includes('receipt voucher') || (entry.reference?.startsWith('PAYMENT:') && entry.description.toLowerCase().includes('received'));
+      const isPayment = entry.entryNumber.includes('PMT') || entry.description.toLowerCase().includes('payment voucher') || (entry.reference?.startsWith('PAYMENT:') && entry.description.toLowerCase().includes('disbursed'));
+      const isContra = entry.entryNumber.includes('CONTRA') || entry.description.toLowerCase().includes('contra');
+      const isJournal = !isSales && !isPurchase && !isExpense && !isReceipt && !isPayment && !isContra;
+
+      if (daybookTypeFilter === 'sales') matchType = isSales;
+      else if (daybookTypeFilter === 'purchase') matchType = isPurchase;
+      else if (daybookTypeFilter === 'expense') matchType = isExpense;
+      else if (daybookTypeFilter === 'receipt') matchType = isReceipt;
+      else if (daybookTypeFilter === 'payment') matchType = isPayment;
+      else if (daybookTypeFilter === 'contra') matchType = isContra;
+      else if (daybookTypeFilter === 'journal') matchType = isJournal;
+
+      return matchSearch && matchAccount && matchType;
     });
-  }, [journalEntries, daybookSearch, daybookAccountFilter]);
+  }, [journalEntries, daybookSearch, daybookAccountFilter, daybookTypeFilter]);
 
   // =========================================================================
   // PAGINATION CONTROLS
@@ -876,7 +1037,7 @@ export const AccountingView: React.FC = () => {
 
   useEffect(() => {
     setDaybookPage(1);
-  }, [daybookSearch, daybookAccountFilter]);
+  }, [daybookSearch, daybookAccountFilter, daybookTypeFilter]);
 
   const totalDaybookPages = Math.max(1, Math.ceil(filteredDaybookEntries.length / daybookPageSize));
   useEffect(() => {
@@ -1153,6 +1314,18 @@ export const AccountingView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleSyncAllTransactions}
+            disabled={isSyncingAll}
+            className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 ${
+              isSyncingAll ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
+            title="Synchronize all Sales Invoices, Purchase Bills, Payments & Expenses into double-entry accounting books"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 ${isSyncingAll ? 'animate-spin' : ''}`} />
+            <span>{isSyncingAll ? 'Syncing...' : 'Sync All Transactions'}</span>
+          </button>
+
           {biometricConfig.enabled && biometricConfig.requireForAccounting && isBiometricAccountingUnlocked && (
             <button
               onClick={lockBiometricAccounting}
@@ -1541,8 +1714,8 @@ export const AccountingView: React.FC = () => {
                       Cr
                     </span>
                     <div>
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">Sundry Creditors (Vendors)</h4>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400">{vendorCreditors.length} Vendor Accounts</span>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white">Sundry Creditors (Trade Payables)</h4>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">{vendorCreditors.length} Creditor Accounts</span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1578,7 +1751,7 @@ export const AccountingView: React.FC = () => {
                     </div>
                   ))}
                   {vendorCreditors.length === 0 && (
-                    <div className="text-center py-4 text-xs text-slate-400">No vendor creditors found.</div>
+                    <div className="text-center py-4 text-xs text-slate-400">No creditors found.</div>
                   )}
                 </div>
               </div>
@@ -1724,7 +1897,7 @@ export const AccountingView: React.FC = () => {
                                 className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 cursor-pointer bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md transition-colors"
                               >
                                 <ChevronDown className={`w-3 h-3 transition-transform ${showCreditorsBreakdown ? 'rotate-180' : ''}`} />
-                                <span>{showCreditorsBreakdown ? 'Hide Vendor Creditors' : `Show Individual Creditors (${vendorCreditors.length} Vendors)`}</span>
+                                <span>{showCreditorsBreakdown ? 'Hide Creditor Accounts' : `Show Individual Creditors (${vendorCreditors.length} Accounts)`}</span>
                               </button>
                             )}
                           </td>
@@ -1835,7 +2008,7 @@ export const AccountingView: React.FC = () => {
                           </tr>
                         ))}
 
-                        {/* Expandable Vendor Creditors Sub-Ledger Rows */}
+                        {/* Expandable Creditors Sub-Ledger Rows */}
                         {isCreditorsControl && showCreditorsBreakdown && vendorCreditors.map(vend => (
                           <tr key={'sub-cr-' + vend.id} className="bg-amber-50/40 dark:bg-amber-950/20 text-xs border-l-4 border-l-amber-500">
                             <td className="py-2.5 px-4 font-mono font-bold text-amber-600 dark:text-amber-400 pl-8">
@@ -1845,7 +2018,7 @@ export const AccountingView: React.FC = () => {
                               <div className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                                 <span>{vend.name}</span>
                                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
-                                  Vendor Creditor
+                                  Creditor
                                 </span>
                               </div>
                               {vend.phone && (
@@ -1970,7 +2143,7 @@ export const AccountingView: React.FC = () => {
                   )}
 
                   {vendorCreditors.length > 0 && (
-                    <optgroup label="Vendor Creditors (Trade Payables / Cr Sub-Ledgers)">
+                    <optgroup label="Sundry Creditors (Trade Payables / Cr Sub-Ledgers)">
                       {vendorCreditors.map(vend => (
                         <option key={'party-' + vend.id} value={'party-' + vend.id}>
                           CR-{vend.id.slice(-4).toUpperCase()} - {vend.name} (Creditor) — Bal: {formatINR(Math.abs(vend.currentBalance || 0))} {(vend.currentBalance || 0) <= 0 ? 'Cr' : 'Dr'}
@@ -2229,6 +2402,21 @@ export const AccountingView: React.FC = () => {
               </div>
 
               <select
+                value={daybookTypeFilter}
+                onChange={e => setDaybookTypeFilter(e.target.value as any)}
+                className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl outline-none text-slate-700 dark:text-slate-200 font-medium"
+              >
+                <option value="all">All Vouchers ({journalEntries.length})</option>
+                <option value="sales">Sales Invoices</option>
+                <option value="purchase">Purchase Bills</option>
+                <option value="expense">Expense Vouchers</option>
+                <option value="receipt">Receipt Vouchers (Money In)</option>
+                <option value="payment">Payment Vouchers (Money Out)</option>
+                <option value="contra">Contra Vouchers (Transfers)</option>
+                <option value="journal">General Journal Vouchers (JV)</option>
+              </select>
+
+              <select
                 value={daybookAccountFilter}
                 onChange={e => setDaybookAccountFilter(e.target.value)}
                 className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl outline-none text-slate-700 dark:text-slate-200"
@@ -2240,6 +2428,18 @@ export const AccountingView: React.FC = () => {
                   </option>
                 ))}
               </select>
+
+              <button
+                onClick={handleSyncAllTransactions}
+                disabled={isSyncingAll}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-all cursor-pointer shadow-sm ${
+                  isSyncingAll ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
+                title="Sync all transactions"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 ${isSyncingAll ? 'animate-spin' : ''}`} />
+                <span>{isSyncingAll ? 'Syncing...' : 'Sync All'}</span>
+              </button>
 
               <button
                 onClick={handleOpenNewJv}
@@ -2261,6 +2461,35 @@ export const AccountingView: React.FC = () => {
                       <span className="px-2.5 py-1 text-xs font-mono font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-100 dark:border-indigo-800">
                         {entry.entryNumber}
                       </span>
+                      {entry.entryNumber.includes('INV') || entry.reference?.startsWith('INVOICE:') ? (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          SALES
+                        </span>
+                      ) : entry.entryNumber.includes('BILL') || entry.reference?.startsWith('BILL:') ? (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                          PURCHASE
+                        </span>
+                      ) : entry.entryNumber.includes('EXP') || entry.reference?.startsWith('EXPENSE:') ? (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+                          EXPENSE
+                        </span>
+                      ) : entry.entryNumber.includes('RCPT') || entry.description.toLowerCase().includes('receipt') ? (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          RECEIPT
+                        </span>
+                      ) : entry.entryNumber.includes('PMT') || entry.description.toLowerCase().includes('disbursed') || entry.description.toLowerCase().includes('payment voucher') ? (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                          PAYMENT
+                        </span>
+                      ) : entry.entryNumber.includes('CONTRA') || entry.description.toLowerCase().includes('contra') ? (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          CONTRA
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          JOURNAL
+                        </span>
+                      )}
                       <span className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {entry.date}

@@ -39,6 +39,8 @@ import {
 } from 'lucide-react';
 import { ShareInvoiceModal } from '../invoices/ShareInvoiceModal';
 import { MonthlyReportCard } from './MonthlyReportCard';
+import { ReceivablesAuditModal } from './ReceivablesAuditModal';
+import { calculateReceivablesAndPayables } from '../../utils/partyBalances';
 import { 
   normalizeLowStockSettings, 
   getProductStockThreshold, 
@@ -61,6 +63,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
     products, 
     parties, 
     expenses, 
+    payments,
     business, 
     updateBusiness,
     showToast,
@@ -69,6 +72,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
   } = useApp();
 
   const [shareModalInvoice, setShareModalInvoice] = useState<any | null>(null);
+  const [isReceivablesModalOpen, setIsReceivablesModalOpen] = useState(false);
 
   // Dynamic Today Date String
   const getTodayDateString = () => {
@@ -141,12 +145,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
   const totalPurchases = purchaseBills
     .reduce((sum, bill) => sum + bill.grandTotal, 0);
 
-  const totalReceivables = invoices
-    .filter(i => i.status !== 'CANCELLED')
-    .reduce((sum, inv) => sum + (inv.amountDue || 0), 0);
-
-  const totalPayables = purchaseBills
-    .reduce((sum, bill) => sum + (bill.amountDue || 0), 0);
+  const { totalReceivables, totalPayables, partyBalancesList } = useMemo(() => {
+    return calculateReceivablesAndPayables(parties, invoices, purchaseBills, payments);
+  }, [parties, invoices, purchaseBills, payments]);
 
   const totalOutputGst = invoices
     .filter(i => i.status !== 'CANCELLED')
@@ -192,71 +193,58 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Welcome & Quick Actions with Rotating Conic-Gradient Border */}
-      <div className="relative rounded-2xl p-[2px] overflow-hidden shadow-2xl">
-        {/* Ambient Outer Conic Glow */}
-        <div 
-          className="absolute top-1/2 left-1/2 w-[350%] aspect-square animate-rotate-conic pointer-events-none opacity-40 blur-xl will-change-transform"
-          style={{
-            background: 'conic-gradient(from 0deg, #6366f1 0deg, #a855f7 72deg, #ec4899 144deg, #06b6d4 216deg, #10b981 288deg, #6366f1 360deg)'
-          }}
-        />
-
-        {/* Sharp Rotating Conic-Gradient Border */}
-        <div 
-          className="absolute top-1/2 left-1/2 w-[350%] aspect-square animate-rotate-conic pointer-events-none will-change-transform"
-          style={{
-            background: 'conic-gradient(from 0deg, #6366f1 0deg, #a855f7 72deg, #ec4899 144deg, #06b6d4 216deg, #10b981 288deg, #6366f1 360deg)'
-          }}
-        />
-
-        {/* Inner Card Body */}
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-[calc(1rem-2px)] bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white backdrop-blur-xl">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl md:text-2xl font-black tracking-tight">
-                Good day, {business.tradeName || business.name} 👋
-              </h1>
-            </div>
-            <p className="text-xs md:text-sm text-slate-300">
-              GSTIN: <span className="font-mono font-semibold text-cyan-300">{business.gstin}</span> • State Code: {business.stateCode} ({business.state})
-            </p>
+      {/* Top Banner / Welcome & Quick Actions - Modern Minimalist Hero Card */}
+      <div className="relative rounded-2xl p-5 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 text-white border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white">
+              Good day, {business.tradeName || business.name}
+            </h1>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => setActiveTab('pos_billing')}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl backdrop-blur transition-all active:scale-95 cursor-pointer"
-            >
-              <ShoppingCart className="w-4 h-4 text-cyan-400" />
-              <span>POS Counter Sale</span>
-            </button>
-
-            <button
-              onClick={onOpenNewInvoice}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/30 transition-all active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Tax Invoice</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-200 border border-slate-700/60 font-mono font-medium">
+              GSTIN: {business.gstin}
+            </span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-300">
+              State Code: {business.stateCode} ({business.state})
+            </span>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setActiveTab('pos_billing')}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-800/90 hover:bg-slate-750 text-slate-200 border border-slate-700/80 rounded-xl transition-all active:scale-95 cursor-pointer shadow-xs"
+          >
+            <ShoppingCart className="w-4 h-4 text-slate-300" />
+            <span>POS Counter Sale</span>
+          </button>
+
+          <button
+            onClick={onOpenNewInvoice}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Tax Invoice</span>
+          </button>
         </div>
       </div>
 
       {/* ------------------------------------------------------------- */}
       {/* DAILY SALE & PURCHASE CONTROL & HIGHLIGHT HUB                 */}
       {/* ------------------------------------------------------------- */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
         {/* Header & Date Switcher Bar */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 dark:from-slate-850 via-indigo-50/40 dark:via-indigo-950/20 to-slate-50 dark:to-slate-850 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 bg-slate-50/60 dark:bg-slate-850/50 border-b border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-indigo-600 dark:bg-indigo-500 text-white shadow-xs">
+              <span className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
                 <Calendar className="w-4 h-4" />
               </span>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Daily Sale & Purchase Tracker</h2>
               {selectedDay === getTodayDateString() && (
-                <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded-full">
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
                   Today
                 </span>
               )}
@@ -268,7 +256,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
 
           {/* Interactive Day Date Selector */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl shadow-xs p-1">
+            <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs p-0.5">
               <button
                 type="button"
                 onClick={() => shiftDate(-1)}
@@ -282,7 +270,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
                 type="date"
                 value={selectedDay}
                 onChange={(e) => setSelectedDay(e.target.value)}
-                className="px-2 py-1 text-xs font-bold text-slate-800 dark:text-slate-200 bg-transparent outline-none cursor-pointer"
+                className="px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 bg-transparent outline-none cursor-pointer"
               />
 
               <button
@@ -300,8 +288,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
               onClick={() => setSelectedDay(getTodayDateString())}
               className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                 selectedDay === getTodayDateString()
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs font-bold'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
+                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-2xs font-bold'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
               }`}
             >
               Today
@@ -312,96 +300,98 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
         {/* Daily Top 3 Metric Cards for Selected Date */}
         <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Daily Sale Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/70 dark:from-emerald-950/40 via-white dark:via-slate-900 to-emerald-50/30 dark:to-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/60 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shadow-xs">
-                  <ArrowUpRight className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <ArrowUpRight className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Daily Sales</span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">{formatDate(selectedDay)}</p>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Daily Sales</span>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">{formatDate(selectedDay)}</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-xs font-bold font-mono bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded-lg">
+              <span className="px-2 py-0.5 text-xs font-semibold font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-md border border-emerald-200/60 dark:border-emerald-800/50">
                 {dayInvoices.length} {dayInvoices.length === 1 ? 'sale' : 'sales'}
               </span>
             </div>
 
             <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-950 dark:text-emerald-200 font-mono">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                 {formatCurrency(dailySaleTotal, business.currencySymbol)}
               </div>
-              <div className="mt-2 pt-2 border-t border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-                <span>Taxable: <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(dailySaleTaxable, business.currencySymbol)}</strong></span>
-                <span>GST: <strong className="text-emerald-700 dark:text-emerald-400 font-mono">{formatCurrency(dailySaleTax, business.currencySymbol)}</strong></span>
+              <div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>Taxable: <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formatCurrency(dailySaleTaxable, business.currencySymbol)}</strong></span>
+                <span>GST: <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">{formatCurrency(dailySaleTax, business.currencySymbol)}</strong></span>
               </div>
             </div>
           </div>
 
           {/* Daily Purchase Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-50/70 dark:from-rose-950/40 via-white dark:via-slate-900 to-rose-50/30 dark:to-rose-950/20 border border-rose-200/80 dark:border-rose-900/60 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 flex items-center justify-center shadow-xs">
-                  <ArrowDownLeft className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                  <ArrowDownLeft className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300">Daily Purchases</span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">{formatDate(selectedDay)}</p>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Daily Purchases</span>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">{formatDate(selectedDay)}</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-xs font-bold font-mono bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 rounded-lg">
+              <span className="px-2 py-0.5 text-xs font-semibold font-mono bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded-md border border-rose-200/60 dark:border-rose-800/50">
                 {dayPurchases.length} {dayPurchases.length === 1 ? 'bill' : 'bills'}
               </span>
             </div>
 
             <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-rose-950 dark:text-rose-200 font-mono">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                 {formatCurrency(dailyPurchaseTotal, business.currencySymbol)}
               </div>
-              <div className="mt-2 pt-2 border-t border-rose-100 dark:border-rose-900/40 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-                <span>Taxable: <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(dailyPurchaseTaxable, business.currencySymbol)}</strong></span>
-                <span>ITC Credit: <strong className="text-rose-700 dark:text-rose-400 font-mono">{formatCurrency(dailyPurchaseItc, business.currencySymbol)}</strong></span>
+              <div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>Taxable: <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formatCurrency(dailyPurchaseTaxable, business.currencySymbol)}</strong></span>
+                <span>ITC: <strong className="text-rose-600 dark:text-rose-400 font-mono font-medium">{formatCurrency(dailyPurchaseItc, business.currencySymbol)}</strong></span>
               </div>
             </div>
           </div>
 
           {/* Daily Net Cash Flow / Spread Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/70 dark:from-indigo-950/40 via-white dark:via-slate-900 to-cyan-50/30 dark:to-cyan-950/20 border border-indigo-200/80 dark:border-indigo-900/60 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 flex items-center justify-center shadow-xs">
-                  <TrendingUp className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200">Daily Net Spread</span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Sales minus Purchases</p>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Daily Net Spread</span>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Sales minus Purchases</p>
                 </div>
               </div>
-              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${
-                dailyNetSpread >= 0 ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300'
+              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md border ${
+                dailyNetSpread >= 0 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/50' 
+                  : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/50'
               }`}>
                 {dailyNetSpread >= 0 ? 'Net Surplus' : 'Net Outflow'}
               </span>
             </div>
 
             <div className="mt-3">
-              <div className={`text-2xl sm:text-3xl font-black font-mono ${
-                dailyNetSpread >= 0 ? 'text-indigo-950 dark:text-indigo-200' : 'text-rose-700 dark:text-rose-300'
+              <div className={`text-2xl font-bold font-mono ${
+                dailyNetSpread >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'
               }`}>
                 {dailyNetSpread >= 0 ? '+' : ''}{formatCurrency(dailyNetSpread, business.currencySymbol)}
               </div>
-              <div className="mt-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+              <div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                 <button
                   onClick={() => setActiveTab('gst_returns')}
-                  className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <span>View GST Registers</span>
+                  <span>GST Registers</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {dayInvoices.length + dayPurchases.length} total entries
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                  {dayInvoices.length + dayPurchases.length} entries
                 </span>
               </div>
             </div>
@@ -463,23 +453,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
         </div>
 
         {/* Receivables (Debtors) */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => setIsReceivablesModalOpen(true)}
+          className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer group"
+          title="Click to audit receivables, view unpaid invoices & reconcile customer accounts"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Accounts Receivable</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+              Accounts Receivable
+            </span>
+            <div className={`w-8 h-8 rounded-xl ${totalReceivables <= 0.01 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'} flex items-center justify-center`}>
+              {totalReceivables <= 0.01 ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold text-amber-900 dark:text-amber-300">
+          <div className={`mt-2 text-2xl font-bold font-mono ${totalReceivables <= 0.01 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-900 dark:text-amber-300'}`}>
             {formatCurrency(totalReceivables, business.currencySymbol)}
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>Pending from customers</span>
+            <span>{totalReceivables <= 0.01 ? 'All collections cleared (0 due)' : 'Pending from customers'}</span>
             <button
-              onClick={() => setActiveTab('parties')}
-              className="text-amber-700 dark:text-amber-400 font-medium hover:underline cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsReceivablesModalOpen(true);
+              }}
+              className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
             >
-              View Debtors
+              <span>{totalReceivables <= 0.01 ? 'Audit & Verify' : 'Audit & Settle'}</span>
+              <ArrowUpRight className="w-3 h-3" />
             </button>
           </div>
         </div>
@@ -496,7 +496,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
             {formatCurrency(totalPayables, business.currencySymbol)}
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>Due to suppliers</span>
+            <span>Due to Creditors (Payables)</span>
             <button
               onClick={() => setActiveTab('purchases')}
               className="text-rose-700 dark:text-rose-400 font-medium hover:underline cursor-pointer"
@@ -512,39 +512,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
       {/* ------------------------------------------------------------- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Parties & Client Accounts Hub Card */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white shadow-md flex flex-col justify-between">
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-indigo-500/20 text-cyan-300 border border-indigo-400/20">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm">Parties & Client Accounts</h3>
-                  <p className="text-[11px] text-slate-300">Customer & Vendor Ledger Balances</p>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Parties & Client Accounts</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Customer & Creditor Ledger Balances</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-cyan-500/20 text-cyan-300 rounded-full border border-cyan-500/30">
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full border border-slate-200 dark:border-slate-700">
                 {parties.length} Contacts
               </span>
             </div>
 
             <div className="space-y-2 mt-4 text-xs">
-              <div className="flex justify-between items-center py-1.5 border-b border-white/10">
-                <span className="text-slate-300">Total Receivables (Debtors):</span>
-                <span className="font-bold text-emerald-400 font-mono">
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Total Receivables (Debtors):</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
                   {formatCurrency(totalReceivables, business.currencySymbol)}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-1.5 border-b border-white/10">
-                <span className="text-slate-300">Total Payables (Vendors):</span>
-                <span className="font-bold text-rose-300 font-mono">
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Total Payables (Creditors):</span>
+                <span className="font-semibold text-rose-600 dark:text-rose-400 font-mono">
                   {formatCurrency(totalPayables, business.currencySymbol)}
                 </span>
               </div>
               <div className="flex justify-between items-center py-1.5">
-                <span className="text-slate-300">Registered GSTIN Parties:</span>
-                <span className="font-bold text-cyan-300">
+                <span className="text-slate-500 dark:text-slate-400">Registered GSTIN Parties:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
                   {parties.filter(p => p.gstin).length} Verified
                 </span>
               </div>
@@ -553,7 +553,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
 
           <button
             onClick={() => setActiveTab('parties')}
-            className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-lg transition-transform active:scale-95 cursor-pointer"
+            className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white text-white dark:text-slate-900 font-semibold text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
           >
             <span>View Parties & Statements</span>
             <ArrowUpRight className="w-4 h-4" />
@@ -818,6 +818,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenNewInvoice, 
           updateBusiness({ dispatchSettings: newSettings }, true);
         }}
         showToast={showToast}
+      />
+
+      {/* Receivables & Debtors Audit / Settlement Modal */}
+      <ReceivablesAuditModal
+        isOpen={isReceivablesModalOpen}
+        onClose={() => setIsReceivablesModalOpen(false)}
+        partyBalancesList={partyBalancesList}
+        totalReceivables={totalReceivables}
       />
     </div>
   );

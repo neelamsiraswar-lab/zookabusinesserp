@@ -465,7 +465,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto modal-overlay">
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-[98vw] md:max-w-4xl lg:max-w-5xl my-auto flex flex-col max-h-[96dvh] sm:max-h-[92dvh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-[98vw] md:max-w-4xl lg:max-w-5xl my-auto flex flex-col max-h-[96dvh] sm:max-h-[92dvh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Modal Header */}
         <div className="px-4 py-3.5 sm:px-6 sm:py-4.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
@@ -495,33 +495,33 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         </div>
 
         {/* Stepper / Progress indicator */}
-        <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+        <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
           <div className="flex items-center gap-6">
             <button
               onClick={() => setActiveStep('UPLOAD')}
               className={`flex items-center gap-2 font-semibold cursor-pointer ${
-                activeStep === 'UPLOAD' ? 'text-indigo-600 font-bold' : 'text-slate-500'
+                activeStep === 'UPLOAD' ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-500 dark:text-slate-400'
               }`}
             >
               <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] ${
-                activeStep === 'UPLOAD' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+                activeStep === 'UPLOAD' ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
               }`}>
                 1
               </span>
               <span>Upload CSV File</span>
             </button>
 
-            <span className="text-slate-300">→</span>
+            <span className="text-slate-300 dark:text-slate-600">→</span>
 
             <button
               onClick={() => parsedRows.length > 0 && setActiveStep('PREVIEW')}
               disabled={parsedRows.length === 0}
               className={`flex items-center gap-2 font-semibold cursor-pointer ${
-                activeStep === 'PREVIEW' ? 'text-indigo-600 font-bold' : 'text-slate-500 disabled:opacity-50'
+                activeStep === 'PREVIEW' ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-500 dark:text-slate-400 disabled:opacity-50'
               }`}
             >
               <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] ${
-                activeStep === 'PREVIEW' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+                activeStep === 'PREVIEW' ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
               }`}>
                 2
               </span>
@@ -531,7 +531,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
 
           <button
             onClick={handleDownloadSampleTemplate}
-            className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-bold hover:underline cursor-pointer"
+            className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold hover:underline cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download Sample CSV Template</span>
@@ -548,7 +548,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/30 hover:bg-indigo-50/60 rounded-2xl p-8 sm:p-12 text-center transition-all cursor-pointer group"
+                className="border-2 border-dashed border-indigo-200 dark:border-indigo-800 hover:border-indigo-500 dark:hover:border-indigo-400 bg-indigo-50/30 dark:bg-indigo-950/20 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/40 rounded-2xl p-8 sm:p-12 text-center transition-all cursor-pointer group"
               >
                 <input
                   ref={fileInputRef}
@@ -558,49 +558,49 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                   className="hidden"
                 />
 
-                <div className="w-16 h-16 rounded-2xl bg-indigo-100 text-indigo-600 group-hover:scale-110 flex items-center justify-center mx-auto mb-4 transition-transform shadow-xs">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 flex items-center justify-center mx-auto mb-4 transition-transform shadow-xs">
                   <Upload className="w-8 h-8" />
                 </div>
 
-                <h3 className="text-base font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                   Click to select CSV or drag & drop file here
                 </h3>
-                <p className="text-xs text-slate-500 mt-1.5 max-w-md mx-auto">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-md mx-auto">
                   Supports comma-separated values (.csv) with product names, SKU, Barcode, HSN, rates, GST %, and opening quantities.
                 </p>
 
-                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-xs font-semibold text-slate-700">
+                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs text-xs font-semibold text-slate-700 dark:text-slate-200">
                   <Sparkles className="w-4 h-4 text-amber-500" />
                   <span>Smart auto-mapping for missing columns & GST slabs</span>
                 </div>
               </div>
 
               {/* Template Guidelines Card */}
-              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <HelpCircle className="w-4 h-4 text-indigo-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                     <span>CSV Format & Columns Reference</span>
                   </h4>
-                  <span className="text-[11px] text-slate-500 font-medium">* Only Product Name is strictly required</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">* Only Product Name is strictly required</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="font-bold text-slate-800 block">Product Name *</span>
-                    <span className="text-[10px] text-slate-500">e.g. Dell Monitor 27"</span>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <span className="font-bold text-slate-800 dark:text-slate-100 block">Product Name *</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">e.g. Dell Monitor 27"</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="font-bold text-slate-800 block">HSN Code</span>
-                    <span className="text-[10px] text-slate-500">e.g. 8471, 8528</span>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <span className="font-bold text-slate-800 dark:text-slate-100 block">HSN Code</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">e.g. 8471, 8528</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="font-bold text-slate-800 block">GST Rate (%)</span>
-                    <span className="text-[10px] text-slate-500">0, 5, 12, 18, or 28</span>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <span className="font-bold text-slate-800 dark:text-slate-100 block">GST Rate (%)</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">0, 5, 12, 18, or 28</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="font-bold text-slate-800 block">Unit of Measure</span>
-                    <span className="text-[10px] text-slate-500">PCS, KGS, BOX, NOS</span>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <span className="font-bold text-slate-800 dark:text-slate-100 block">Unit of Measure</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">PCS, KGS, BOX, NOS</span>
                   </div>
                 </div>
 
@@ -608,7 +608,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                   <button
                     type="button"
                     onClick={handleDownloadSampleTemplate}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download Pre-filled Excel/CSV Template</span>
@@ -623,37 +623,37 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
             <div className="space-y-4">
               {/* Summary KPIs & Options Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Parsed Rows</span>
-                  <div className="text-xl font-bold text-slate-900 mt-0.5">{parsedRows.length}</div>
+                  <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{parsedRows.length}</div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Valid to Import</span>
-                  <div className="text-xl font-bold text-emerald-900 mt-0.5">{validRowsCount} items</div>
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Valid to Import</span>
+                  <div className="text-xl font-bold text-emerald-900 dark:text-emerald-200 mt-0.5">{validRowsCount} items</div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Auto-Adjusted</span>
-                  <div className="text-xl font-bold text-amber-900 mt-0.5">{warningRowsCount} items</div>
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Auto-Adjusted</span>
+                  <div className="text-xl font-bold text-amber-900 dark:text-amber-200 mt-0.5">{warningRowsCount} items</div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Opening Stock Value</span>
-                  <div className="text-xl font-bold text-indigo-950 mt-0.5 font-mono">
+                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Opening Stock Value</span>
+                  <div className="text-xl font-bold text-indigo-950 dark:text-indigo-200 mt-0.5 font-mono">
                     {formatCurrency(totalStockValuation, currencySymbol)}
                   </div>
                 </div>
               </div>
 
               {/* Filters & Options Row */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 text-xs">
+                  <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1 text-xs">
                     <button
                       onClick={() => setFilterStatus('ALL')}
                       className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
-                        filterStatus === 'ALL' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                        filterStatus === 'ALL' ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       All ({parsedRows.length})
@@ -661,7 +661,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                     <button
                       onClick={() => setFilterStatus('VALID')}
                       className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
-                        filterStatus === 'VALID' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                        filterStatus === 'VALID' ? 'bg-emerald-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       Valid
@@ -669,7 +669,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                     <button
                       onClick={() => setFilterStatus('WARNING')}
                       className={`px-2.5 py-1 rounded font-semibold transition-colors cursor-pointer ${
-                        filterStatus === 'WARNING' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                        filterStatus === 'WARNING' ? 'bg-amber-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       Warnings ({warningRowsCount})
@@ -691,12 +691,12 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search in preview..."
-                    className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none text-slate-800 placeholder-slate-400"
+                    className="px-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400"
                   />
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={updateExisting}
@@ -708,7 +708,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
 
                   <button
                     onClick={handleReset}
-                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
                     title="Clear file and upload again"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -717,9 +717,9 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
               </div>
 
               {/* Data Preview Table */}
-              <div className="border border-slate-200 rounded-xl overflow-x-auto max-h-96">
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto max-h-96">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="sticky top-0 bg-slate-100 text-slate-600 font-bold border-b border-slate-200 z-10">
+                  <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700 z-10">
                     <tr>
                       <th className="py-2.5 px-3">#</th>
                       <th className="py-2.5 px-3">Status</th>
@@ -741,24 +741,24 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                       <th className="py-2.5 px-3 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                     {displayRows.map((row) => (
                       <tr 
                         key={row.index} 
-                        className={`hover:bg-slate-50/80 transition-colors ${
-                          row.status === 'ERROR' ? 'bg-rose-50/40' : row.status === 'WARNING' ? 'bg-amber-50/20' : ''
+                        className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors ${
+                          row.status === 'ERROR' ? 'bg-rose-50/40 dark:bg-rose-950/20' : row.status === 'WARNING' ? 'bg-amber-50/20 dark:bg-amber-950/20' : ''
                         }`}
                       >
                         <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">{row.index}</td>
                         <td className="py-2.5 px-3">
                           {row.status === 'VALID' && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
                               <Check className="w-3 h-3" /> Valid
                             </span>
                           )}
                           {row.status === 'WARNING' && (
                             <span 
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 cursor-help"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 cursor-help"
                               title={row.messages.join('\n')}
                             >
                               <AlertTriangle className="w-3 h-3" /> Adjusted
@@ -766,47 +766,47 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                           )}
                           {row.status === 'ERROR' && (
                             <span 
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 cursor-help"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 cursor-help"
                               title={row.messages.join('\n')}
                             >
                               <X className="w-3 h-3" /> Error
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 font-semibold text-slate-900">
+                        <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-slate-100">
                           <div>{row.name || <span className="text-rose-500 italic">Missing Name</span>}</div>
                           {row.description && (
                             <div className="text-[10px] text-slate-400 line-clamp-1">{row.description}</div>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">{row.sku}</td>
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">{row.hsnCode}</td>
-                        <td className="py-2.5 px-3 text-slate-700">{row.category}</td>
-                        <td className="py-2.5 px-3 text-slate-600 uppercase font-mono text-[11px]">{row.unit}</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-slate-700">
-                          <div className="font-semibold text-slate-900">
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400">{row.sku}</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400">{row.hsnCode}</td>
+                        <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300">{row.category}</td>
+                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 uppercase font-mono text-[11px]">{row.unit}</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">
+                          <div className="font-semibold text-slate-900 dark:text-white">
                             {formatCurrency(row.purchasePrice * (1 + (row.gstRate || 0) / 100), currencySymbol)}
                           </div>
                           <div className="text-[10px] text-slate-400">
                             Base: {formatCurrency(row.purchasePrice, currencySymbol)}
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
                           {formatCurrency(row.sellingPrice, currencySymbol)}
                         </td>
                         <td className="py-2.5 px-3 text-center">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 font-mono">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
                             {row.gstRate}%
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700">
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700 dark:text-indigo-400">
                           {row.isService ? 'Service' : `${row.currentStock} ${row.unit}`}
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
                             onClick={() => handleDeleteRow(row.index)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition-colors"
+                            className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded cursor-pointer transition-colors"
                             title="Exclude this item from import"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -822,12 +822,12 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-          <div className="text-xs text-slate-500">
+        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
             {activeStep === 'PREVIEW' ? (
               <span>
-                File: <strong className="text-slate-800">{fileName}</strong> • Ready to import{' '}
-                <strong className="text-emerald-700">{validRowsCount}</strong> items
+                File: <strong className="text-slate-800 dark:text-slate-200">{fileName}</strong> • Ready to import{' '}
+                <strong className="text-emerald-700 dark:text-emerald-400">{validRowsCount}</strong> items
               </span>
             ) : (
               <span>Fast CSV bulk loader for product catalogs, rates & opening stock</span>
@@ -838,7 +838,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
             >
               Cancel
             </button>

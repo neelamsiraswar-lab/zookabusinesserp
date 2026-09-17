@@ -36,6 +36,7 @@ import { BankStatementImportModal } from '../accounting/BankStatementImportModal
 import { AutoUpdateVoucherNumbersModal } from './AutoUpdateVoucherNumbersModal';
 import { DesktopModal } from '../common/DesktopModal';
 import { getNextAvailableVoucherNumber } from '../../utils/voucherNumberUtils';
+import { calculateReceivablesAndPayables } from '../../utils/partyBalances';
 
 export const PaymentsView: React.FC = () => {
   const { 
@@ -50,11 +51,27 @@ export const PaymentsView: React.FC = () => {
     business 
   } = useApp();
 
+  // Calculate Unified Receivables & Payables (incorporating Opening Balances, Bills, Invoices & Standalone Payments)
+  const { 
+    totalReceivables, 
+    totalPayables, 
+    partyBalances, 
+    partyBalancesList,
+    totalDebtorsCount,
+    totalCreditorsCount 
+  } = useMemo(() => {
+    return calculateReceivablesAndPayables(parties, invoices, purchaseBills, payments);
+  }, [parties, invoices, purchaseBills, payments]);
+
   // Active Tab Filter
   const [activeTab, setActiveTab] = useState<'ALL' | 'PAYMENT_IN' | 'PAYMENT_OUT' | 'CONTRA_TRANSFER' | 'PENDING_RECEIVABLES' | 'PENDING_PAYABLES'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterMethod, setFilterMethod] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH'>('ALL');
+
+  // Sub-view filters for pending tabs
+  const [payablesViewMode, setPayablesViewMode] = useState<'BILLS' | 'CREDITORS'>('BILLS');
+  const [receivablesViewMode, setReceivablesViewMode] = useState<'INVOICES' | 'DEBTORS'>('INVOICES');
 
   // Modals state
   const [isRecordModalOpen, setIsRecordModalOpen] = useState<boolean>(false);
@@ -72,20 +89,76 @@ export const PaymentsView: React.FC = () => {
       .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime());
   }, [invoices]);
 
-  const totalPendingReceivables = useMemo(() => {
+  const totalPendingInvoicesDue = useMemo(() => {
     return pendingInvoices.reduce((sum, i) => sum + (i.amountDue !== undefined ? i.amountDue : i.grandTotal), 0);
   }, [pendingInvoices]);
 
-  // Pending Purchase Bills (Payables to Vendors)
+  // Pending Purchase Bills (Payables to Creditors)
   const pendingBills = useMemo(() => {
     return purchaseBills
-      .filter(b => (b.amountDue > 0 || (b.status !== 'PAID' && (b.amountDue === undefined || b.amountDue > 0))))
+      .filter(b => (b.status as string) !== 'CANCELLED' && (b.amountDue > 0 || (b.status !== 'PAID' && (b.amountDue === undefined || b.amountDue > 0))))
       .sort((a, b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime());
   }, [purchaseBills]);
 
-  const totalPendingPayables = useMemo(() => {
+  const totalPendingBillsDue = useMemo(() => {
     return pendingBills.reduce((sum, b) => sum + (b.amountDue !== undefined ? b.amountDue : b.grandTotal), 0);
   }, [pendingBills]);
+
+  // Creditors with outstanding payable balance (Cr)
+  const creditorsWithPayables = useMemo(() => {
+    return partyBalancesList
+      .filter(p => p.isPayable)
+      .map(calc => {
+        const party = parties.find(pt => pt.id === calc.partyId);
+        return {
+          ...calc,
+          phone: party?.phone || '',
+          city: party?.city || '',
+          state: party?.state || '',
+          gstin: party?.gstin || ''
+        };
+      })
+      .sort((a, b) => b.pendingDueAmount - a.pendingDueAmount);
+  }, [partyBalancesList, parties]);
+
+  const filteredCreditorsWithPayables = useMemo(() => {
+    if (!searchQuery.trim()) return creditorsWithPayables;
+    const q = searchQuery.toLowerCase();
+    return creditorsWithPayables.filter(c => 
+      c.partyName.toLowerCase().includes(q) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.gstin && c.gstin.toLowerCase().includes(q)) ||
+      (c.city && c.city.toLowerCase().includes(q))
+    );
+  }, [creditorsWithPayables, searchQuery]);
+
+  // Debtors with outstanding receivable balance (Dr)
+  const debtorsWithReceivables = useMemo(() => {
+    return partyBalancesList
+      .filter(p => p.isReceivable)
+      .map(calc => {
+        const party = parties.find(pt => pt.id === calc.partyId);
+        return {
+          ...calc,
+          phone: party?.phone || '',
+          city: party?.city || '',
+          state: party?.state || '',
+          gstin: party?.gstin || ''
+        };
+      })
+      .sort((a, b) => b.pendingDueAmount - a.pendingDueAmount);
+  }, [partyBalancesList, parties]);
+
+  const filteredDebtorsWithReceivables = useMemo(() => {
+    if (!searchQuery.trim()) return debtorsWithReceivables;
+    const q = searchQuery.toLowerCase();
+    return debtorsWithReceivables.filter(d => 
+      d.partyName.toLowerCase().includes(q) ||
+      (d.phone && d.phone.includes(q)) ||
+      (d.gstin && d.gstin.toLowerCase().includes(q)) ||
+      (d.city && d.city.toLowerCase().includes(q))
+    );
+  }, [debtorsWithReceivables, searchQuery]);
 
   // Filtered Pending Invoices
   const filteredPendingInvoices = useMemo(() => {
@@ -213,12 +286,12 @@ export const PaymentsView: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchQuery, filterMethod, dateFilter]);
+  }, [activeTab, searchQuery, filterMethod, dateFilter, payablesViewMode, receivablesViewMode]);
 
   const currentTotal = activeTab === 'PENDING_RECEIVABLES'
-    ? filteredPendingInvoices.length
+    ? (receivablesViewMode === 'INVOICES' ? filteredPendingInvoices.length : filteredDebtorsWithReceivables.length)
     : activeTab === 'PENDING_PAYABLES'
-    ? filteredPendingBills.length
+    ? (payablesViewMode === 'BILLS' ? filteredPendingBills.length : filteredCreditorsWithPayables.length)
     : filteredPayments.length;
 
   const totalPages = Math.max(1, Math.ceil(currentTotal / pageSize));
@@ -233,19 +306,29 @@ export const PaymentsView: React.FC = () => {
     return filteredPendingInvoices.slice(start, start + pageSize);
   }, [filteredPendingInvoices, currentPage, pageSize]);
 
+  const paginatedDebtorsWithReceivables = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredDebtorsWithReceivables.slice(start, start + pageSize);
+  }, [filteredDebtorsWithReceivables, currentPage, pageSize]);
+
   const paginatedPendingBills = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredPendingBills.slice(start, start + pageSize);
   }, [filteredPendingBills, currentPage, pageSize]);
+
+  const paginatedCreditorsWithPayables = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredCreditorsWithPayables.slice(start, start + pageSize);
+  }, [filteredCreditorsWithPayables, currentPage, pageSize]);
 
   const paginatedPayments = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredPayments.slice(start, start + pageSize);
   }, [filteredPayments, currentPage, pageSize]);
 
-  // Available Customers & Vendors for dropdowns
+  // Available Customers & Creditors for dropdowns
   const customers = useMemo(() => parties.filter(p => p.type === 'CUSTOMER' || p.type === 'BOTH'), [parties]);
-  const vendors = useMemo(() => parties.filter(p => p.type === 'VENDOR' || p.type === 'BOTH'), [parties]);
+  const creditors = useMemo(() => parties.filter(p => p.type === 'VENDOR' || p.type === 'BOTH'), [parties]);
 
   // Open Record Modal
   const handleOpenRecord = (type: PaymentType) => {
@@ -322,7 +405,7 @@ export const PaymentsView: React.FC = () => {
       type: 'PAYMENT_OUT',
       date: new Date().toISOString().split('T')[0],
       partyId: party?.id || bill.vendorId || '',
-      partyName: bill.vendorName || party?.name || 'Vendor',
+      partyName: bill.vendorName || party?.name || 'Creditor (Supplier)',
       partyType: 'VENDOR',
       amount: dueAmt,
       paymentMethod: 'BANK_TRANSFER',
@@ -335,8 +418,68 @@ export const PaymentsView: React.FC = () => {
       linkedBillId: bill.id,
       linkedBillNumber: bill.billNumber,
       fromAccount: 'HDFC Current Bank Account (acc-2)',
-      toAccount: 'Vendor Bank / Cash',
+      toAccount: 'Creditor Bank / Cash',
       notes: `Payment disbursed for Purchase Bill ${bill.billNumber}`
+    });
+    setIsRecordModalOpen(true);
+  };
+
+  // Open Record Modal pre-filled for a Creditor Account balance
+  const handleOpenPayCreditor = (creditor: { partyId: string; partyName: string; pendingDueAmount: number }) => {
+    setEditingPayment(null);
+    setRecordModalType('PAYMENT_OUT');
+    const nextVoucher = getNextAvailableVoucherNumber(payments, business, 'PAYMENT_OUT').voucherNumber;
+
+    setFormData({
+      voucherNumber: nextVoucher,
+      type: 'PAYMENT_OUT',
+      date: new Date().toISOString().split('T')[0],
+      partyId: creditor.partyId,
+      partyName: creditor.partyName,
+      partyType: 'VENDOR',
+      amount: creditor.pendingDueAmount > 0 ? creditor.pendingDueAmount : '',
+      paymentMethod: 'BANK_TRANSFER',
+      bankAccountId: 'acc-2',
+      bankAccountName: 'HDFC Current Bank Account',
+      referenceNo: '',
+      chequeDate: '',
+      linkedInvoiceId: '',
+      linkedInvoiceNumber: '',
+      linkedBillId: '',
+      linkedBillNumber: '',
+      fromAccount: 'HDFC Current Bank Account (acc-2)',
+      toAccount: 'Creditor Bank / Cash',
+      notes: `Payment disbursed to settle Creditor account balance (${creditor.partyName})`
+    });
+    setIsRecordModalOpen(true);
+  };
+
+  // Open Record Modal pre-filled for a Debtor Account balance
+  const handleOpenCollectDebtor = (debtor: { partyId: string; partyName: string; pendingDueAmount: number }) => {
+    setEditingPayment(null);
+    setRecordModalType('PAYMENT_IN');
+    const nextVoucher = getNextAvailableVoucherNumber(payments, business, 'PAYMENT_IN').voucherNumber;
+
+    setFormData({
+      voucherNumber: nextVoucher,
+      type: 'PAYMENT_IN',
+      date: new Date().toISOString().split('T')[0],
+      partyId: debtor.partyId,
+      partyName: debtor.partyName,
+      partyType: 'CUSTOMER',
+      amount: debtor.pendingDueAmount > 0 ? debtor.pendingDueAmount : '',
+      paymentMethod: 'BANK_TRANSFER',
+      bankAccountId: 'acc-2',
+      bankAccountName: 'HDFC Current Bank Account',
+      referenceNo: '',
+      chequeDate: '',
+      linkedInvoiceId: '',
+      linkedInvoiceNumber: '',
+      linkedBillId: '',
+      linkedBillNumber: '',
+      fromAccount: 'Cash in Hand (acc-1)',
+      toAccount: 'HDFC Current Bank Account (acc-2)',
+      notes: `Payment receipt to settle Debtor account balance (${debtor.partyName})`
     });
     setIsRecordModalOpen(true);
   };
@@ -524,277 +667,277 @@ export const PaymentsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+    <div className="space-y-5 animate-in fade-in duration-300">
+      {/* Minimalist Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-              <Receipt className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Payments & Receipts Module</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Record customer collections (Money In), vendor disbursements (Money Out), & Contra bank transfers</p>
-            </div>
-          </div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Payments & Receipts</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Track customer collections, creditor payments, and account contra transfers</p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Secondary Actions */}
           <button
             onClick={() => setShowResequenceModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer active:scale-95"
-            title="Auto-resequence voucher numbers from a starting sequence"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 text-xs font-medium transition-all cursor-pointer"
+            title="Auto-resequence voucher numbers"
           >
-            <Sparkles className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            <Hash className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            <span>Voucher Sequences</span>
+            <Hash className="w-3.5 h-3.5 text-slate-500" />
+            <span>Voucher Sequence</span>
           </button>
 
           <button
             onClick={() => setShowBankStatementModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer active:scale-95"
-            title="Auto-create receipts, payments, and ledger entries by uploading Bank Statement CSV"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 text-xs font-medium transition-all cursor-pointer"
+            title="Import Bank Statement CSV"
           >
-            <Landmark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>Bank Statement Auto Entry (CSV)</span>
-          </button>
-
-          <button
-            onClick={() => handleOpenRecord('PAYMENT_IN')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm hover:shadow transition-all"
-          >
-            <ArrowDownLeft className="w-4 h-4" />
-            <span>+ Payment Received (In)</span>
-          </button>
-
-          <button
-            onClick={() => handleOpenRecord('PAYMENT_OUT')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm hover:shadow transition-all"
-          >
-            <ArrowUpRight className="w-4 h-4" />
-            <span>- Payment Made (Out)</span>
-          </button>
-
-          <button
-            onClick={() => handleOpenRecord('CONTRA_TRANSFER')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm hover:shadow transition-all"
-          >
-            <ArrowLeftRight className="w-4 h-4" />
-            <span>⇄ Contra Transfer</span>
+            <Upload className="w-3.5 h-3.5 text-slate-500" />
+            <span>Import Statement</span>
           </button>
 
           <button
             onClick={handleExportCSV}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
+            className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700 text-xs font-medium transition-colors cursor-pointer"
             title="Export CSV Statement"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
+          </button>
+
+          <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5 hidden sm:block" />
+
+          {/* Primary Transaction Buttons */}
+          <button
+            onClick={() => handleOpenRecord('PAYMENT_IN')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
+          >
+            <ArrowDownLeft className="w-3.5 h-3.5" />
+            <span>Receive Payment</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenRecord('PAYMENT_OUT')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>Pay Creditor</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenRecord('CONTRA_TRANSFER')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600 text-white text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+            <span>Contra</span>
           </button>
         </div>
       </div>
 
-      {/* Metric Cards Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {/* Minimalist Metric Cards Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Total Money In */}
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg">Money In</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Money In</span>
+            <div className="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <ArrowDownLeft className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-black text-slate-900 dark:text-white">{formatINR(metrics.totalIn)}</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+          <div className="mt-3">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{formatINR(metrics.totalIn)}</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">{metrics.inCount}</span> receipts
             </div>
           </div>
         </div>
 
         {/* Total Money Out */}
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-lg">Money Out</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Money Out</span>
+            <div className="w-6 h-6 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
               <ArrowUpRight className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-black text-slate-900 dark:text-white">{formatINR(metrics.totalOut)}</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+          <div className="mt-3">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">{formatINR(metrics.totalOut)}</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               <span className="font-semibold text-rose-600 dark:text-rose-400">{metrics.outCount}</span> disbursements
             </div>
           </div>
         </div>
 
-        {/* Pending Customer Receivables (Unpaid Invoices) */}
+        {/* Pending Customer Receivables (Debtors) */}
         <div 
           onClick={() => setActiveTab('PENDING_RECEIVABLES')}
-          className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-amber-200/80 dark:border-amber-900/50 hover:border-amber-400 dark:hover:border-amber-600 shadow-sm relative overflow-hidden cursor-pointer transition-all hover:shadow-md group"
+          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+            activeTab === 'PENDING_RECEIVABLES'
+              ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700 shadow-xs ring-1 ring-amber-400/20'
+              : 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs'
+          }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-lg">Pending Receivables</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Pending Receivables</span>
+            <div className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-black text-amber-700 dark:text-amber-400">{formatINR(totalPendingReceivables)}</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center justify-between">
-              <span><strong className="text-amber-700 dark:text-amber-400">{pendingInvoices.length}</strong> unpaid invoices</span>
-              <span className="text-indigo-600 dark:text-indigo-400 font-semibold group-hover:underline">View & Collect →</span>
+          <div className="mt-3">
+            <div className="text-xl font-bold tracking-tight text-amber-600 dark:text-amber-400">{formatINR(totalReceivables)}</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
+              <span>{pendingInvoices.length} bills • {debtorsWithReceivables.length} debtors</span>
+              <span className="text-indigo-600 dark:text-indigo-400 font-medium">View →</span>
             </div>
           </div>
         </div>
 
-        {/* Pending Vendor Payables (Unpaid Bills) */}
+        {/* Pending Creditor Payables */}
         <div 
           onClick={() => setActiveTab('PENDING_PAYABLES')}
-          className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-rose-200/80 dark:border-rose-900/50 hover:border-rose-400 dark:hover:border-rose-600 shadow-sm relative overflow-hidden cursor-pointer transition-all hover:shadow-md group"
+          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+            activeTab === 'PENDING_PAYABLES'
+              ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-300 dark:border-rose-700 shadow-xs ring-1 ring-rose-400/20'
+              : 'bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs'
+          }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-lg">Pending Payables</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Pending Payables</span>
+            <div className="w-6 h-6 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
               <Building2 className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-black text-rose-700 dark:text-rose-400">{formatINR(totalPendingPayables)}</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center justify-between">
-              <span><strong className="text-rose-700 dark:text-rose-400">{pendingBills.length}</strong> unpaid bills</span>
-              <span className="text-indigo-600 dark:text-indigo-400 font-semibold group-hover:underline">View & Pay →</span>
+          <div className="mt-3">
+            <div className="text-xl font-bold tracking-tight text-rose-600 dark:text-rose-400">{formatINR(totalPayables)}</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
+              <span>{pendingBills.length} bills • {creditorsWithPayables.length} creditors</span>
+              <span className="text-indigo-600 dark:text-indigo-400 font-medium">View →</span>
             </div>
           </div>
         </div>
 
         {/* Liquid Balances */}
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">Liquid Balances</span>
-            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Liquid Balances</span>
+            <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
               <Landmark className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2 space-y-0.5">
+          <div className="mt-2 space-y-1">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 dark:text-slate-400">Bank:</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200">{formatINR(metrics.bankBalance)}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{formatINR(metrics.bankBalance)}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 dark:text-slate-400">Cash:</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200">{formatINR(metrics.cashBalance)}</span>
+              <span className="font-semibold text-slate-900 dark:text-white">{formatINR(metrics.cashBalance)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filter and Tab Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-4 space-y-4">
-        {/* Navigation Tabs */}
+      {/* Main Content Area */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-xs p-4 sm:p-5 space-y-4">
+        {/* Minimal Navigation Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl flex-wrap">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/70 rounded-xl flex-wrap">
             <button
               onClick={() => setActiveTab('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                 activeTab === 'ALL'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              All Transactions ({payments.length})
+              All ({payments.length})
             </button>
             <button
               onClick={() => setActiveTab('PAYMENT_IN')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                 activeTab === 'PAYMENT_IN'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                  ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600'
               }`}
             >
-              <ArrowDownLeft className="w-3.5 h-3.5" />
+              <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
               <span>Received ({metrics.inCount})</span>
             </button>
             <button
               onClick={() => setActiveTab('PAYMENT_OUT')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                 activeTab === 'PAYMENT_OUT'
-                  ? 'bg-rose-600 text-white shadow-sm'
-                  : 'text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                  ? 'bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-400 shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'
               }`}
             >
-              <ArrowUpRight className="w-3.5 h-3.5" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-rose-600" />
               <span>Paid ({metrics.outCount})</span>
             </button>
             <button
               onClick={() => setActiveTab('CONTRA_TRANSFER')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                 activeTab === 'CONTRA_TRANSFER'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <ArrowLeftRight className="w-3.5 h-3.5" />
+              <ArrowLeftRight className="w-3.5 h-3.5 text-slate-500" />
               <span>Contra ({payments.filter(p => p.type === 'CONTRA_TRANSFER').length})</span>
             </button>
             <button
               onClick={() => setActiveTab('PENDING_RECEIVABLES')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                 activeTab === 'PENDING_RECEIVABLES'
-                  ? 'bg-amber-500 text-white shadow-sm'
-                  : 'text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/70'
+                  ? 'bg-amber-500 text-white shadow-xs font-semibold'
+                  : 'text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40'
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
-              <span>Pending Receivables ({pendingInvoices.length})</span>
+              <span>Receivables ({pendingInvoices.length > 0 ? pendingInvoices.length : debtorsWithReceivables.length})</span>
             </button>
             <button
               onClick={() => setActiveTab('PENDING_PAYABLES')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                 activeTab === 'PENDING_PAYABLES'
-                  ? 'bg-rose-600 text-white shadow-sm'
-                  : 'text-rose-800 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/70'
+                  ? 'bg-rose-600 text-white shadow-xs font-semibold'
+                  : 'text-rose-800 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40'
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>Pending Payables ({pendingBills.length})</span>
+              <span>Payables ({pendingBills.length > 0 ? pendingBills.length : creditorsWithPayables.length})</span>
             </button>
           </div>
 
           {/* Quick Date Filters */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 dark:text-slate-500">Date:</span>
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-lg text-xs">
-              <button
-                onClick={() => setDateFilter('ALL')}
-                className={`px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer ${
-                  dateFilter === 'ALL' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                All Time
-              </button>
-              <button
-                onClick={() => setDateFilter('THIS_MONTH')}
-                className={`px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer ${
-                  dateFilter === 'THIS_MONTH' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                This Month
-              </button>
-              <button
-                onClick={() => setDateFilter('LAST_MONTH')}
-                className={`px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer ${
-                  dateFilter === 'LAST_MONTH' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                Last Month
-              </button>
-            </div>
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/70 p-1 rounded-xl text-xs">
+            <button
+              onClick={() => setDateFilter('ALL')}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                dateFilter === 'ALL' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold shadow-xs' : 'text-slate-600 dark:text-slate-400 font-medium'
+              }`}
+            >
+              All Time
+            </button>
+            <button
+              onClick={() => setDateFilter('THIS_MONTH')}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                dateFilter === 'THIS_MONTH' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold shadow-xs' : 'text-slate-600 dark:text-slate-400 font-medium'
+              }`}
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setDateFilter('LAST_MONTH')}
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                dateFilter === 'LAST_MONTH' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold shadow-xs' : 'text-slate-600 dark:text-slate-400 font-medium'
+              }`}
+            >
+              Last Month
+            </button>
           </div>
         </div>
 
-        {/* Search & Filter Controls */}
+        {/* Minimal Search & Filter Controls */}
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
@@ -804,12 +947,12 @@ export const PaymentsView: React.FC = () => {
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={
                 activeTab === 'PENDING_RECEIVABLES' 
-                  ? "Search pending invoices by Invoice #, Customer Name, Phone..." 
+                  ? "Search by Customer, Phone, City, GSTIN, or Invoice #..." 
                   : activeTab === 'PENDING_PAYABLES'
-                  ? "Search pending purchase bills by Bill #, Vendor Name..."
-                  : "Search by Voucher #, Party Name, Cheque/UTR Ref, Linked Invoice/Bill..."
+                  ? "Search by Creditor, Phone, City, GSTIN, or Bill #..."
+                  : "Search by Voucher #, Party Name, Reference, Notes..."
               }
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400/20 focus:border-slate-400 transition-all"
             />
             {searchQuery && (
               <button
@@ -826,7 +969,7 @@ export const PaymentsView: React.FC = () => {
               <select
                 value={filterMethod}
                 onChange={e => setFilterMethod(e.target.value)}
-                className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="px-3 py-2 bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400/20 focus:border-slate-400"
               >
                 <option value="ALL">All Payment Methods</option>
                 <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS/IMPS)</option>
@@ -839,226 +982,446 @@ export const PaymentsView: React.FC = () => {
           )}
         </div>
 
-        {/* Render Pending Customer Receivables Table */}
+        {/* Render Pending Customer Receivables Table & View Modes */}
         {activeTab === 'PENDING_RECEIVABLES' && (
-          <div className="overflow-x-auto rounded-xl border border-amber-200 dark:border-amber-900/50 bg-white dark:bg-slate-900">
-            <div className="bg-amber-50/70 dark:bg-amber-950/40 p-3 border-b border-amber-200 dark:border-amber-900/50 flex items-center justify-between">
+          <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+            <div className="bg-slate-50/70 dark:bg-slate-800/40 p-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                <span className="text-xs font-bold text-amber-900 dark:text-amber-300">Unsettled Customer Invoices (Pending Receivables)</span>
+                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Customer Receivables</span>
+                <div className="inline-flex rounded-lg bg-slate-200/70 dark:bg-slate-700/60 p-0.5 ml-2">
+                  <button
+                    onClick={() => setReceivablesViewMode('INVOICES')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer ${
+                      receivablesViewMode === 'INVOICES'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    Unsettled Invoices ({pendingInvoices.length})
+                  </button>
+                  <button
+                    onClick={() => setReceivablesViewMode('DEBTORS')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer ${
+                      receivablesViewMode === 'DEBTORS'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    Debtor Balances ({debtorsWithReceivables.length})
+                  </button>
+                </div>
               </div>
-              <span className="text-xs font-bold text-amber-800 dark:text-amber-400">
-                Total Due: {formatINR(totalPendingReceivables)}
-              </span>
+              <div className="text-right">
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                  Total Receivables: {formatINR(totalReceivables)}
+                </span>
+                {totalReceivables !== totalPendingInvoicesDue && (
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                    (Invoices Due: {formatINR(totalPendingInvoicesDue)})
+                  </span>
+                )}
+              </div>
             </div>
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 uppercase font-semibold border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3 px-3.5">Invoice Date</th>
-                  <th className="py-3 px-3.5">Invoice #</th>
-                  <th className="py-3 px-3.5">Customer Name & Phone</th>
-                  <th className="py-3 px-3.5 text-right">Total Invoice</th>
-                  <th className="py-3 px-3.5 text-right">Amount Paid</th>
-                  <th className="py-3 px-3.5 text-right font-bold text-amber-800 dark:text-amber-400">Pending Due</th>
-                  <th className="py-3 px-3.5 text-center">Status</th>
-                  <th className="py-3 px-3.5 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {filteredPendingInvoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-10 text-slate-400 dark:text-slate-500">
-                      <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500" />
-                      <p className="font-semibold text-slate-700 dark:text-slate-300">No pending receivables!</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">All customer invoices are fully settled.</p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedPendingInvoices.map(inv => {
-                    const dueAmt = inv.amountDue !== undefined ? inv.amountDue : inv.grandTotal;
-                    const paidAmt = inv.amountPaid || (inv.grandTotal - dueAmt);
 
-                    return (
-                      <tr key={inv.id} className="hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors">
-                        <td className="py-3.5 px-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                          {formatDate(inv.invoiceDate, 'short')}
-                          {inv.dueDate && (
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500">Due: {formatDate(inv.dueDate, 'short')}</div>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-3.5">
-                          <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{inv.invoiceNumber}</span>
-                        </td>
-                        <td className="py-3.5 px-3.5">
-                          <div className="font-semibold text-slate-900 dark:text-white">{inv.customerName || 'Customer'}</div>
-                          {inv.customerPhone && (
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{inv.customerPhone}</div>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-right font-medium text-slate-700 dark:text-slate-300">
-                          {formatINR(inv.grandTotal)}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-right font-medium text-emerald-600 dark:text-emerald-400">
-                          {formatINR(paidAmt)}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-right font-black text-amber-700 dark:text-amber-400 text-sm">
-                          {formatINR(dueAmt)}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                            dueAmt === inv.grandTotal 
-                              ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800' 
-                              : 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                          }`}>
-                            {dueAmt === inv.grandTotal ? 'UNPAID' : 'PARTIAL DUE'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3.5 text-center">
-                          <button
-                            onClick={() => handleOpenCollectInvoice(inv)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer"
-                          >
-                            <ArrowDownLeft className="w-3.5 h-3.5" />
-                            <span>Collect (Settle)</span>
-                          </button>
+            {/* Invoices View */}
+            {receivablesViewMode === 'INVOICES' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-semibold tracking-wider border-b border-slate-200/80 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3 px-3.5">Invoice Date</th>
+                      <th className="py-3 px-3.5">Invoice #</th>
+                      <th className="py-3 px-3.5">Customer</th>
+                      <th className="py-3 px-3.5 text-right">Total Invoice</th>
+                      <th className="py-3 px-3.5 text-right">Paid</th>
+                      <th className="py-3 px-3.5 text-right font-bold text-slate-900 dark:text-white">Pending Due</th>
+                      <th className="py-3 px-3.5 text-center">Status</th>
+                      <th className="py-3 px-3.5 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredPendingInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-10 text-slate-400 dark:text-slate-500">
+                          <CheckCircle2 className="w-7 h-7 mx-auto mb-2 text-emerald-500/80" />
+                          <p className="font-medium text-slate-700 dark:text-slate-300">No pending invoice receivables</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">All customer invoices are settled.</p>
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    ) : (
+                      paginatedPendingInvoices.map(inv => {
+                        const dueAmt = inv.amountDue !== undefined ? inv.amountDue : inv.grandTotal;
+                        const paidAmt = inv.amountPaid || (inv.grandTotal - dueAmt);
 
-            {filteredPendingInvoices.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalItems={filteredPendingInvoices.length}
-                pageSize={pageSize}
-                pageSizeOptions={[10, 25, 50, 100]}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-                itemLabel="invoices"
-              />
+                        return (
+                          <tr key={inv.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                            <td className="py-3 px-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {formatDate(inv.invoiceDate, 'short')}
+                              {inv.dueDate && (
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500">Due: {formatDate(inv.dueDate, 'short')}</div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="font-mono font-medium text-slate-900 dark:text-white">{inv.invoiceNumber}</span>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <div className="font-medium text-slate-900 dark:text-white">{inv.customerName || 'Customer'}</div>
+                              {inv.customerPhone && (
+                                <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">{inv.customerPhone}</div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-medium text-slate-600 dark:text-slate-400">
+                              {formatINR(inv.grandTotal)}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                              {formatINR(paidAmt)}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-bold text-amber-700 dark:text-amber-400">
+                              {formatINR(dueAmt)}
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                dueAmt === inv.grandTotal 
+                                  ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400' 
+                                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
+                              }`}>
+                                {dueAmt === inv.grandTotal ? 'Unpaid' : 'Partial'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <button
+                                onClick={() => handleOpenCollectInvoice(inv)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs transition-all cursor-pointer"
+                              >
+                                <ArrowDownLeft className="w-3 h-3" />
+                                <span>Collect</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+
+                {filteredPendingInvoices.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredPendingInvoices.length}
+                    pageSize={pageSize}
+                    pageSizeOptions={[10, 25, 50, 100]}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                    itemLabel="invoices"
+                  />
+                )}
+              </div>
+            ) : (
+              /* Customer Debtors View */
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-semibold tracking-wider border-b border-slate-200/80 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3 px-3.5">Customer / Debtor</th>
+                      <th className="py-3 px-3.5">Phone & GSTIN</th>
+                      <th className="py-3 px-3.5 text-right">Opening Bal</th>
+                      <th className="py-3 px-3.5 text-right">Invoices (Dr)</th>
+                      <th className="py-3 px-3.5 text-right">Received (Cr)</th>
+                      <th className="py-3 px-3.5 text-right font-bold text-slate-900 dark:text-white">Net Due</th>
+                      <th className="py-3 px-3.5 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredDebtorsWithReceivables.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-10 text-slate-400 dark:text-slate-500">
+                          <CheckCircle2 className="w-7 h-7 mx-auto mb-2 text-emerald-500/80" />
+                          <p className="font-medium text-slate-700 dark:text-slate-300">No debtor balances pending</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">All customer debtor accounts are settled.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedDebtorsWithReceivables.map(debtor => (
+                        <tr key={debtor.partyId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-3.5">
+                            <div className="font-semibold text-slate-900 dark:text-white">{debtor.partyName}</div>
+                            {(debtor.city || debtor.state) && (
+                              <div className="text-[10px] text-slate-400 dark:text-slate-500">{debtor.city}{debtor.city && debtor.state ? ', ' : ''}{debtor.state}</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3.5">
+                            {debtor.phone && <div className="text-slate-600 dark:text-slate-300 font-mono text-[11px]">{debtor.phone}</div>}
+                            {debtor.gstin && <div className="text-slate-400 dark:text-slate-500 font-mono text-[10px]">GSTIN: {debtor.gstin}</div>}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-medium text-slate-500 dark:text-slate-400">
+                            {formatINR(Math.abs(debtor.openingBalance))} {debtor.openingBalanceType}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-medium text-slate-600 dark:text-slate-300">
+                            {formatINR(debtor.totalInvoicedGross)}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                            {formatINR(debtor.totalReceipts)}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-bold text-amber-700 dark:text-amber-400">
+                            {formatINR(debtor.pendingDueAmount)} Dr
+                          </td>
+                          <td className="py-3 px-3.5 text-center">
+                            <button
+                              onClick={() => handleOpenCollectDebtor(debtor)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs transition-all cursor-pointer"
+                            >
+                              <ArrowDownLeft className="w-3 h-3" />
+                              <span>Collect</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+
+                {filteredDebtorsWithReceivables.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredDebtorsWithReceivables.length}
+                    pageSize={pageSize}
+                    pageSizeOptions={[10, 25, 50, 100]}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                    itemLabel="debtors"
+                  />
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* Render Pending Vendor Payables Table */}
+        {/* Render Pending Creditor Payables Table & View Modes */}
         {activeTab === 'PENDING_PAYABLES' && (
-          <div className="overflow-x-auto rounded-xl border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-slate-900">
-            <div className="bg-rose-50/70 dark:bg-rose-950/40 p-3 border-b border-rose-200 dark:border-rose-900/50 flex items-center justify-between">
+          <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+            <div className="bg-slate-50/70 dark:bg-slate-800/40 p-3 border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-rose-700 dark:text-rose-400" />
-                <span className="text-xs font-bold text-rose-900 dark:text-rose-300">Unsettled Purchase Bills (Pending Payables to Vendors)</span>
+                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Creditor Payables</span>
+                <div className="inline-flex rounded-lg bg-slate-200/70 dark:bg-slate-700/60 p-0.5 ml-2">
+                  <button
+                    onClick={() => setPayablesViewMode('BILLS')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer ${
+                      payablesViewMode === 'BILLS'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    Unsettled Bills ({pendingBills.length})
+                  </button>
+                  <button
+                    onClick={() => setPayablesViewMode('CREDITORS')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer ${
+                      payablesViewMode === 'CREDITORS'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    Creditor Balances ({creditorsWithPayables.length})
+                  </button>
+                </div>
               </div>
-              <span className="text-xs font-bold text-rose-800 dark:text-rose-400">
-                Total Due: {formatINR(totalPendingPayables)}
-              </span>
+              <div className="text-right">
+                <span className="text-xs font-bold text-rose-700 dark:text-rose-400">
+                  Total Payables: {formatINR(totalPayables)}
+                </span>
+                {totalPayables !== totalPendingBillsDue && (
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                    (Bills Due: {formatINR(totalPendingBillsDue)})
+                  </span>
+                )}
+              </div>
             </div>
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 uppercase font-semibold border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3 px-3.5">Bill Date</th>
-                  <th className="py-3 px-3.5">Bill #</th>
-                  <th className="py-3 px-3.5">Vendor Name & Phone</th>
-                  <th className="py-3 px-3.5 text-right">Total Bill</th>
-                  <th className="py-3 px-3.5 text-right">Amount Paid</th>
-                  <th className="py-3 px-3.5 text-right font-bold text-rose-800 dark:text-rose-400">Pending Due</th>
-                  <th className="py-3 px-3.5 text-center">Status</th>
-                  <th className="py-3 px-3.5 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {filteredPendingBills.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-10 text-slate-400 dark:text-slate-500">
-                      <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500" />
-                      <p className="font-semibold text-slate-700 dark:text-slate-300">No pending vendor payables!</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">All supplier bills are fully settled.</p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedPendingBills.map(bill => {
-                    const dueAmt = bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal;
-                    const paidAmt = bill.amountPaid || (bill.grandTotal - dueAmt);
 
-                    return (
-                      <tr key={bill.id} className="hover:bg-rose-50/40 dark:hover:bg-rose-950/20 transition-colors">
-                        <td className="py-3.5 px-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                          {formatDate(bill.billDate, 'short')}
-                          {bill.dueDate && (
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500">Due: {formatDate(bill.dueDate, 'short')}</div>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-3.5">
-                          <span className="font-mono font-bold text-purple-700 dark:text-purple-400">{bill.billNumber}</span>
-                        </td>
-                        <td className="py-3.5 px-3.5">
-                          <div className="font-semibold text-slate-900 dark:text-white">{bill.vendorName || 'Vendor'}</div>
-                          {bill.vendorPhone && (
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{bill.vendorPhone}</div>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-right font-medium text-slate-700 dark:text-slate-300">
-                          {formatINR(bill.grandTotal)}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-right font-medium text-emerald-600 dark:text-emerald-400">
-                          {formatINR(paidAmt)}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-right font-black text-rose-700 dark:text-rose-400 text-sm">
-                          {formatINR(dueAmt)}
-                        </td>
-                        <td className="py-3.5 px-3.5 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                            dueAmt === bill.grandTotal 
-                              ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800' 
-                              : 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                          }`}>
-                            {dueAmt === bill.grandTotal ? 'UNPAID' : 'PARTIAL DUE'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3.5 text-center">
-                          <button
-                            onClick={() => handleOpenPayBill(bill)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer"
-                          >
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                            <span>Pay Bill (Settle)</span>
-                          </button>
+            {/* Purchase Bills View */}
+            {payablesViewMode === 'BILLS' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-semibold tracking-wider border-b border-slate-200/80 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3 px-3.5">Bill Date</th>
+                      <th className="py-3 px-3.5">Bill #</th>
+                      <th className="py-3 px-3.5">Creditor (Supplier)</th>
+                      <th className="py-3 px-3.5 text-right">Total Bill</th>
+                      <th className="py-3 px-3.5 text-right">Paid</th>
+                      <th className="py-3 px-3.5 text-right font-bold text-slate-900 dark:text-white">Pending Due</th>
+                      <th className="py-3 px-3.5 text-center">Status</th>
+                      <th className="py-3 px-3.5 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredPendingBills.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-10 text-slate-400 dark:text-slate-500">
+                          <CheckCircle2 className="w-7 h-7 mx-auto mb-2 text-emerald-500/80" />
+                          <p className="font-medium text-slate-700 dark:text-slate-300">No pending purchase bills</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">All supplier bills are settled.</p>
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    ) : (
+                      paginatedPendingBills.map(bill => {
+                        const dueAmt = bill.amountDue !== undefined ? bill.amountDue : bill.grandTotal;
+                        const paidAmt = bill.amountPaid || (bill.grandTotal - dueAmt);
 
-            {filteredPendingBills.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalItems={filteredPendingBills.length}
-                pageSize={pageSize}
-                pageSizeOptions={[10, 25, 50, 100]}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-                itemLabel="bills"
-              />
+                        return (
+                          <tr key={bill.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                            <td className="py-3 px-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {formatDate(bill.billDate, 'short')}
+                              {bill.dueDate && (
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500">Due: {formatDate(bill.dueDate, 'short')}</div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="font-mono font-medium text-slate-900 dark:text-white">{bill.billNumber}</span>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <div className="font-medium text-slate-900 dark:text-white">{bill.vendorName || 'Creditor (Supplier)'}</div>
+                              {bill.vendorPhone && (
+                                <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">{bill.vendorPhone}</div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-medium text-slate-600 dark:text-slate-400">
+                              {formatINR(bill.grandTotal)}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                              {formatINR(paidAmt)}
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-bold text-rose-700 dark:text-rose-400">
+                              {formatINR(dueAmt)}
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                dueAmt === bill.grandTotal 
+                                  ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400' 
+                                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
+                              }`}>
+                                {dueAmt === bill.grandTotal ? 'Unpaid' : 'Partial'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <button
+                                onClick={() => handleOpenPayBill(bill)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs transition-all cursor-pointer"
+                              >
+                                <ArrowUpRight className="w-3 h-3" />
+                                <span>Pay</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+
+                {filteredPendingBills.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredPendingBills.length}
+                    pageSize={pageSize}
+                    pageSizeOptions={[10, 25, 50, 100]}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                    itemLabel="bills"
+                  />
+                )}
+              </div>
+            ) : (
+              /* Creditors View */
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-semibold tracking-wider border-b border-slate-200/80 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3 px-3.5">Creditor (Supplier)</th>
+                      <th className="py-3 px-3.5">Phone & GSTIN</th>
+                      <th className="py-3 px-3.5 text-right">Opening Bal</th>
+                      <th className="py-3 px-3.5 text-right">Purchases (Cr)</th>
+                      <th className="py-3 px-3.5 text-right">Paid (Dr)</th>
+                      <th className="py-3 px-3.5 text-right font-bold text-slate-900 dark:text-white">Net Due</th>
+                      <th className="py-3 px-3.5 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredCreditorsWithPayables.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-10 text-slate-400 dark:text-slate-500">
+                          <CheckCircle2 className="w-7 h-7 mx-auto mb-2 text-emerald-500/80" />
+                          <p className="font-medium text-slate-700 dark:text-slate-300">No creditor payables pending</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">All creditor accounts are settled.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedCreditorsWithPayables.map(creditor => (
+                        <tr key={creditor.partyId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-3.5">
+                            <div className="font-semibold text-slate-900 dark:text-white">{creditor.partyName}</div>
+                            {(creditor.city || creditor.state) && (
+                              <div className="text-[10px] text-slate-400 dark:text-slate-500">{creditor.city}{creditor.city && creditor.state ? ', ' : ''}{creditor.state}</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3.5">
+                            {creditor.phone && <div className="text-slate-600 dark:text-slate-300 font-mono text-[11px]">{creditor.phone}</div>}
+                            {creditor.gstin && <div className="text-slate-400 dark:text-slate-500 font-mono text-[10px]">GSTIN: {creditor.gstin}</div>}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-medium text-slate-500 dark:text-slate-400">
+                            {formatINR(Math.abs(creditor.openingBalance))} {creditor.openingBalanceType}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-medium text-slate-600 dark:text-slate-300">
+                            {formatINR(creditor.totalPurchasesGross)}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                            {formatINR(creditor.totalDisbursements)}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-bold text-rose-700 dark:text-rose-400">
+                            {formatINR(creditor.pendingDueAmount)} Cr
+                          </td>
+                          <td className="py-3 px-3.5 text-center">
+                            <button
+                              onClick={() => handleOpenPayCreditor(creditor)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs transition-all cursor-pointer"
+                            >
+                              <ArrowUpRight className="w-3 h-3" />
+                              <span>Pay</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+
+                {filteredCreditorsWithPayables.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredCreditorsWithPayables.length}
+                    pageSize={pageSize}
+                    pageSizeOptions={[10, 25, 50, 100]}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                    itemLabel="creditors"
+                  />
+                )}
+              </div>
             )}
           </div>
         )}
 
         {/* Standard Transactions Table (for ALL, PAYMENT_IN, PAYMENT_OUT, CONTRA_TRANSFER) */}
         {activeTab !== 'PENDING_RECEIVABLES' && activeTab !== 'PENDING_PAYABLES' && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 uppercase font-semibold border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-50/50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-semibold tracking-wider border-b border-slate-200/80 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-3.5">Date</th>
                 <th className="py-3 px-3.5">Voucher #</th>
                 <th className="py-3 px-3.5">Type</th>
                 <th className="py-3 px-3.5">Party / Accounts</th>
-                <th className="py-3 px-3.5">Payment Mode & Ref</th>
-                <th className="py-3 px-3.5">Linked Document</th>
+                <th className="py-3 px-3.5">Mode & Ref</th>
+                <th className="py-3 px-3.5">Linked Doc</th>
                 <th className="py-3 px-3.5 text-right">Amount</th>
                 <th className="py-3 px-3.5 text-center">Actions</th>
               </tr>
@@ -1067,9 +1430,9 @@ export const PaymentsView: React.FC = () => {
               {filteredPayments.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-400 dark:text-slate-500">
-                    <Receipt className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-                    <p className="font-medium text-slate-600 dark:text-slate-300 text-sm">No payment records found</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try changing search filters or create a new payment receipt.</p>
+                    <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                    <p className="font-medium text-slate-700 dark:text-slate-300 text-sm">No payment records found</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Try changing search filters or create a new payment receipt.</p>
                   </td>
                 </tr>
               ) : (
@@ -1079,45 +1442,44 @@ export const PaymentsView: React.FC = () => {
                   const isContra = p.type === 'CONTRA_TRANSFER';
 
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
                       {/* Date */}
-                      <td className="py-3.5 px-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      <td className="py-3 px-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
                         {formatDate(p.date, 'short')}
                       </td>
 
                       {/* Voucher No */}
-                      <td className="py-3.5 px-3.5">
+                      <td className="py-3 px-3.5">
                         <button
                           onClick={() => setVoucherToPrint(p)}
-                          className="font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline flex items-center gap-1"
+                          className="font-mono font-medium text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                         >
-                          <Hash className="w-3 h-3 text-indigo-400" />
-                          <span>{p.voucherNumber}</span>
+                          {p.voucherNumber}
                         </button>
                       </td>
 
                       {/* Type Badge */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
                         {isMoneyIn && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                            <ArrowDownLeft className="w-3 h-3" /> Received (In)
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
+                            <ArrowDownLeft className="w-3 h-3" /> Received
                           </span>
                         )}
                         {isMoneyOut && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                            <ArrowUpRight className="w-3 h-3" /> Paid (Out)
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400">
+                            <ArrowUpRight className="w-3 h-3" /> Paid
                           </span>
                         )}
                         {isContra && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                            <ArrowLeftRight className="w-3 h-3" /> Contra Transfer
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            <ArrowLeftRight className="w-3 h-3" /> Contra
                           </span>
                         )}
                       </td>
 
                       {/* Party Name */}
-                      <td className="py-3.5 px-3.5">
-                        <div className="font-semibold text-slate-900 dark:text-white max-w-[220px] truncate" title={p.partyName}>
+                      <td className="py-3 px-3.5">
+                        <div className="font-medium text-slate-900 dark:text-white max-w-[220px] truncate" title={p.partyName}>
                           {p.partyName}
                         </div>
                         {p.notes && (
@@ -1128,65 +1490,64 @@ export const PaymentsView: React.FC = () => {
                       </td>
 
                       {/* Payment Mode & Ref */}
-                      <td className="py-3.5 px-3.5">
-                        <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                          <CreditCard className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                          <span>{p.paymentMethod.replace('_', ' ')}</span>
+                      <td className="py-3 px-3.5">
+                        <div className="text-slate-700 dark:text-slate-300 font-medium">
+                          {p.paymentMethod.replace('_', ' ')}
                         </div>
                         {p.referenceNo && (
-                          <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                            Ref: {p.referenceNo}
+                          <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                            {p.referenceNo}
                           </div>
                         )}
                       </td>
 
                       {/* Linked Doc */}
-                      <td className="py-3.5 px-3.5">
+                      <td className="py-3 px-3.5">
                         {p.linkedInvoiceNumber && (
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-md font-mono text-[11px] font-medium border border-indigo-100 dark:border-indigo-800">
-                            <FileText className="w-3 h-3" /> {p.linkedInvoiceNumber}
-                          </div>
+                          <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                            {p.linkedInvoiceNumber}
+                          </span>
                         )}
                         {p.linkedBillNumber && (
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 rounded-md font-mono text-[11px] font-medium border border-amber-100 dark:border-amber-800">
-                            <FileText className="w-3 h-3" /> {p.linkedBillNumber}
-                          </div>
+                          <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                            {p.linkedBillNumber}
+                          </span>
                         )}
                         {!p.linkedInvoiceNumber && !p.linkedBillNumber && (
-                          <span className="text-slate-400 dark:text-slate-500 italic text-[11px]">Direct / Advance</span>
+                          <span className="text-slate-400 dark:text-slate-500 text-[11px]">—</span>
                         )}
                       </td>
 
                       {/* Amount */}
-                      <td className="py-3.5 px-3.5 text-right font-black whitespace-nowrap text-sm">
-                        <span className={isMoneyIn ? 'text-emerald-600 dark:text-emerald-400' : isMoneyOut ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'}>
+                      <td className="py-3 px-3.5 text-right font-bold whitespace-nowrap">
+                        <span className={isMoneyIn ? 'text-emerald-600 dark:text-emerald-400' : isMoneyOut ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}>
                           {isMoneyIn ? '+' : isMoneyOut ? '-' : ''}{formatINR(p.amount)}
                         </span>
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-3.5 text-center">
+                      <td className="py-3 px-3.5 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => setVoucherToPrint(p)}
-                            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors"
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                             title="Print Voucher Receipt"
                           >
-                            <Printer className="w-4 h-4" />
+                            <Printer className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleOpenEdit(p)}
-                            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                             title="Edit Payment"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(p.id)}
-                            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
                             title="Delete Payment"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -1259,7 +1620,7 @@ export const PaymentsView: React.FC = () => {
               {formData.type !== 'CONTRA_TRANSFER' && (
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    {formData.type === 'PAYMENT_IN' ? 'Customer / Received From *' : 'Vendor / Paid To *'}
+                    {formData.type === 'PAYMENT_IN' ? 'Customer (Debtor) / Received From *' : 'Creditor (Supplier) / Paid To *'}
                   </label>
                   <select
                     value={formData.partyId}
@@ -1267,12 +1628,18 @@ export const PaymentsView: React.FC = () => {
                     required
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
-                    <option value="">-- Select {formData.type === 'PAYMENT_IN' ? 'Customer' : 'Vendor'} --</option>
-                    {(formData.type === 'PAYMENT_IN' ? customers : vendors).map(party => (
-                      <option key={party.id} value={party.id}>
-                        {party.name} ({party.city || party.state || 'India'}) - Current Bal: {formatINR(party.currentBalance)}
-                      </option>
-                    ))}
+                    <option value="">-- Select {formData.type === 'PAYMENT_IN' ? 'Customer (Debtor)' : 'Creditor (Supplier)'} --</option>
+                    {(formData.type === 'PAYMENT_IN' ? customers : creditors).map(party => {
+                      const bal = partyBalances[party.id];
+                      const balText = bal 
+                        ? `${formatINR(bal.pendingDueAmount)} ${bal.isPayable ? 'Cr (Payable)' : bal.isReceivable ? 'Dr (Receivable)' : 'Settled'}`
+                        : formatINR(party.currentBalance);
+                      return (
+                        <option key={party.id} value={party.id}>
+                          {party.name} ({party.city || party.state || 'India'}) - Net Bal: {balText}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               )}

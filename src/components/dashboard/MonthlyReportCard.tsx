@@ -188,11 +188,22 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
 
   // 5. Collections & Inflow Realization
   const invoiceCashRealized = useMemo(() => {
-    return monthInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+    return monthInvoices.reduce((sum, inv) => {
+      if (inv.status === 'PAID') {
+        return sum + Math.max(inv.grandTotal || 0, inv.amountPaid || 0);
+      }
+      return sum + (inv.amountPaid || 0);
+    }, 0);
   }, [monthInvoices]);
 
   const invoiceAmountDue = useMemo(() => {
-    return monthInvoices.reduce((sum, inv) => sum + (inv.amountDue || 0), 0);
+    return monthInvoices.reduce((sum, inv) => {
+      if (inv.status === 'PAID') return sum;
+      if (inv.amountDue !== undefined) {
+        return sum + Math.max(0, inv.amountDue);
+      }
+      return sum + Math.max(0, (inv.grandTotal || 0) - (inv.amountPaid || 0));
+    }, 0);
   }, [monthInvoices]);
 
   const directPaymentInTotal = useMemo(() => {
@@ -200,7 +211,9 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
   }, [monthPaymentsIn]);
 
   const totalCashCollected = invoiceCashRealized + directPaymentInTotal;
-  const collectionRatio = grossSales > 0 ? Math.min(100, Math.round((invoiceCashRealized / grossSales) * 100)) : 0;
+  const collectionRatio = grossSales > 0 
+    ? Math.min(100, Math.max(0, Math.round(((grossSales - invoiceAmountDue) / grossSales) * 100))) 
+    : 100;
 
   // 6. GST Position for the month
   const totalEligibleItc = purchasesItc + expensesItc;
@@ -338,14 +351,14 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
   }, [monthExpenses]);
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-all">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden transition-all">
       {/* ------------------------------------------------------------- */}
       {/* CARD HEADER & MONTH SELECTOR                                  */}
       {/* ------------------------------------------------------------- */}
-      <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 dark:from-slate-850 via-slate-100/60 dark:via-slate-800/40 to-slate-50 dark:to-slate-850 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="p-4 sm:p-5 bg-slate-50/60 dark:bg-slate-850/50 border-b border-slate-200/80 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-indigo-600 dark:bg-indigo-500 text-white shadow-xs">
+            <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
               <BarChart3 className="w-5 h-5" />
             </span>
             <div>
@@ -354,11 +367,11 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
                   Monthly Report Card
                 </h2>
                 {isCurrentMonth ? (
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded-full border border-emerald-300 dark:border-emerald-800">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
                     Current Active Month
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full border border-slate-200 dark:border-slate-700">
                     Historical Archive
                   </span>
                 )}
@@ -373,7 +386,7 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
         {/* Month Selector Controls & Actions */}
         <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-auto">
           {/* Stepper & Month Input */}
-          <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl shadow-xs p-1">
+          <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs p-0.5">
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
@@ -391,7 +404,7 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
                 onChange={(e) => {
                   if (e.target.value) setSelectedMonth(e.target.value);
                 }}
-                className="text-xs font-bold text-slate-800 dark:text-slate-200 bg-transparent outline-none cursor-pointer"
+                className="text-xs font-semibold text-slate-800 dark:text-slate-200 bg-transparent outline-none cursor-pointer"
               />
             </div>
 
@@ -409,7 +422,7 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
             <button
               type="button"
               onClick={() => setSelectedMonth(getCurrentMonthString())}
-              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all cursor-pointer"
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/40 transition-all cursor-pointer"
             >
               Jump to This Month
             </button>
@@ -419,7 +432,7 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
           <button
             type="button"
             onClick={() => setShowPrintModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 shadow-xs transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 shadow-2xs transition-all active:scale-95 cursor-pointer"
             title="Print or Export Monthly Report Card"
           >
             <Printer className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
@@ -431,14 +444,14 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
       {/* ------------------------------------------------------------- */}
       {/* EXECUTIVE SCORE STRIP (Month Health, MoM Growth, Billing Days) */}
       {/* ------------------------------------------------------------- */}
-      <div className="px-4 sm:px-5 py-3 bg-slate-50/70 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="px-4 sm:px-5 py-3 bg-slate-50/40 dark:bg-slate-800/30 border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5 flex-wrap">
           <div className="flex items-center gap-1.5">
             <span className="text-slate-500 dark:text-slate-400">Operating Status:</span>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-xs ${
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-semibold text-xs border ${
               netOperatingSpread >= 0 
-                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800' 
-                : 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/50' 
+                : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/50'
             }`}>
               {netOperatingSpread >= 0 ? (
                 <>
@@ -455,31 +468,31 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
           </div>
 
           {salesMomGrowth !== null && (
-            <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 pl-2 border-l border-slate-300 dark:border-slate-700">
+            <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 pl-2 border-l border-slate-200 dark:border-slate-750 text-[11px]">
               <span>MoM Sales:</span>
-              <span className={`font-bold font-mono ${salesMomGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              <span className={`font-semibold font-mono ${salesMomGrowth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                 {salesMomGrowth >= 0 ? '+' : ''}{salesMomGrowth.toFixed(1)}% vs last month
               </span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
-          <span>Active Billing Days: <strong className="text-slate-800 dark:text-slate-200 font-mono">{activeSalesDaysCount}/{daysInMonth} days</strong></span>
+        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[11px]">
+          <span>Active Billing Days: <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{activeSalesDaysCount}/{daysInMonth} days</strong></span>
           <span>•</span>
-          <span>Invoices: <strong className="text-slate-800 dark:text-slate-200 font-mono">{monthInvoices.length}</strong></span>
+          <span>Invoices: <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{monthInvoices.length}</strong></span>
           <span>•</span>
-          <span>Purchases: <strong className="text-slate-800 dark:text-slate-200 font-mono">{monthPurchases.length}</strong></span>
+          <span>Purchases: <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{monthPurchases.length}</strong></span>
         </div>
       </div>
 
       {/* ------------------------------------------------------------- */}
       {/* SUB-VIEW TABS (KPIs, Daily Chart, Top Performers, Breakdowns)  */}
       {/* ------------------------------------------------------------- */}
-      <div className="px-4 sm:px-5 pt-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto no-scrollbar">
+      <div className="px-4 sm:px-5 pt-3 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-2 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTabSubView('kpi')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTabSubView === 'kpi'
               ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -491,7 +504,7 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
 
         <button
           onClick={() => setActiveTabSubView('daily_chart')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTabSubView === 'daily_chart'
               ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -503,7 +516,7 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
 
         <button
           onClick={() => setActiveTabSubView('top_performers')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTabSubView === 'top_performers'
               ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -515,7 +528,7 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
 
         <button
           onClick={() => setActiveTabSubView('breakdowns')}
-          className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTabSubView === 'breakdowns'
               ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -532,38 +545,38 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
       {activeTabSubView === 'kpi' && (
         <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* 1. Monthly Revenue (Gross Sales) */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/60 dark:from-emerald-950/30 via-white dark:via-slate-900 to-emerald-50/20 dark:to-emerald-950/10 border border-emerald-200/80 dark:border-emerald-900/50 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
-                  <ArrowUpRight className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <ArrowUpRight className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                     Monthly Sales Turnover
                   </span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Gross Billed Supplies</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Gross Billed Supplies</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-xs font-mono font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded-lg">
+              <span className="px-2 py-0.5 text-xs font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-md border border-emerald-200/60 dark:border-emerald-800/50">
                 {monthInvoices.length} {monthInvoices.length === 1 ? 'invoice' : 'invoices'}
               </span>
             </div>
 
             <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-950 dark:text-emerald-200 font-mono">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                 {formatCurrency(grossSales, business.currencySymbol)}
               </div>
-              <div className="mt-2.5 pt-2.5 border-t border-emerald-100 dark:border-emerald-900/40 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between items-center">
                   <span>Taxable Outward:</span>
-                  <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(taxableSales, business.currencySymbol)}</strong>
+                  <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formatCurrency(taxableSales, business.currencySymbol)}</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Output GST Collected:</span>
-                  <strong className="text-emerald-700 dark:text-emerald-400 font-mono">{formatCurrency(outputGst, business.currencySymbol)}</strong>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">{formatCurrency(outputGst, business.currencySymbol)}</strong>
                 </div>
-                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
+                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-400">
                   <span>Avg Invoice Ticket:</span>
                   <span className="font-mono">{monthInvoices.length > 0 ? formatCurrency(grossSales / monthInvoices.length, business.currencySymbol) : '₹0'}</span>
                 </div>
@@ -572,38 +585,38 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
           </div>
 
           {/* 2. Monthly Purchases (Inward Supply) */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-50/60 dark:from-rose-950/30 via-white dark:via-slate-900 to-rose-50/20 dark:to-rose-950/10 border border-rose-200/80 dark:border-rose-900/50 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 flex items-center justify-center">
-                  <ArrowDownLeft className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                  <ArrowDownLeft className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                     Monthly Purchases
                   </span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Vendor Inward Bills</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Vendor Inward Bills</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-xs font-mono font-bold bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 rounded-lg">
+              <span className="px-2 py-0.5 text-xs font-mono font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded-md border border-rose-200/60 dark:border-rose-800/50">
                 {monthPurchases.length} {monthPurchases.length === 1 ? 'bill' : 'bills'}
               </span>
             </div>
 
             <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-rose-950 dark:text-rose-200 font-mono">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                 {formatCurrency(grossPurchases, business.currencySymbol)}
               </div>
-              <div className="mt-2.5 pt-2.5 border-t border-rose-100 dark:border-rose-900/40 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between items-center">
                   <span>Taxable Inward:</span>
-                  <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(taxablePurchases, business.currencySymbol)}</strong>
+                  <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formatCurrency(taxablePurchases, business.currencySymbol)}</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Input Tax Credit (ITC):</span>
-                  <strong className="text-rose-700 dark:text-rose-400 font-mono">{formatCurrency(purchasesItc, business.currencySymbol)}</strong>
+                  <strong className="text-rose-600 dark:text-rose-400 font-mono font-medium">{formatCurrency(purchasesItc, business.currencySymbol)}</strong>
                 </div>
-                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
+                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-400">
                   <span>Unpaid Supplier Bills:</span>
                   <span className="font-mono">{formatCurrency(monthPurchases.reduce((s, b) => s + (b.amountDue || 0), 0), business.currencySymbol)}</span>
                 </div>
@@ -612,38 +625,38 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
           </div>
 
           {/* 3. Monthly Operating Expenses */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/60 dark:from-amber-950/30 via-white dark:via-slate-900 to-amber-50/20 dark:to-amber-950/10 border border-amber-200/80 dark:border-amber-900/50 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 flex items-center justify-center">
-                  <Wallet className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Wallet className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                     Operating Expenses
                   </span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Overhead & Operational</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Overhead & Operational</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-xs font-mono font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 rounded-lg">
+              <span className="px-2 py-0.5 text-xs font-mono font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 rounded-md border border-amber-200/60 dark:border-amber-800/50">
                 {monthExpenses.length} entries
               </span>
             </div>
 
             <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-amber-950 dark:text-amber-200 font-mono">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                 {formatCurrency(totalExpenses, business.currencySymbol)}
               </div>
-              <div className="mt-2.5 pt-2.5 border-t border-amber-100 dark:border-amber-900/40 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between items-center">
                   <span>GST on Expenses (ITC):</span>
-                  <strong className="text-amber-700 dark:text-amber-400 font-mono">{formatCurrency(expensesItc, business.currencySymbol)}</strong>
+                  <strong className="text-amber-600 dark:text-amber-400 font-mono font-medium">{formatCurrency(expensesItc, business.currencySymbol)}</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Categories Logged:</span>
-                  <strong className="text-slate-800 dark:text-slate-200">{expenseCategoriesStats.length} heads</strong>
+                  <strong className="text-slate-700 dark:text-slate-300 font-medium">{expenseCategoriesStats.length} heads</strong>
                 </div>
-                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
+                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-400">
                   <span>Combined Inward + Spend:</span>
                   <span className="font-mono">{formatCurrency(totalOutflow, business.currencySymbol)}</span>
                 </div>
@@ -652,42 +665,44 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
           </div>
 
           {/* 4. Net Operating Spread (Sales - Purchases - Expenses) */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/60 dark:from-indigo-950/30 via-white dark:via-slate-900 to-cyan-50/20 dark:to-cyan-950/10 border border-indigo-200/80 dark:border-indigo-900/50 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                     Net Operating Spread
                   </span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Sales minus Inward & Expenses</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Sales minus Inward & Expenses</p>
                 </div>
               </div>
-              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${
-                netOperatingSpread >= 0 ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300'
+              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md border ${
+                netOperatingSpread >= 0 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/50' 
+                  : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/50'
               }`}>
                 {netOperatingSpread >= 0 ? 'Gross Profit' : 'Deficit'}
               </span>
             </div>
 
             <div className="mt-3">
-              <div className={`text-2xl sm:text-3xl font-black font-mono ${
-                netOperatingSpread >= 0 ? 'text-indigo-950 dark:text-indigo-200' : 'text-rose-700 dark:text-rose-300'
+              <div className={`text-2xl font-bold font-mono ${
+                netOperatingSpread >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600 dark:text-rose-400'
               }`}>
                 {netOperatingSpread >= 0 ? '+' : ''}{formatCurrency(netOperatingSpread, business.currencySymbol)}
               </div>
-              <div className="mt-2.5 pt-2.5 border-t border-indigo-100 dark:border-indigo-900/40 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between items-center">
                   <span>Operating Margin:</span>
-                  <strong className="text-indigo-600 dark:text-indigo-400 font-mono">{profitMarginPercent.toFixed(1)}%</strong>
+                  <strong className="text-indigo-600 dark:text-indigo-400 font-mono font-medium">{profitMarginPercent.toFixed(1)}%</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Total Inflow (Sales):</span>
-                  <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(grossSales, business.currencySymbol)}</strong>
+                  <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formatCurrency(grossSales, business.currencySymbol)}</strong>
                 </div>
-                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
+                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-400">
                   <span>Total Outflow (Cost+Exp):</span>
                   <span className="font-mono">{formatCurrency(totalOutflow, business.currencySymbol)}</span>
                 </div>
@@ -696,38 +711,38 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
           </div>
 
           {/* 5. Collections & Cash Realization */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/60 dark:from-blue-950/30 via-white dark:via-slate-900 to-blue-50/20 dark:to-blue-950/10 border border-blue-200/80 dark:border-blue-900/50 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 flex items-center justify-center">
-                  <CreditCard className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <CreditCard className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                     Collections & Inflow
                   </span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Realized Cash & Debtor Due</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Realized Cash & Debtor Due</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-xs font-mono font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 rounded-lg">
+              <span className="px-2 py-0.5 text-xs font-mono font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-md border border-blue-200/60 dark:border-blue-800/50">
                 {collectionRatio}% Collected
               </span>
             </div>
 
             <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-blue-950 dark:text-blue-200 font-mono">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                 {formatCurrency(totalCashCollected, business.currencySymbol)}
               </div>
-              <div className="mt-2.5 pt-2.5 border-t border-blue-100 dark:border-blue-900/40 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between items-center">
                   <span>From Month Invoices:</span>
-                  <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(invoiceCashRealized, business.currencySymbol)}</strong>
+                  <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formatCurrency(invoiceCashRealized, business.currencySymbol)}</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Pending Customer Due:</span>
-                  <strong className="text-amber-700 dark:text-amber-400 font-mono">{formatCurrency(invoiceAmountDue, business.currencySymbol)}</strong>
+                  <strong className="text-amber-600 dark:text-amber-400 font-mono font-medium">{formatCurrency(invoiceAmountDue, business.currencySymbol)}</strong>
                 </div>
-                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
+                <div className="flex justify-between items-center text-[11px] pt-1 text-slate-400">
                   <span>Payment Receipts Logged:</span>
                   <span className="font-mono">{monthPaymentsIn.length} vouchers</span>
                 </div>
@@ -736,22 +751,22 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
           </div>
 
           {/* 6. Monthly GST Position (GSTR-3B Balance) */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/60 dark:from-purple-950/30 via-white dark:via-slate-900 to-purple-50/20 dark:to-purple-950/10 border border-purple-200/80 dark:border-purple-900/50 shadow-xs">
+          <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 flex items-center justify-center">
-                  <Receipt className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <Receipt className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-900 dark:text-purple-200">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                     Monthly GST Position
                   </span>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Output Tax vs Eligible ITC</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Output Tax vs Eligible ITC</p>
                 </div>
               </div>
               <button
                 onClick={() => setActiveTab('gst_returns')}
-                className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+                className="text-[11px] text-purple-600 dark:text-purple-400 font-medium hover:underline flex items-center gap-0.5 cursor-pointer"
               >
                 <span>GSTR-3B</span>
                 <ArrowRight className="w-3 h-3" />
@@ -759,28 +774,28 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
             </div>
 
             <div className="mt-3">
-              <div className="text-2xl sm:text-3xl font-black text-purple-950 dark:text-purple-200 font-mono">
+              <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                 {netGstPayable > 0 
                   ? formatCurrency(netGstPayable, business.currencySymbol)
                   : formatCurrency(netItcCreditForward, business.currencySymbol)}
               </div>
               <div className="mt-1">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
                   netGstPayable > 0 
-                    ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300' 
-                    : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'
+                    ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200/60 dark:border-rose-800/50' 
+                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/50'
                 }`}>
                   {netGstPayable > 0 ? 'Net GST Payable to Govt' : 'ITC Balance Carried Forward'}
                 </span>
               </div>
-              <div className="mt-2 pt-2 border-t border-purple-100 dark:border-purple-900/40 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 dark:border-slate-700/60 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex justify-between items-center">
                   <span>Output Tax (Sales):</span>
-                  <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(outputGst, business.currencySymbol)}</strong>
+                  <strong className="text-slate-700 dark:text-slate-300 font-mono font-medium">{formatCurrency(outputGst, business.currencySymbol)}</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Eligible ITC (Purchases+Exp):</span>
-                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{formatCurrency(totalEligibleItc, business.currencySymbol)}</strong>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">{formatCurrency(totalEligibleItc, business.currencySymbol)}</strong>
                 </div>
               </div>
             </div>

@@ -262,31 +262,31 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
   const isAllExpanded = filteredInvoices.length > 0 && filteredInvoices.every(inv => expandedInvoiceIds[inv.id]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Tax Invoices & Billing</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Create, track, and manage GST compliant tax invoices & receipts</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Create, track, and manage GST compliant tax invoices & receipts</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <button
             type="button"
             onClick={() => setIsAutoUpdateModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-800 rounded-xl transition-all cursor-pointer shadow-2xs group"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl transition-all cursor-pointer shadow-2xs group"
             title="Auto-update & re-sequence invoice numbers from starting number in company and system settings"
           >
-            <Hash className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+            <Hash className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Auto Invoice No.</span>
           </button>
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl transition-all cursor-pointer shadow-2xs"
             title="Import historical and bulk sale invoices from CSV, Excel, or JSON"
           >
-            <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Import Sale Invoice</span>
           </button>
           <button
@@ -294,23 +294,23 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
               setStatementPartyId(parties[0]?.id || null);
               setIsStatementOpen(true);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 rounded-xl transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50 border border-indigo-200/70 dark:border-indigo-800/70 rounded-xl transition-all cursor-pointer shadow-2xs"
             title="Generate and export client account statement"
           >
-            <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Account Statement</span>
           </button>
           <button
             onClick={() => setActiveTab('pos_billing')}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
           >
             <span>POS Quick Sale</span>
           </button>
           <button
             onClick={onOpenNewInvoice}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Create Tax Invoice</span>
           </button>
         </div>
@@ -318,22 +318,22 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
 
       {/* Uncommitted Invoice Draft Notification Banner */}
       {activeDraft && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-indigo-500/10 border border-amber-500/30 dark:border-amber-500/20 text-slate-800 dark:text-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-in fade-in duration-150">
+        <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 text-slate-800 dark:text-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-150">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
               <History className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
                   Unsaved Invoice Draft
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300">
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-100/80 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-700/60">
                   {formatDraftTime(activeDraft.savedAt)}
                 </span>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                Draft for <strong className="font-semibold text-slate-900 dark:text-white">{activeDraft.customerName || 'Unnamed Party'}</strong> with {activeDraft.items?.length || 0} items ({formatCurrency(activeDraft.grandTotal || 0, business.currencySymbol)}) was saved to localStorage.
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                Draft for <strong className="font-semibold text-slate-900 dark:text-white">{activeDraft.customerName || 'Unnamed Party'}</strong> with {activeDraft.items?.length || 0} items ({formatCurrency(activeDraft.grandTotal || 0, business.currencySymbol)}) was saved locally.
               </p>
             </div>
           </div>
@@ -342,7 +342,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
             <button
               type="button"
               onClick={onOpenNewInvoice}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Resume Draft</span>
@@ -355,7 +355,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
                 setActiveDraft(null);
                 showToast('info', 'Draft Removed', 'Unsaved draft was cleared.');
               }}
-              className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs font-medium rounded-xl transition-all flex items-center gap-1 cursor-pointer"
               title="Discard draft"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-500" />
@@ -366,7 +366,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
       )}
 
       {/* Filter & Search Bar */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <input
@@ -374,7 +374,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by invoice #, customer name, GSTIN..."
-            className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
           />
           {searchQuery && (
             <button
@@ -393,7 +393,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="px-3 py-2 text-xs bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="ALL">All Statuses</option>
               <option value="PAID">Paid</option>
@@ -405,7 +405,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="px-3 py-2 text-xs bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="ALL">All Types</option>
               <option value="TAX_INVOICE">Tax Invoice (GST)</option>
@@ -417,11 +417,11 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
           </div>
 
           {/* View Mode Toggle Button: List vs Card */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0">
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 shrink-0">
             <button
               type="button"
               onClick={() => handleViewModeChange('list')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'list'
                   ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -434,7 +434,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
             <button
               type="button"
               onClick={() => handleViewModeChange('card')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'card'
                   ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -449,9 +449,9 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
       </div>
 
       {/* Invoices List Container (Desktop Table + Mobile Cards OR Card Grid) */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
         {/* Controls & Sorting Bar */}
-        <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-50/90 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs">
+        <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-slate-50/60 dark:bg-slate-850/50 border-b border-slate-200/80 dark:border-slate-800 text-xs">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-600 dark:text-slate-300">
               {sortedInvoices.length} {sortedInvoices.length === 1 ? 'Invoice' : 'Invoices'}

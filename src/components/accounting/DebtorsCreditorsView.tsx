@@ -222,6 +222,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
         // Avoid double-counting invoice/bill settlement payments already recorded in amountPaid
         if (p.linkedInvoiceId && partyInvoiceIds.has(p.linkedInvoiceId)) return false;
         if (p.linkedBillId && partyBillIds.has(p.linkedBillId)) return false;
+        if (p.id.startsWith('pay-rec-inv-') || p.id.startsWith('pay-rec-pb-')) return false;
         return isParty;
       });
 
@@ -280,10 +281,10 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
       }
 
       const roleLabel = role === 'BOTH' 
-        ? 'Customer & Vendor (Dual Role)' 
+        ? 'Customer & Creditor (Dual Role)' 
         : role === 'DEBTOR' 
           ? 'Sundry Debtor (Customer)' 
-          : 'Sundry Creditor (Vendor)';
+          : 'Sundry Creditor (Supplier)';
 
       const roleBadgeClass = role === 'BOTH'
         ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
@@ -748,13 +749,13 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Sundry Creditors (Vendors) */}
+        {/* Card 2: Sundry Creditors (Suppliers) */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-rose-200 dark:border-rose-900/60 p-4 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-bl-full pointer-events-none" />
           <div className="flex items-center justify-between text-xs text-rose-700 dark:text-rose-400 font-bold mb-1.5">
             <span className="flex items-center gap-1.5">
               <ArrowUpRight className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-              <span>Sundry Creditors (Vendors)</span>
+              <span>Sundry Creditors (Trade Payables)</span>
             </span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300">
               {totalCreditorsCount} Parties
@@ -904,7 +905,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
                   : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
               }`}
             >
-              <span>Sundry Creditors (Vendors)</span>
+              <span>Sundry Creditors (Suppliers)</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500/30 text-current">
                 {totalCreditorsCount}
               </span>
@@ -1290,7 +1291,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
                   ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
                   : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
             }`}>
-              {selectedPartyForLedger.type === 'CUSTOMER' ? 'Sundry Debtor (Customer)' : selectedPartyForLedger.type === 'VENDOR' ? 'Sundry Creditor (Vendor)' : 'Dual Role (Customer & Vendor)'}
+              {selectedPartyForLedger.type === 'CUSTOMER' ? 'Sundry Debtor (Customer)' : selectedPartyForLedger.type === 'VENDOR' ? 'Sundry Creditor (Supplier)' : 'Dual Role (Customer & Creditor)'}
             </span>
           }
           subtitle={`General Ledger Statement of Accounts • ${selectedPartyForLedger.phone || 'No phone'} • ${selectedPartyForLedger.gstin ? `GSTIN: ${selectedPartyForLedger.gstin}` : 'Unregistered'}`}

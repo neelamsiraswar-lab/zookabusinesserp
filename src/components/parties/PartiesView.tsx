@@ -7,6 +7,7 @@ import { INDIAN_STATES } from '../../utils/constants';
 import { ClientStatementModal } from './ClientStatementModal';
 import { BulkPartyUploadModal } from './BulkPartyUploadModal';
 import { Pagination } from '../common/Pagination';
+import { calculateReceivablesAndPayables } from '../../utils/partyBalances';
 import { 
   Users, 
   Search, 
@@ -34,6 +35,7 @@ export const PartiesView: React.FC = () => {
     parties, 
     invoices, 
     purchaseBills, 
+    payments,
     business, 
     createParty, 
     bulkCreateParties, 
@@ -132,13 +134,9 @@ export const PartiesView: React.FC = () => {
     return filteredParties.slice(start, start + pageSize);
   }, [filteredParties, currentPage, pageSize]);
 
-  const totalReceivables = parties
-    .filter(p => p.currentBalance > 0)
-    .reduce((s, p) => s + p.currentBalance, 0);
-
-  const totalPayables = parties
-    .filter(p => p.currentBalance < 0)
-    .reduce((s, p) => s + Math.abs(p.currentBalance), 0);
+  const { totalReceivables, totalPayables, partyBalances } = useMemo(() => {
+    return calculateReceivablesAndPayables(parties, invoices, purchaseBills, payments);
+  }, [parties, invoices, purchaseBills, payments]);
 
   const handleOpenCreate = (presetType?: 'CUSTOMER' | 'VENDOR' | 'BOTH') => {
     setEditingParty(null);
@@ -250,25 +248,25 @@ export const PartiesView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            <span>Customers & Vendors (Parties Master)</span>
+            <span>Customers & Creditors (Parties Master)</span>
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Maintain customer/vendor accounts, GSTIN verification, ledgers & payment tracking
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Maintain customer & creditor accounts, GSTIN verification, ledgers & payment tracking
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Sync Invoiced Customers & Vendors */}
+          {/* Sync Invoiced Customers & Creditors */}
           <button
             onClick={() => syncBillingParties()}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200 bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 border border-teal-200 dark:border-teal-800 rounded-xl shadow-xs transition-all cursor-pointer"
-            title="Auto-sync all customer & vendor names from your invoices and bills into contacts master"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200 bg-teal-50/70 dark:bg-teal-950/50 hover:bg-teal-100/70 dark:hover:bg-teal-900/50 border border-teal-200/70 dark:border-teal-800/70 rounded-xl shadow-2xs transition-all cursor-pointer"
+            title="Auto-sync all customer & creditor names from your invoices and bills into contacts master"
           >
             <RefreshCw className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
             <span>Sync Invoiced Contacts</span>
@@ -277,10 +275,10 @@ export const PartiesView: React.FC = () => {
           {/* Bulk Import CSV Action */}
           <button
             onClick={() => setIsBulkUploadOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 rounded-xl shadow-xs transition-all cursor-pointer"
-            title="Bulk upload customer and vendor list from CSV file"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs transition-all cursor-pointer"
+            title="Bulk upload customer and creditor list from CSV file"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Import CSV</span>
           </button>
 
@@ -289,53 +287,57 @@ export const PartiesView: React.FC = () => {
               setStatementPartyId(parties[0]?.id || null);
               setIsStatementOpen(true);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800 rounded-xl transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50 border border-indigo-200/70 dark:border-indigo-800/70 rounded-xl transition-all cursor-pointer shadow-2xs"
             title="Generate and export client account statement with transaction history and balance"
           >
-            <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Account Statements</span>
           </button>
           <button
             onClick={() => handleOpenCreate(partyTypeFilter === 'VENDOR' ? 'VENDOR' : 'CUSTOMER')}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>{partyTypeFilter === 'VENDOR' ? 'Add New Vendor' : partyTypeFilter === 'CUSTOMER' ? 'Add New Customer' : 'Add New Contact'}</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>{partyTypeFilter === 'VENDOR' ? 'Add New Creditor' : partyTypeFilter === 'CUSTOMER' ? 'Add New Customer' : 'Add New Contact'}</span>
           </button>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Receivables (Customers)</span>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Receivables (Debtors / Customers)</span>
+            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">
               {formatCurrency(totalReceivables, business.currencySymbol)}
             </div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">Money to be collected</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              {totalReceivables <= 0.01 ? 'All customer accounts cleared (0 pending)' : 'Money to be collected'}
+            </span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0">
             Dr
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Payables (Suppliers)</span>
-            <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Payables (Creditors / Suppliers)</span>
+            <div className={`text-xl font-bold mt-0.5 font-mono ${totalPayables <= 0.01 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
               {formatCurrency(totalPayables, business.currencySymbol)}
             </div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">Money owed to vendors</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              {totalPayables <= 0.01 ? 'All supplier payables cleared (0 owed)' : 'Money owed to creditors'}
+            </span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-sm">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">
             Cr
           </div>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-center gap-3">
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
           <input
@@ -343,7 +345,7 @@ export const PartiesView: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search party by name, company, GSTIN or phone..."
-            className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
           {searchQuery && (
             <button
@@ -357,30 +359,30 @@ export const PartiesView: React.FC = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 w-full sm:w-auto flex-wrap">
+        <div className="flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 shrink-0 w-full sm:w-auto flex-wrap">
           {(['ALL', 'CUSTOMER', 'VENDOR', 'POS_CUSTOMER'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setPartyTypeFilter(tab)}
-              className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer flex items-center gap-1 ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
                 partyTypeFilter === tab
-                  ? 'bg-slate-900 dark:bg-indigo-600 text-white border-slate-900 dark:border-indigo-600 shadow-sm'
-                  : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               {tab === 'POS_CUSTOMER' && <ShoppingCart className="w-3 h-3 text-amber-500" />}
-              <span>{tab === 'ALL' ? 'All Contacts' : tab === 'CUSTOMER' ? 'Customers' : tab === 'VENDOR' ? 'Vendors' : 'POS / Retail'}</span>
+              <span>{tab === 'ALL' ? 'All Contacts' : tab === 'CUSTOMER' ? 'Customers (Debtors)' : tab === 'VENDOR' ? 'Creditors (Suppliers)' : 'POS / Retail'}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Parties Table */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-semibold">
+              <tr className="bg-slate-50/60 dark:bg-slate-850/50 border-b border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-semibold">
                 <th className="py-3 px-4">Contact & Company</th>
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4">GSTIN & PAN</th>
@@ -391,8 +393,10 @@ export const PartiesView: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {paginatedParties.map(party => {
-                const isDebtor = party.currentBalance > 0;
-                const isCreditor = party.currentBalance < 0;
+                const calcBal = partyBalances?.get(party.id);
+                const effectiveBalance = calcBal ? calcBal.closingBalance : party.currentBalance;
+                const isDebtor = effectiveBalance > 0.01;
+                const isCreditor = effectiveBalance < -0.01;
 
                 // Find POS sales and total transactions for this party
                 const partyInvoices = invoices.filter(i => 
@@ -427,7 +431,7 @@ export const PartiesView: React.FC = () => {
                           ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300'
                           : 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300'
                       }`}>
-                        {party.type}
+                        {party.type === 'CUSTOMER' ? 'Customer (Debtor)' : party.type === 'VENDOR' ? 'Creditor (Supplier)' : 'Dual Role'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
@@ -450,7 +454,7 @@ export const PartiesView: React.FC = () => {
                       <div className={`font-mono font-bold text-xs ${
                         isDebtor ? 'text-emerald-600 dark:text-emerald-400' : isCreditor ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'
                       }`}>
-                        {formatCurrency(Math.abs(party.currentBalance), business.currencySymbol)}
+                        {formatCurrency(Math.abs(effectiveBalance), business.currencySymbol)}
                         <span className="text-[10px] ml-1 font-sans font-bold">
                           {isDebtor ? '(Dr)' : isCreditor ? '(Cr)' : '(Settled)'}
                         </span>

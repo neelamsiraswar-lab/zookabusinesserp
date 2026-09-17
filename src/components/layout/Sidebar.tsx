@@ -63,7 +63,7 @@ export const Sidebar: React.FC = () => {
     platformConfig
   } = useApp();
 
-  const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
+  const palette = getThemePalette(business?.themeColor || currentCompany?.themeColor || 'indigo');
 
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
     return typeof document !== 'undefined' && !!document.fullscreenElement;

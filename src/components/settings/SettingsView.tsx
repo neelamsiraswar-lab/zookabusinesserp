@@ -88,7 +88,7 @@ export const SettingsView: React.FC = () => {
     setActiveTab: setGlobalActiveTab
   } = useApp();
 
-  const palette = getThemePalette(currentCompany?.themeColor || 'indigo');
+  const palette = getThemePalette(business?.themeColor || currentCompany?.themeColor || 'indigo');
 
   const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'header' | 'footer' | 'bottom_nav' | 'signature' | 'banking' | 'invoicing' | 'pos' | 'templates' | 'dispatch' | 'item_lines' | 'low_stock' | 'security' | 'biometrics' | 'pwa' | 'backup'>('profile');
   const [formData, setFormData] = useState({ ...business });

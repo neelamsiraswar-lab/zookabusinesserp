@@ -84,6 +84,7 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
     invoices, 
     purchaseBills, 
     payments,
+    journalEntries,
     createPayment,
     business, 
     recordInvoicePayment, 
@@ -405,6 +406,8 @@ export const ClientStatementModal: React.FC<ClientStatementModalProps> = ({
         });
       }
     });
+
+    // D. In Ledger / Statement, do not show journal entries to avoid duplicity of amount
 
     // Sort all events chronologically
     allEvents.sort((a, b) => a.timestamp - b.timestamp);
