@@ -26,7 +26,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   onClose,
   onSelectInvoice
 }) => {
-  const { invoices, products, parties, purchaseBills, cheques, setActiveTab } = useApp();
+  const { invoices, products, parties, purchaseBills, cheques, setActiveTab, can } = useApp();
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -212,9 +212,17 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-slate-900 dark:text-white">{formatINR(prod.sellingPrice)}</div>
-                      <div className={`text-[11px] font-semibold ${prod.currentStock <= prod.minStockAlert ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                    <div className="text-right font-mono">
+                      <div className="font-bold text-slate-900 dark:text-white text-xs">
+                        <span className="text-[10px] text-slate-400 font-normal font-sans mr-1">Sale:</span>
+                        {formatINR(prod.sellingPrice)}
+                      </div>
+                      {can('inventory', 'viewPurchaseCost') && prod.purchasePrice > 0 && (
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          <span className="font-sans text-[9px]">Buy (Incl. Tax):</span> {formatINR(prod.purchasePrice * (1 + (prod.gstRate || 0) / 100))}
+                        </div>
+                      )}
+                      <div className={`text-[11px] font-semibold font-sans ${prod.currentStock <= prod.minStockAlert ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'}`}>
                         {prod.isService ? 'Service' : `${prod.currentStock} in Stock`}
                       </div>
                     </div>

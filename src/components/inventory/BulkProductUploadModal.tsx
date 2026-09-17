@@ -728,8 +728,14 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                       <th className="py-2.5 px-3">HSN</th>
                       <th className="py-2.5 px-3">Category</th>
                       <th className="py-2.5 px-3">Unit</th>
-                      <th className="py-2.5 px-3 text-right">Cost Price</th>
-                      <th className="py-2.5 px-3 text-right">Selling Price</th>
+                      <th className="py-2.5 px-3 text-right">
+                        <div>Purchase (Incl. Tax)</div>
+                        <div className="text-[9px] font-normal text-slate-400">Base Cost</div>
+                      </th>
+                      <th className="py-2.5 px-3 text-right">
+                        <div>Sale Rate</div>
+                        <div className="text-[9px] font-normal text-slate-400">Selling Price</div>
+                      </th>
                       <th className="py-2.5 px-3 text-center">GST %</th>
                       <th className="py-2.5 px-3 text-right">Stock</th>
                       <th className="py-2.5 px-3 text-center">Action</th>
@@ -778,7 +784,12 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                         <td className="py-2.5 px-3 text-slate-700">{row.category}</td>
                         <td className="py-2.5 px-3 text-slate-600 uppercase font-mono text-[11px]">{row.unit}</td>
                         <td className="py-2.5 px-3 text-right font-mono text-slate-700">
-                          {formatCurrency(row.purchasePrice, currencySymbol)}
+                          <div className="font-semibold text-slate-900">
+                            {formatCurrency(row.purchasePrice * (1 + (row.gstRate || 0) / 100), currencySymbol)}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Base: {formatCurrency(row.purchasePrice, currencySymbol)}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                           {formatCurrency(row.sellingPrice, currencySymbol)}
