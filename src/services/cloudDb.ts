@@ -11,6 +11,8 @@ import {
   where, 
   onSnapshot, 
   handleFirestoreError, 
+  isPermissionDeniedError,
+  isOfflineError,
   OperationType 
 } from './firebase';
 import { 
@@ -136,6 +138,21 @@ export interface RealtimeListenersConfig {
   onError?: (err: any) => void;
 }
 
+/**
+ * Safely fetches a Firestore document with retry for transient offline/handshake states
+ */
+async function getDocSafe(docRef: any, maxRetries = 2, delayMs = 400): Promise<any> {
+  try {
+    return await getDoc(docRef);
+  } catch (err) {
+    if (isOfflineError(err) && maxRetries > 0) {
+      await new Promise(res => setTimeout(res, delayMs));
+      return getDocSafe(docRef, maxRetries - 1, delayMs * 1.5);
+    }
+    throw err;
+  }
+}
+
 class CloudDbService {
   private isOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
@@ -156,13 +173,16 @@ class CloudDbService {
   async getSystemState(): Promise<{ activeCompanyId?: string } | null> {
     try {
       const docRef = doc(db, 'systemState', 'global');
-      const snap = await getDoc(docRef);
+      const snap = await getDocSafe(docRef);
       if (snap.exists()) {
         return snap.data() as { activeCompanyId?: string };
       }
     } catch (e) {
-      handleFirestoreError(e, OperationType.GET, 'systemState/global');
-      console.warn('CloudDb: Failed reading system state from Firestore:', e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.GET, 'systemState/global');
+      } else {
+        console.warn('CloudDb: Reading system state from Firestore notice (offline/cached):', e instanceof Error ? e.message : e);
+      }
     }
     return null;
   }
@@ -172,8 +192,11 @@ class CloudDbService {
       const docRef = doc(db, 'systemState', 'global');
       await setDoc(docRef, { ...state, lastSyncedAt: new Date().toISOString() }, { merge: true });
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'systemState/global');
-      console.warn('CloudDb: Failed writing system state to Firestore:', e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.WRITE, 'systemState/global');
+      } else {
+        console.warn('CloudDb: Writing system state to Firestore notice:', e instanceof Error ? e.message : e);
+      }
     }
   }
 
@@ -187,7 +210,11 @@ class CloudDbService {
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, 'systemState/global');
+        if (isPermissionDeniedError(error)) {
+          handleFirestoreError(error, OperationType.GET, 'systemState/global');
+        } else {
+          console.warn('CloudDb: systemState/global snapshot notice:', error?.message);
+        }
         if (onError) onError(error);
       }
     );
@@ -196,13 +223,16 @@ class CloudDbService {
   async fetchSuperAdminAuth(): Promise<Partial<SuperAdminAuthData> | null> {
     try {
       const docRef = doc(db, 'systemState', 'superAdminAuth');
-      const snap = await getDoc(docRef);
+      const snap = await getDocSafe(docRef);
       if (snap.exists()) {
         return snap.data() as Partial<SuperAdminAuthData>;
       }
     } catch (e) {
-      handleFirestoreError(e, OperationType.GET, 'systemState/superAdminAuth');
-      console.warn('CloudDb: Failed reading Super Admin auth from Firestore:', e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.GET, 'systemState/superAdminAuth');
+      } else {
+        console.warn('CloudDb: Reading Super Admin auth notice (offline/local fallback):', e instanceof Error ? e.message : e);
+      }
     }
     return null;
   }
@@ -213,8 +243,11 @@ class CloudDbService {
       const cleanData = sanitizeForFirestore({ ...authData, updatedAt: new Date().toISOString() });
       await setDoc(docRef, cleanData, { merge: true });
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'systemState/superAdminAuth');
-      console.error('CloudDb: Failed saving Super Admin auth to Firestore:', e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.WRITE, 'systemState/superAdminAuth');
+      } else {
+        console.warn('CloudDb: Saving Super Admin auth notice:', e instanceof Error ? e.message : e);
+      }
     }
   }
 
@@ -228,7 +261,11 @@ class CloudDbService {
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, 'systemState/superAdminAuth');
+        if (isPermissionDeniedError(error)) {
+          handleFirestoreError(error, OperationType.GET, 'systemState/superAdminAuth');
+        } else {
+          console.warn('CloudDb: systemState/superAdminAuth snapshot notice:', error?.message);
+        }
         if (onError) onError(error);
       }
     );
@@ -240,13 +277,16 @@ class CloudDbService {
   async fetchPlatformConfig(): Promise<Partial<PlatformConfig> | null> {
     try {
       const docRef = doc(db, 'systemState', 'platformConfig');
-      const snap = await getDoc(docRef);
+      const snap = await getDocSafe(docRef);
       if (snap.exists()) {
         return snap.data() as Partial<PlatformConfig>;
       }
     } catch (e) {
-      handleFirestoreError(e, OperationType.GET, 'systemState/platformConfig');
-      console.warn('CloudDb: Failed reading platform config from Firestore:', e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.GET, 'systemState/platformConfig');
+      } else {
+        console.warn('CloudDb: Reading platform config notice (offline/local fallback):', e instanceof Error ? e.message : e);
+      }
     }
     return null;
   }
@@ -257,8 +297,11 @@ class CloudDbService {
       const cleanData = sanitizeForFirestore({ ...config, updatedAt: new Date().toISOString() });
       await setDoc(docRef, cleanData, { merge: true });
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'systemState/platformConfig');
-      console.error('CloudDb: Failed saving platform config to Firestore:', e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.WRITE, 'systemState/platformConfig');
+      } else {
+        console.warn('CloudDb: Saving platform config notice:', e instanceof Error ? e.message : e);
+      }
     }
   }
 
@@ -272,7 +315,11 @@ class CloudDbService {
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, 'systemState/platformConfig');
+        if (isPermissionDeniedError(error)) {
+          handleFirestoreError(error, OperationType.GET, 'systemState/platformConfig');
+        } else {
+          console.warn('CloudDb: systemState/platformConfig snapshot notice:', error?.message);
+        }
         if (onError) onError(error);
       }
     );
@@ -370,13 +417,16 @@ class CloudDbService {
   async fetchBusinessProfile(companyId: string): Promise<BusinessProfile | null> {
     try {
       const docRef = doc(db, 'businessProfiles', companyId);
-      const snap = await getDoc(docRef);
+      const snap = await getDocSafe(docRef);
       if (snap.exists()) {
         return normalizeBusinessProfile(snap.data() as BusinessProfile);
       }
     } catch (e) {
-      handleFirestoreError(e, OperationType.GET, `businessProfiles/${companyId}`);
-      console.warn(`CloudDb: Error fetching business profile for ${companyId}:`, e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.GET, `businessProfiles/${companyId}`);
+      } else {
+        console.warn(`CloudDb: Error fetching business profile for ${companyId} notice:`, e);
+      }
     }
     return null;
   }
@@ -388,8 +438,11 @@ class CloudDbService {
       await setDoc(docRef, cleanData, { merge: true });
       return { success: true };
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `businessProfiles/${companyId}`);
-      console.warn('CloudDb: Note saving business profile:', e);
+      if (isPermissionDeniedError(e)) {
+        handleFirestoreError(e, OperationType.WRITE, `businessProfiles/${companyId}`);
+      } else {
+        console.warn('CloudDb: Note saving business profile notice:', e);
+      }
       return { success: false, error: e };
     }
   }
@@ -400,14 +453,14 @@ class CloudDbService {
   async fetchCompanyDataPartition(companyId: string): Promise<CloudCompanyData | null> {
     try {
       const compDocRef = doc(db, 'companies', companyId);
-      const compSnap = await getDoc(compDocRef);
+      const compSnap = await getDocSafe(compDocRef);
       if (!compSnap.exists()) {
         return null;
       }
       const company = compSnap.data() as Company;
 
       const busDocRef = doc(db, 'businessProfiles', companyId);
-      const busSnap = await getDoc(busDocRef);
+      const busSnap = await getDocSafe(busDocRef);
       const rawBus = busSnap.exists() ? (busSnap.data() as BusinessProfile) : null;
 
       const businessData: BusinessProfile = rawBus ? {

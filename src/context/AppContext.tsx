@@ -4088,6 +4088,107 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePurchaseBill = (id: string, billData: Partial<PurchaseBill>) => {
+    const target = purchaseBills.find(b => b.id === id);
+    if (!target) return;
+
+    // 1. Inward Stock adjustment when items change
+    if (billData.items && billData.items.length > 0) {
+      const netStockDelta = new Map<string, { delta: number; rate: number; name: string }>();
+
+      // Deduct old inward quantities
+      if (target.items && target.items.length > 0) {
+        target.items.forEach(item => {
+          const qty = Number(item.quantity) || 0;
+          if (qty <= 0) return;
+          const key = item.productId || item.name.trim().toLowerCase();
+          const existing = netStockDelta.get(key);
+          if (existing) {
+            existing.delta -= qty;
+          } else {
+            netStockDelta.set(key, { delta: -qty, rate: item.rate || 0, name: item.name.trim().toLowerCase() });
+          }
+        });
+      }
+
+      // Add new inward quantities
+      billData.items.forEach(item => {
+        const qty = Number(item.quantity) || 0;
+        if (qty <= 0) return;
+        const rate = Number(item.rate) || 0;
+        const key = item.productId || item.name.trim().toLowerCase();
+        const existing = netStockDelta.get(key);
+        if (existing) {
+          existing.delta += qty;
+          if (rate > 0) existing.rate = rate;
+        } else {
+          netStockDelta.set(key, { delta: qty, rate, name: item.name.trim().toLowerCase() });
+        }
+      });
+
+      if (netStockDelta.size > 0) {
+        setProducts(prev => {
+          return prev.map(prod => {
+            const entry = netStockDelta.get(prod.id) || netStockDelta.get(prod.name.trim().toLowerCase());
+            if (entry && !prod.isService && entry.delta !== 0) {
+              const updatedProd = {
+                ...prod,
+                currentStock: Math.max(0, Math.round(((prod.currentStock || 0) + entry.delta) * 1000) / 1000),
+                purchasePrice: entry.rate > 0 ? entry.rate : prod.purchasePrice
+              };
+              cloudDb.syncEntityDoc('products', currentCompanyId, updatedProd).catch(console.warn);
+              return updatedProd;
+            }
+            return prod;
+          });
+        });
+      }
+    }
+
+    // 2. Adjust vendor payable ledger balance
+    const oldDue = target.amountDue ?? 0;
+    const newDue = billData.amountDue !== undefined ? billData.amountDue : oldDue;
+    const oldVendorId = target.vendorId;
+    const newVendorId = billData.vendorId || oldVendorId;
+
+    if (oldVendorId === newVendorId) {
+      const dueDiff = newDue - oldDue;
+      if (dueDiff !== 0 && oldVendorId) {
+        setParties(prev => prev.map(p => {
+          if (p.id === oldVendorId) {
+            const updatedParty = {
+              ...p,
+              currentBalance: p.currentBalance - dueDiff
+            };
+            cloudDb.syncEntityDoc('parties', currentCompanyId, updatedParty).catch(console.warn);
+            return updatedParty;
+          }
+          return p;
+        }));
+      }
+    } else {
+      if (oldVendorId && oldDue > 0) {
+        setParties(prev => prev.map(p => {
+          if (p.id === oldVendorId) {
+            const updatedParty = { ...p, currentBalance: p.currentBalance + oldDue };
+            cloudDb.syncEntityDoc('parties', currentCompanyId, updatedParty).catch(console.warn);
+            return updatedParty;
+          }
+          return p;
+        }));
+      }
+      if (newVendorId && newDue > 0) {
+        setParties(prev => prev.map(p => {
+          if (p.id === newVendorId) {
+            const updatedParty = { ...p, currentBalance: p.currentBalance - newDue };
+            cloudDb.syncEntityDoc('parties', currentCompanyId, updatedParty).catch(console.warn);
+            return updatedParty;
+          }
+          return p;
+        }));
+      }
+    }
+
+    // 3. Update purchase bill record
     setPurchaseBills(prev => prev.map(b => {
       if (b.id === id) {
         const updated = { ...b, ...billData };
@@ -4096,7 +4197,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return b;
     }));
-    showToast('success', 'Purchase Bill Updated', 'Purchase bill modified.');
+
+    showToast('success', 'Purchase Bill Updated', `Bill ${billData.billNumber || target.billNumber} modified.`);
   };
 
   const deletePurchaseBill = (id: string) => {

@@ -206,6 +206,7 @@ export interface PurchaseBillItem {
   quantity: number;
   unit: string;
   rate: number;
+  taxIncludedRate?: number;
   taxableAmount: number;
   gstRate: GstTaxRate;
   cgstAmount: number;

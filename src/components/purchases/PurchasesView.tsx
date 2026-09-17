@@ -36,7 +36,9 @@ import {
   Hash,
   AlertTriangle,
   Check,
-  Boxes
+  Boxes,
+  Pencil,
+  Filter
 } from 'lucide-react';
 
 export const PurchasesView: React.FC = () => {
@@ -48,6 +50,7 @@ export const PurchasesView: React.FC = () => {
     customHsnCodes,
     business, 
     createPurchaseBill, 
+    updatePurchaseBill,
     deletePurchaseBill, 
     createProduct,
     recordPurchasePayment, 
@@ -61,6 +64,7 @@ export const PurchasesView: React.FC = () => {
 
   // Modals
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [editingBillId, setEditingBillId] = useState<string | null>(null);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isCustomHsnModalOpen, setIsCustomHsnModalOpen] = useState(false);
   const [hsnLookupTargetIndex, setHsnLookupTargetIndex] = useState<number | null>(null);
@@ -68,6 +72,13 @@ export const PurchasesView: React.FC = () => {
 
   // State for product search autocomplete dropdown
   const [activeSuggestIndex, setActiveSuggestIndex] = useState<number | null>(null);
+
+  // Dedicated Product Search & Picker Modal State
+  const [isProductSearchModalOpen, setIsProductSearchModalOpen] = useState(false);
+  const [productSearchTargetRowIndex, setProductSearchTargetRowIndex] = useState<number | null>(null);
+  const [productModalSearchQuery, setProductModalSearchQuery] = useState('');
+  const [productModalCategoryFilter, setProductModalCategoryFilter] = useState('ALL');
+  const [productModalStockFilter, setProductModalStockFilter] = useState<'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
 
   // Quick Add Product Modal State (for creating product directly from purchase dialog if not in stock/catalog)
   const [isQuickAddProductModalOpen, setIsQuickAddProductModalOpen] = useState(false);
@@ -90,7 +101,7 @@ export const PurchasesView: React.FC = () => {
   const [vendorId, setVendorId] = useState('');
   const [vendorName, setVendorName] = useState('');
   const [vendorGstin, setVendorGstin] = useState('');
-  const [vendorInvoiceNo, setVendorInvoiceNo] = useState('');
+  const [purchaseInvoiceNo, setPurchaseInvoiceNo] = useState('');
   const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
   const [itcEligibility, setItcEligibility] = useState<PurchaseBill['itcEligibility']>('ELIGIBLE_ALL');
@@ -110,14 +121,13 @@ export const PurchasesView: React.FC = () => {
       quantity: 10,
       unit: products[0]?.unit || 'PCS',
       rate: products[0]?.purchasePrice || 1000,
+      taxIncludedRate: Math.round(((products[0]?.purchasePrice || 1000) * (1 + (products[0]?.gstRate || 18) / 100) + Number.EPSILON) * 100) / 100,
       taxableAmount: 10000,
       gstRate: products[0]?.gstRate || 18,
       cgstAmount: 900,
       sgstAmount: 900,
       igstAmount: 0,
-      totalAmount: 11800,
-      batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
-      expiryDate: '2028-12-31'
+      totalAmount: 11800
     }
   ]);
 
@@ -145,6 +155,7 @@ export const PurchasesView: React.FC = () => {
   ): PurchaseBillItem => {
     const qty = Math.max(0, Number(item.quantity) || 0);
     const gstRateVal = Number(item.gstRate) || 0;
+    const taxFactor = 1 + gstRateVal / 100;
 
     let rate = Math.max(0, Number(item.rate) || 0);
     let taxable = 0;
@@ -155,7 +166,6 @@ export const PurchasesView: React.FC = () => {
 
     if (mode === 'INCLUSIVE' && (item.totalAmount !== undefined && item.totalAmount > 0)) {
       total = round2(item.totalAmount);
-      const taxFactor = 1 + gstRateVal / 100;
       taxable = round2(total / taxFactor);
       rate = qty > 0 ? round2(taxable / qty) : 0;
       const totalTax = round2(total - taxable);
@@ -185,10 +195,13 @@ export const PurchasesView: React.FC = () => {
       total = round2(taxable + cgst + sgst + igst);
     }
 
+    const taxIncludedRate = round2(rate * taxFactor);
+
     return {
       ...item,
       quantity: qty,
       rate,
+      taxIncludedRate,
       taxableAmount: taxable,
       cgstAmount: cgst,
       sgstAmount: sgst,
@@ -241,13 +254,14 @@ export const PurchasesView: React.FC = () => {
   };
 
   const handleOpenPurchaseModal = () => {
+    setEditingBillId(null);
     const defaultVendor = parties.find(p => p.type !== 'CUSTOMER') || parties[0];
     const firstProd = products[0];
     
     setVendorId(defaultVendor?.id || '');
     setVendorName(defaultVendor?.name || '');
     setVendorGstin(defaultVendor?.gstin || '');
-    setVendorInvoiceNo(`VIN-${Date.now().toString().slice(-4)}`);
+    setPurchaseInvoiceNo(''); // Manual entry - user must manually type supplier's bill #
     setBillDate(new Date().toISOString().split('T')[0]);
     setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
     setItcEligibility('ELIGIBLE_ALL');
@@ -273,14 +287,13 @@ export const PurchasesView: React.FC = () => {
         quantity: 10,
         unit: firstProd.unit || 'PCS',
         rate: pPrice,
+        taxIncludedRate: round2(pPrice * (1 + gstR / 100)),
         taxableAmount: 0,
         gstRate: gstR,
         cgstAmount: 0,
         sgstAmount: 0,
         igstAmount: 0,
-        totalAmount: 0,
-        batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
-        expiryDate: '2028-12-31'
+        totalAmount: 0
       };
       setPItems([recalculateItem(initialItem, isInter, 'EXCLUSIVE')]);
     } else {
@@ -292,18 +305,63 @@ export const PurchasesView: React.FC = () => {
         quantity: 1,
         unit: 'PCS',
         rate: 0,
+        taxIncludedRate: 0,
         taxableAmount: 0,
         gstRate: 18,
         cgstAmount: 0,
         sgstAmount: 0,
         igstAmount: 0,
-        totalAmount: 0,
-        batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
-        expiryDate: ''
+        totalAmount: 0
       };
       setPItems([initialItem]);
     }
 
+    setIsPurchaseModalOpen(true);
+  };
+
+  const handleEditPurchaseBill = (bill: PurchaseBill) => {
+    setEditingBillId(bill.id);
+    setVendorId(bill.vendorId || '');
+    setVendorName(bill.vendorName || '');
+    setVendorGstin(bill.vendorGstin || '');
+    setPurchaseInvoiceNo(bill.vendorInvoiceNumber || bill.billNumber || '');
+    setBillDate(bill.billDate ? bill.billDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setDueDate(bill.dueDate ? bill.dueDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setItcEligibility(bill.itcEligibility || 'ELIGIBLE_ALL');
+    setIsInterState(!!bill.isInterState);
+
+    if (bill.items && bill.items.length > 0) {
+      setPItems(bill.items.map(it => {
+        const gstR = it.gstRate || 0;
+        const taxInclRate = it.taxIncludedRate !== undefined
+          ? it.taxIncludedRate
+          : (it.rate ? round2(it.rate * (1 + gstR / 100)) : 0);
+        return {
+          ...it,
+          id: it.id || 'pbi-' + Math.random().toString(36).substr(2, 6),
+          taxIncludedRate: taxInclRate
+        };
+      }));
+    } else {
+      setPItems([{
+        id: 'pbi-' + Date.now(),
+        productId: '',
+        name: '',
+        hsnCode: '',
+        quantity: 1,
+        unit: 'PCS',
+        rate: 0,
+        taxIncludedRate: 0,
+        taxableAmount: 0,
+        gstRate: 18,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        totalAmount: 0
+      }]);
+    }
+
+    setSelectedBillForView(null);
     setIsPurchaseModalOpen(true);
   };
 
@@ -372,6 +430,80 @@ export const PurchasesView: React.FC = () => {
         (p.barcode && p.barcode.includes(query))
       );
     }).slice(0, 30);
+  };
+
+  // Categories and filtered products for Dedicated Product Search Modal
+  const productCategories = useMemo(() => {
+    const cats = new Set<string>();
+    products.forEach(p => {
+      if (p.category) cats.add(p.category);
+    });
+    return Array.from(cats);
+  }, [products]);
+
+  const modalFilteredProducts = useMemo(() => {
+    return products.filter(p => {
+      // Category filter
+      if (productModalCategoryFilter !== 'ALL' && p.category !== productModalCategoryFilter) {
+        return false;
+      }
+      // Stock filter
+      const stock = p.currentStock || 0;
+      const isOut = stock <= 0;
+      const isLow = !isOut && stock <= (p.minStockAlert || 5);
+      if (productModalStockFilter === 'IN_STOCK' && isOut) return false;
+      if (productModalStockFilter === 'LOW_STOCK' && !isLow) return false;
+      if (productModalStockFilter === 'OUT_OF_STOCK' && !isOut) return false;
+
+      // Query filter
+      if (!productModalSearchQuery.trim()) return true;
+      const q = productModalSearchQuery.trim().toLowerCase();
+      return (
+        p.name.toLowerCase().includes(q) ||
+        (p.sku && p.sku.toLowerCase().includes(q)) ||
+        (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+        (p.hsnCode && p.hsnCode.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q))
+      );
+    });
+  }, [products, productModalCategoryFilter, productModalStockFilter, productModalSearchQuery]);
+
+  const handleSelectFromProductModal = (prod: Product) => {
+    if (productSearchTargetRowIndex !== null && pItems[productSearchTargetRowIndex]) {
+      handleSelectProductForIndex(productSearchTargetRowIndex, prod);
+    } else {
+      // Add as new row
+      const purchasePrice = (prod.purchasePrice !== undefined && prod.purchasePrice > 0)
+        ? prod.purchasePrice
+        : (prod.sellingPrice ? round2(prod.sellingPrice * 0.7) : 0);
+      const newItem: PurchaseBillItem = {
+        id: `pbi-${Date.now()}`,
+        productId: prod.id,
+        name: prod.name,
+        hsnCode: prod.hsnCode || '',
+        quantity: 1,
+        unit: prod.unit || 'PCS',
+        rate: purchasePrice,
+        taxableAmount: 0,
+        gstRate: (prod.gstRate !== undefined ? prod.gstRate : 18) as GstTaxRate,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        totalAmount: 0
+      };
+      setPItems(prev => [...prev, recalculateItem(newItem, isInterState, purchasePriceMode)]);
+    }
+    setIsProductSearchModalOpen(false);
+    showToast('success', 'Product Selected', `Added "${prod.name}" to purchase bill items.`);
+  };
+
+  const openProductSearchModal = (targetRowIndex: number | null = null, initialQuery: string = '') => {
+    setActiveSuggestIndex(null);
+    setProductSearchTargetRowIndex(targetRowIndex);
+    setProductModalSearchQuery(initialQuery);
+    setProductModalCategoryFilter('ALL');
+    setProductModalStockFilter('ALL');
+    setIsProductSearchModalOpen(true);
   };
 
   const openQuickAddProduct = (rowIndex?: number, initialName?: string) => {
@@ -514,19 +646,42 @@ export const PurchasesView: React.FC = () => {
       quantity: 1,
       unit: 'PCS',
       rate: 0,
+      taxIncludedRate: 0,
       taxableAmount: 0,
       gstRate: 18,
       cgstAmount: 0,
       sgstAmount: 0,
       igstAmount: 0,
-      totalAmount: 0,
-      batchNumber: `BATCH-${Date.now().toString().slice(-4)}`,
-      expiryDate: ''
+      totalAmount: 0
     };
     setPItems(prev => {
       const nextList = [...prev, recalculateItem(rawItem, isInterState, purchasePriceMode)];
       setActiveSuggestIndex(nextList.length - 1);
       return nextList;
+    });
+  };
+
+  const handleItemTaxIncludedRateChange = (index: number, val: number) => {
+    const incRate = Math.max(0, val || 0);
+    setPItems(prev => {
+      const next = [...prev];
+      const target = next[index];
+      if (!target) return prev;
+
+      const gstRateVal = Number(target.gstRate) || 0;
+      const taxFactor = 1 + gstRateVal / 100;
+      const exclRate = taxFactor > 0 ? round2(incRate / taxFactor) : incRate;
+
+      const updatedItem: PurchaseBillItem = {
+        ...target,
+        rate: exclRate,
+        taxIncludedRate: incRate
+      };
+
+      const recalculated = recalculateItem(updatedItem, isInterState, 'EXCLUSIVE');
+      recalculated.taxIncludedRate = incRate;
+      next[index] = recalculated;
+      return next;
     });
   };
 
@@ -540,6 +695,13 @@ export const PurchasesView: React.FC = () => {
 
   const handleSavePurchaseBill = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const cleanInvoiceNo = purchaseInvoiceNo.trim();
+    if (!cleanInvoiceNo) {
+      showToast('error', 'Invoice Number Required', 'Please manually type the purchase invoice number from the supplier bill.');
+      return;
+    }
+
     if (!vendorName.trim()) {
       showToast('error', 'Missing Vendor', 'Please select or enter a supplier / vendor name.');
       return;
@@ -556,6 +718,16 @@ export const PurchasesView: React.FC = () => {
       return;
     }
 
+    const isDuplicate = purchaseBills.some(
+      b => (editingBillId ? b.id !== editingBillId : true) &&
+           b.billNumber.toLowerCase() === cleanInvoiceNo.toLowerCase() && 
+           b.vendorName.toLowerCase() === vendorName.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      showToast('error', 'Duplicate Invoice Number', `A purchase bill with invoice number "${cleanInvoiceNo}" already exists for this vendor.`);
+      return;
+    }
+
     const subTotalTaxable = round2(pItems.reduce((s, it) => s + (it.taxableAmount || 0), 0));
     const totalCgst = round2(pItems.reduce((s, it) => s + (it.cgstAmount || 0), 0));
     const totalSgst = round2(pItems.reduce((s, it) => s + (it.sgstAmount || 0), 0));
@@ -565,39 +737,81 @@ export const PurchasesView: React.FC = () => {
     const grandTotal = Math.round(rawGrandTotal);
     const roundOff = round2(grandTotal - rawGrandTotal);
 
-    createPurchaseBill({
-      billNumber: `PB/2026/${String(purchaseBills.length + 1).padStart(3, '0')}`,
-      vendorInvoiceNumber: vendorInvoiceNo.trim() || `VIN-${Date.now().toString().slice(-4)}`,
-      vendorId: vendorId || 'vendor-misc',
-      vendorName: vendorName.trim(),
-      vendorGstin: vendorGstin.trim() ? vendorGstin.trim().toUpperCase() : undefined,
-      billDate,
-      dueDate,
-      status: 'UNPAID',
-      isInterState,
-      items: pItems.map(it => ({
-        ...it,
-        quantity: Number(it.quantity) || 0,
-        rate: round2(Number(it.rate) || 0),
-        taxableAmount: round2(it.taxableAmount),
-        cgstAmount: round2(it.cgstAmount),
-        sgstAmount: round2(it.sgstAmount),
-        igstAmount: round2(it.igstAmount),
-        totalAmount: round2(it.totalAmount)
-      })),
-      subTotalTaxable,
-      totalCgst,
-      totalSgst,
-      totalIgst,
-      totalTax,
-      roundOff,
-      grandTotal,
-      amountPaid: 0,
-      amountDue: grandTotal,
-      itcEligibility
-    });
+    if (editingBillId) {
+      const existingBill = purchaseBills.find(b => b.id === editingBillId);
+      const paid = existingBill?.amountPaid || 0;
+      const newDue = Math.max(0, grandTotal - paid);
+      const newStatus = newDue === 0 ? 'PAID' : (paid > 0 ? 'PARTIALLY_PAID' : 'UNPAID');
+
+      updatePurchaseBill(editingBillId, {
+        billNumber: cleanInvoiceNo,
+        vendorInvoiceNumber: cleanInvoiceNo,
+        vendorId: vendorId || existingBill?.vendorId || 'vendor-misc',
+        vendorName: vendorName.trim(),
+        vendorGstin: vendorGstin.trim() ? vendorGstin.trim().toUpperCase() : undefined,
+        billDate,
+        dueDate,
+        status: newStatus,
+        isInterState,
+        items: pItems.map(it => ({
+          ...it,
+          quantity: Number(it.quantity) || 0,
+          rate: round2(Number(it.rate) || 0),
+          taxIncludedRate: it.taxIncludedRate !== undefined ? round2(Number(it.taxIncludedRate)) : round2(Number(it.rate) * (1 + (it.gstRate || 0) / 100)),
+          taxableAmount: round2(it.taxableAmount),
+          cgstAmount: round2(it.cgstAmount),
+          sgstAmount: round2(it.sgstAmount),
+          igstAmount: round2(it.igstAmount),
+          totalAmount: round2(it.totalAmount)
+        })),
+        subTotalTaxable,
+        totalCgst,
+        totalSgst,
+        totalIgst,
+        totalTax,
+        roundOff,
+        grandTotal,
+        amountPaid: paid,
+        amountDue: newDue,
+        itcEligibility
+      });
+    } else {
+      createPurchaseBill({
+        billNumber: cleanInvoiceNo,
+        vendorInvoiceNumber: cleanInvoiceNo,
+        vendorId: vendorId || 'vendor-misc',
+        vendorName: vendorName.trim(),
+        vendorGstin: vendorGstin.trim() ? vendorGstin.trim().toUpperCase() : undefined,
+        billDate,
+        dueDate,
+        status: 'UNPAID',
+        isInterState,
+        items: pItems.map(it => ({
+          ...it,
+          quantity: Number(it.quantity) || 0,
+          rate: round2(Number(it.rate) || 0),
+          taxIncludedRate: it.taxIncludedRate !== undefined ? round2(Number(it.taxIncludedRate)) : round2(Number(it.rate) * (1 + (it.gstRate || 0) / 100)),
+          taxableAmount: round2(it.taxableAmount),
+          cgstAmount: round2(it.cgstAmount),
+          sgstAmount: round2(it.sgstAmount),
+          igstAmount: round2(it.igstAmount),
+          totalAmount: round2(it.totalAmount)
+        })),
+        subTotalTaxable,
+        totalCgst,
+        totalSgst,
+        totalIgst,
+        totalTax,
+        roundOff,
+        grandTotal,
+        amountPaid: 0,
+        amountDue: grandTotal,
+        itcEligibility
+      });
+    }
 
     setIsPurchaseModalOpen(false);
+    setEditingBillId(null);
   };
 
   const handleSaveExpense = (e: React.FormEvent) => {
@@ -887,6 +1101,13 @@ export const PurchasesView: React.FC = () => {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleEditPurchaseBill(bill)}
+                            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                            title="Edit Purchase Bill"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => deletePurchaseBill(bill.id)}
                             className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                             title="Delete Purchase Bill & Rollback Stock"
@@ -998,17 +1219,26 @@ export const PurchasesView: React.FC = () => {
         return (
           <DesktopModal
             isOpen={isPurchaseModalOpen}
-            onClose={() => setIsPurchaseModalOpen(false)}
+            onClose={() => {
+              setIsPurchaseModalOpen(false);
+              setEditingBillId(null);
+            }}
             size="3xl"
             allowMaximize={true}
-            title="Add Stock by Inward Purchase Bill"
+            title={editingBillId ? `Edit Purchase Bill (${purchaseInvoiceNo || 'Bill'})` : "Add Stock by Inward Purchase Bill"}
             badge={
-              <span className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold rounded-full border border-emerald-200 dark:border-emerald-800">
-                ⚡ Auto-Increments Stock
-              </span>
+              editingBillId ? (
+                <span className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold rounded-full border border-amber-200 dark:border-amber-800">
+                  ✏️ Edit Mode
+                </span>
+              ) : (
+                <span className="hidden xs:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold rounded-full border border-emerald-200 dark:border-emerald-800">
+                  ⚡ Auto-Increments Stock
+                </span>
+              )
             }
-            subtitle="Record supplier inward invoice, allocate expenses, and update inventory counts"
-            icon={<PackagePlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+            subtitle={editingBillId ? "Update supplier details, invoice line items, tax rates, and inventory inward" : "Record supplier inward invoice, allocate expenses, and update inventory counts"}
+            icon={editingBillId ? <Pencil className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> : <PackagePlus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
             iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
             bodyClassName="p-0 overflow-hidden flex flex-col flex-1 min-h-0"
           >
@@ -1092,16 +1322,19 @@ export const PurchasesView: React.FC = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         <div>
                           <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 text-[11px]">
-                            Supplier Bill Ref # *
+                            Purchase Invoice Number *
                           </label>
                           <input
                             type="text"
-                            value={vendorInvoiceNo}
-                            onChange={(e) => setVendorInvoiceNo(e.target.value)}
+                            value={purchaseInvoiceNo}
+                            onChange={(e) => setPurchaseInvoiceNo(e.target.value)}
                             placeholder="e.g. INV-2026-904"
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-indigo-500/40 dark:border-indigo-400/40 focus:border-indigo-600 dark:focus:border-indigo-400 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono font-bold"
                             required
                           />
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                            Type manual invoice # from supplier bill
+                          </p>
                         </div>
 
                         <div>
@@ -1194,38 +1427,8 @@ export const PurchasesView: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* Mode Toggle & Actions Toolbar */}
+                      {/* Actions Toolbar */}
                       <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
-                        {/* Price Entry Mode Pill Switch */}
-                        <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs shrink-0">
-                          <span className="hidden sm:inline-block px-1.5 text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-                            Edit:
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setPurchasePriceMode('EXCLUSIVE')}
-                            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                              purchasePriceMode === 'EXCLUSIVE'
-                                ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-2xs border border-indigo-200 dark:border-indigo-600'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                            }`}
-                            title="Enter supplier cost rate directly before tax (Tax Exclusive)"
-                          >
-                            Cost Rate (Excl.)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPurchasePriceMode('INCLUSIVE')}
-                            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                              purchasePriceMode === 'INCLUSIVE'
-                                ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-2xs border border-indigo-200 dark:border-indigo-600'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-                            }`}
-                            title="Enter total purchase bill line amount inclusive of GST (Tax Inclusive)"
-                          >
-                            Line Total (Incl.)
-                          </button>
-                        </div>
 
                         {/* Quick GST Chips (Visible on Mobile + Desktop) */}
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px] overflow-x-auto max-w-full">
@@ -1249,8 +1452,18 @@ export const PurchasesView: React.FC = () => {
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
+                            onClick={() => openProductSearchModal(null, '')}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl transition-all border border-indigo-200/80 dark:border-indigo-800/80 cursor-pointer shadow-2xs shrink-0"
+                            title="Browse and search products from full inventory catalog modal"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Search Catalog</span>
+                            <span className="sm:hidden">Catalog</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => openQuickAddProduct()}
-                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl transition-all border border-indigo-200/80 dark:border-indigo-800/80 cursor-pointer shadow-2xs shrink-0"
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs shrink-0"
                             title="Quickly add a new product to inventory catalog"
                           >
                             <PackagePlus className="w-3.5 h-3.5" />
@@ -1334,7 +1547,7 @@ export const PurchasesView: React.FC = () => {
                                           }}
                                           onFocus={() => setActiveSuggestIndex(idx)}
                                           placeholder="Search catalog or type item name..."
-                                          className="w-full pl-8 pr-16 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                          className="w-full pl-8 pr-22 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                           required
                                         />
                                         <div className="absolute right-1.5 flex items-center gap-1">
@@ -1352,6 +1565,14 @@ export const PurchasesView: React.FC = () => {
                                               <X className="w-3 h-3" />
                                             </button>
                                           )}
+                                          <button
+                                            type="button"
+                                            onClick={() => openProductSearchModal(idx, item.name)}
+                                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors"
+                                            title="Open full catalog search modal"
+                                          >
+                                            <Search className="w-3.5 h-3.5" />
+                                          </button>
                                           <button
                                             type="button"
                                             onClick={() => openQuickAddProduct(idx, item.name)}
@@ -1373,6 +1594,17 @@ export const PurchasesView: React.FC = () => {
                                               Catalog Products ({filteredSuggestions.length})
                                             </span>
                                             <div className="flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  openProductSearchModal(idx, item.name);
+                                                }}
+                                                className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold text-[10px] flex items-center gap-0.5"
+                                                title="Open in full screen modal"
+                                              >
+                                                <span>Modal ↗</span>
+                                              </button>
                                               <button
                                                 type="button"
                                                 onClick={(e) => {
@@ -1571,56 +1803,51 @@ export const PurchasesView: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Mobile Sub-Grid 2: Pricing (Exclusive vs Inclusive) */}
-                              <div className="grid grid-cols-2 gap-2.5">
+                              {/* Mobile Sub-Grid 2: Pricing (Exclusive & Inclusive Rates + Total) */}
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                 <div>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <label className="font-semibold text-[11px] text-slate-600 dark:text-slate-300">
-                                      Cost Rate (₹ Excl.)
-                                    </label>
-                                    {purchasePriceMode === 'EXCLUSIVE' && (
-                                      <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1 rounded">
-                                        Active
-                                      </span>
-                                    )}
-                                  </div>
+                                  <label className="block font-semibold text-[11px] text-slate-600 dark:text-slate-300 mb-1">
+                                    Cost Rate (₹ Excl.)
+                                  </label>
                                   <input
                                     type="number"
                                     min="0"
                                     step="any"
                                     value={item.rate || ''}
                                     onChange={(e) => handleItemFieldChange(idx, 'rate', parseFloat(e.target.value) || 0)}
-                                    className={`w-full px-3 py-2 text-xs font-mono font-bold text-right rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all ${
-                                      purchasePriceMode === 'EXCLUSIVE'
-                                        ? 'bg-white dark:bg-slate-800 border-2 border-indigo-500 dark:border-indigo-400 text-indigo-950 dark:text-indigo-200 shadow-2xs'
-                                        : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
-                                    }`}
+                                    className="w-full px-3 py-2 text-xs font-mono font-bold text-right rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                     placeholder="0.00"
                                     required
                                   />
                                 </div>
                                 <div>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <label className="font-semibold text-[11px] text-slate-600 dark:text-slate-300">
-                                      Line Total (₹ Incl.)
-                                    </label>
-                                    {purchasePriceMode === 'INCLUSIVE' && (
-                                      <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1 rounded">
-                                        Active
-                                      </span>
-                                    )}
+                                  <label className="block font-semibold text-[11px] text-indigo-700 dark:text-indigo-300 mb-1">
+                                    Tax Incl. Rate (₹)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={item.taxIncludedRate !== undefined ? item.taxIncludedRate : (item.rate ? round2(item.rate * (1 + (item.gstRate || 0) / 100)) : '')}
+                                    onChange={(e) => handleItemTaxIncludedRateChange(idx, parseFloat(e.target.value) || 0)}
+                                    className="w-full px-3 py-2 text-xs font-mono font-bold text-right rounded-xl bg-indigo-50/50 dark:bg-indigo-950/40 border-2 border-indigo-500/80 dark:border-indigo-400 text-indigo-950 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs"
+                                    placeholder="0.00"
+                                  />
+                                  <div className="text-[10px] text-right text-indigo-600 dark:text-indigo-400 font-mono mt-0.5 font-medium">
+                                    Rate with {item.gstRate}% GST
                                   </div>
+                                </div>
+                                <div>
+                                  <label className="block font-semibold text-[11px] text-slate-600 dark:text-slate-300 mb-1">
+                                    Line Total (₹ Incl.)
+                                  </label>
                                   <input
                                     type="number"
                                     min="0"
                                     step="any"
                                     value={item.totalAmount || ''}
                                     onChange={(e) => handleItemInclusiveTotalChange(idx, parseFloat(e.target.value) || 0)}
-                                    className={`w-full px-3 py-2 text-xs font-mono font-bold text-right rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all ${
-                                      purchasePriceMode === 'INCLUSIVE'
-                                        ? 'bg-white dark:bg-slate-800 border-2 border-indigo-500 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300 shadow-2xs'
-                                        : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'
-                                    }`}
+                                    className="w-full px-3 py-2 text-xs font-mono font-bold text-right rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                     placeholder="0.00"
                                   />
                                 </div>
@@ -1660,65 +1887,40 @@ export const PurchasesView: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Mobile Sub-Grid 4: HSN & Batch / Expiry */}
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
-                                <div>
-                                  <label className="block font-semibold text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
-                                    HSN / SAC Code
-                                  </label>
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="text"
-                                      list={`purch-hsn-list-m-${idx}`}
-                                      value={item.hsnCode}
-                                      onChange={(e) => handleItemFieldChange(idx, 'hsnCode', e.target.value)}
-                                      placeholder="HSN code"
-                                      className="w-full px-2 py-1 text-xs font-mono uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
-                                    />
-                                    <datalist id={`purch-hsn-list-m-${idx}`}>
-                                      {customHsnCodes.map(h => (
-                                        <option key={`cm-${h.id}`} value={h.code}>
-                                          [Custom] {h.code} - {h.description} ({h.gstRate}%)
-                                        </option>
-                                      ))}
-                                      {COMMON_HSN_CODES.map(h => (
-                                        <option key={`sm-${h.code}`} value={h.code}>
-                                          {h.code} - {h.description} ({h.defaultGst}%)
-                                        </option>
-                                      ))}
-                                    </datalist>
-                                    <button
-                                      type="button"
-                                      onClick={() => setHsnLookupTargetIndex(idx)}
-                                      className="px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg border border-indigo-200/60 dark:border-indigo-800 shrink-0 cursor-pointer"
-                                      title="Lookup HSN in directory"
-                                    >
-                                      <Search className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="block font-semibold text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
-                                    Batch Number
-                                  </label>
+                              {/* Mobile Sub-Grid 4: HSN / SAC Code */}
+                              <div className="pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                                <label className="block font-semibold text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
+                                  HSN / SAC Code
+                                </label>
+                                <div className="flex items-center gap-1 max-w-xs">
                                   <input
                                     type="text"
-                                    value={item.batchNumber || ''}
-                                    onChange={(e) => handleItemFieldChange(idx, 'batchNumber', e.target.value)}
-                                    placeholder="e.g. BATCH-01"
-                                    className="w-full px-2 py-1 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
+                                    list={`purch-hsn-list-m-${idx}`}
+                                    value={item.hsnCode}
+                                    onChange={(e) => handleItemFieldChange(idx, 'hsnCode', e.target.value)}
+                                    placeholder="HSN code"
+                                    className="w-full px-2 py-1 text-xs font-mono uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
                                   />
-                                </div>
-                                <div>
-                                  <label className="block font-semibold text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
-                                    Expiry Date
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={item.expiryDate || ''}
-                                    onChange={(e) => handleItemFieldChange(idx, 'expiryDate', e.target.value)}
-                                    className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
-                                  />
+                                  <datalist id={`purch-hsn-list-m-${idx}`}>
+                                    {customHsnCodes.map(h => (
+                                      <option key={`cm-${h.id}`} value={h.code}>
+                                        [Custom] {h.code} - {h.description} ({h.gstRate}%)
+                                      </option>
+                                    ))}
+                                    {COMMON_HSN_CODES.map(h => (
+                                      <option key={`sm-${h.code}`} value={h.code}>
+                                        {h.code} - {h.description} ({h.defaultGst}%)
+                                      </option>
+                                    ))}
+                                  </datalist>
+                                  <button
+                                    type="button"
+                                    onClick={() => setHsnLookupTargetIndex(idx)}
+                                    className="px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 rounded-lg border border-indigo-200/60 dark:border-indigo-800 shrink-0 cursor-pointer"
+                                    title="Lookup HSN in directory"
+                                  >
+                                    <Search className="w-3 h-3" />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -1728,31 +1930,23 @@ export const PurchasesView: React.FC = () => {
                     </div>
 
                     {/* B. Desktop Accounting Table View (Screen width >= lg) */}
-                    <div className="hidden lg:block border border-slate-200/90 dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xs">
-                      <div className="overflow-x-auto min-w-[920px]">
+                    <div className={`hidden lg:block border border-slate-200/90 dark:border-slate-700 rounded-2xl shadow-2xs transition-all ${
+                      activeSuggestIndex !== null ? 'min-h-[440px] pb-40 overflow-visible' : 'min-h-[200px] overflow-x-auto'
+                    }`}>
+                      <div className={`w-full min-w-[920px] ${activeSuggestIndex !== null ? 'min-h-[400px] pb-36' : ''}`}>
                         <table className="w-full text-left text-xs border-collapse">
                           <thead className="bg-slate-100/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-slate-700">
                             <tr>
                               <th className="py-2.5 px-3 min-w-[220px]">Item Description & Product</th>
                               <th className="py-2.5 px-2 w-28">HSN / SAC</th>
-                              <th className="py-2.5 px-2 w-32">Batch / Exp</th>
                               <th className="py-2.5 px-2 w-20 text-center">Qty *</th>
                               <th className="py-2.5 px-2 w-20">Unit</th>
-                              <th className={`py-2.5 px-2 w-32 text-right transition-colors ${
-                                purchasePriceMode === 'EXCLUSIVE'
-                                  ? 'bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-bold border-x border-indigo-200 dark:border-indigo-800'
-                                  : ''
-                              }`}>
-                                Cost Rate (₹ Excl.)
+                              <th className="py-2.5 px-2 w-28 text-right">Cost Rate (₹ Excl.)</th>
+                              <th className="py-2.5 px-2 w-32 text-right bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-950 dark:text-indigo-200 font-bold border-x border-indigo-200 dark:border-indigo-800">
+                                Tax Incl. Rate (₹)
                               </th>
-                              <th className="py-2.5 px-2 w-36 text-center">GST Rate & Tax</th>
-                              <th className={`py-2.5 px-3 w-32 text-right transition-colors ${
-                                purchasePriceMode === 'INCLUSIVE'
-                                  ? 'bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-bold border-x border-indigo-200 dark:border-indigo-800'
-                                  : ''
-                              }`}>
-                                Line Total (₹ Incl.)
-                              </th>
+                              <th className="py-2.5 px-2 w-32 text-center">GST Rate & Tax</th>
+                              <th className="py-2.5 px-3 w-32 text-right">Line Total (₹ Incl.)</th>
                               <th className="py-2.5 px-2 w-10 text-center"></th>
                             </tr>
                           </thead>
@@ -1772,9 +1966,9 @@ export const PurchasesView: React.FC = () => {
                                 const filteredSuggestions = getFilteredProductsForItem(item.name);
 
                                 return (
-                                  <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                                  <tr key={item.id} className={`hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors ${activeSuggestIndex === idx ? 'relative z-30' : ''}`}>
                                     {/* Item / Product */}
-                                    <td className="py-2 px-3 align-top">
+                                    <td className={`py-2 px-3 align-top ${activeSuggestIndex === idx ? 'relative z-30' : ''}`}>
                                       <div className="relative space-y-1">
                                         {/* Catalog Linked Badge */}
                                         {matchedProduct && (
@@ -1807,7 +2001,7 @@ export const PurchasesView: React.FC = () => {
                                             }}
                                             onFocus={() => setActiveSuggestIndex(idx)}
                                             placeholder="Search catalog or item name..."
-                                            className="w-full pl-7 pr-16 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                            className="w-full pl-7 pr-22 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                                             required
                                           />
                                           <div className="absolute right-1 flex items-center gap-0.5">
@@ -1827,6 +2021,14 @@ export const PurchasesView: React.FC = () => {
                                             )}
                                             <button
                                               type="button"
+                                              onClick={() => openProductSearchModal(idx, item.name)}
+                                              className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
+                                              title="Open full product catalog search modal"
+                                            >
+                                              <Search className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              type="button"
                                               onClick={() => openQuickAddProduct(idx, item.name)}
                                               className="px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 rounded border border-indigo-200/80 dark:border-indigo-800 cursor-pointer shrink-0"
                                               title="Create as new product in catalog"
@@ -1838,13 +2040,26 @@ export const PurchasesView: React.FC = () => {
 
                                         {/* Dropdown Menu */}
                                         {activeSuggestIndex === idx && (
-                                          <div className="absolute left-0 top-full mt-1 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 modal-content-scroll">
+                                          <div className={`absolute left-0 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 modal-content-scroll ${
+                                            idx > 1 && idx >= pItems.length - 1 ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+                                          }`}>
                                             <div className="p-2 bg-slate-50 dark:bg-slate-800/90 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider sticky top-0 backdrop-blur-xs z-10">
                                               <span className="flex items-center gap-1">
                                                 <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                                                 Matching Products ({filteredSuggestions.length})
                                               </span>
                                               <div className="flex items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openProductSearchModal(idx, item.name);
+                                                  }}
+                                                  className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
+                                                  title="Open in full screen modal"
+                                                >
+                                                  <span>Modal ↗</span>
+                                                </button>
                                                 <button
                                                   type="button"
                                                   onClick={(e) => {
@@ -2025,25 +2240,6 @@ export const PurchasesView: React.FC = () => {
                                       </div>
                                     </td>
 
-                                    {/* Batch & Exp */}
-                                    <td className="py-2 px-2 align-top">
-                                      <div className="space-y-1">
-                                        <input
-                                          type="text"
-                                          value={item.batchNumber || ''}
-                                          onChange={(e) => handleItemFieldChange(idx, 'batchNumber', e.target.value)}
-                                          placeholder="Batch #"
-                                          className="w-full px-1.5 py-1 text-[11px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
-                                        />
-                                        <input
-                                          type="date"
-                                          value={item.expiryDate || ''}
-                                          onChange={(e) => handleItemFieldChange(idx, 'expiryDate', e.target.value)}
-                                          className="w-full px-1 py-0.5 text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg"
-                                        />
-                                      </div>
-                                    </td>
-
                                     {/* Quantity */}
                                     <td className="py-2 px-2 align-top">
                                       <input
@@ -2092,6 +2288,22 @@ export const PurchasesView: React.FC = () => {
                                       />
                                       <div className="text-[10px] text-right text-slate-400 dark:text-slate-500 font-mono mt-0.5">
                                         Taxable: {formatCurrency(item.taxableAmount, '')}
+                                      </div>
+                                    </td>
+
+                                    {/* Tax Included Rate */}
+                                    <td className="py-2 px-2 align-top bg-indigo-50/40 dark:bg-indigo-950/30 border-x border-indigo-200 dark:border-indigo-800/60">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={item.taxIncludedRate !== undefined ? item.taxIncludedRate : (item.rate ? round2(item.rate * (1 + (item.gstRate || 0) / 100)) : '')}
+                                        onChange={(e) => handleItemTaxIncludedRateChange(idx, parseFloat(e.target.value) || 0)}
+                                        className="w-full px-2 py-1 text-xs font-mono font-bold text-right rounded-lg bg-white dark:bg-slate-800 border-2 border-indigo-500/80 dark:border-indigo-400 text-indigo-950 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs"
+                                        placeholder="0.00"
+                                      />
+                                      <div className="text-[10px] text-right text-indigo-600 dark:text-indigo-400 font-mono mt-0.5 font-medium">
+                                        Incl. {item.gstRate}% GST
                                       </div>
                                     </td>
 
@@ -2245,7 +2457,10 @@ export const PurchasesView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setIsPurchaseModalOpen(false)}
+                      onClick={() => {
+                        setIsPurchaseModalOpen(false);
+                        setEditingBillId(null);
+                      }}
                       className="flex-1 xs:flex-none px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-center"
                     >
                       Cancel
@@ -2254,8 +2469,17 @@ export const PurchasesView: React.FC = () => {
                       type="submit"
                       className="flex-1 xs:flex-none px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <PackagePlus className="w-4 h-4 shrink-0" />
-                      <span>Save Bill & Add Stock</span>
+                      {editingBillId ? (
+                        <>
+                          <Check className="w-4 h-4 shrink-0" />
+                          <span>Update Purchase Bill</span>
+                        </>
+                      ) : (
+                        <>
+                          <PackagePlus className="w-4 h-4 shrink-0" />
+                          <span>Save Bill & Add Stock</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -2282,7 +2506,19 @@ export const PurchasesView: React.FC = () => {
         iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
         bodyClassName="p-4 sm:p-6 space-y-4 text-xs"
         footer={
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between w-full">
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedBillForView) {
+                  handleEditPurchaseBill(selectedBillForView);
+                }
+              }}
+              className="px-3.5 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Edit Bill</span>
+            </button>
             <button
               type="button"
               onClick={() => setSelectedBillForView(null)}
@@ -2809,6 +3045,295 @@ export const PurchasesView: React.FC = () => {
                 </button>
               </div>
             </form>
+      </DesktopModal>
+
+      {/* Dedicated Product Search & Picker Modal */}
+      <DesktopModal
+        isOpen={isProductSearchModalOpen}
+        onClose={() => setIsProductSearchModalOpen(false)}
+        size="2xl"
+        allowMaximize={true}
+        title="Search Product Catalog"
+        subtitle={
+          productSearchTargetRowIndex !== null && pItems[productSearchTargetRowIndex]
+            ? `Selecting product for Item Row #${productSearchTargetRowIndex + 1} (${pItems[productSearchTargetRowIndex].name || 'Empty Row'})`
+            : "Select products from inventory catalog to add to inward purchase bill"
+        }
+        badge={
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800">
+            {products.length} Products
+          </span>
+        }
+        icon={<Boxes className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
+        iconBgColor="bg-indigo-50 dark:bg-indigo-950/70"
+        bodyClassName="p-4 sm:p-5 text-xs space-y-3.5"
+        footer={
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Showing <strong>{modalFilteredProducts.length}</strong> of <strong>{products.length}</strong> products
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProductSearchModalOpen(false);
+                  openQuickAddProduct(productSearchTargetRowIndex, productModalSearchQuery);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl transition-all border border-indigo-200/80 dark:border-indigo-800 cursor-pointer shadow-2xs"
+              >
+                <PackagePlus className="w-4 h-4" />
+                <span>+ Create New Product</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsProductSearchModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          {/* Search Input */}
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 absolute left-3.5 text-slate-400 dark:text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={productModalSearchQuery}
+              onChange={(e) => setProductModalSearchQuery(e.target.value)}
+              placeholder="Search by product name, SKU code, barcode, category or HSN..."
+              className="w-full pl-10 pr-9 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              autoFocus
+            />
+            {productModalSearchQuery && (
+              <button
+                type="button"
+                onClick={() => setProductModalSearchQuery('')}
+                className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex flex-wrap items-center gap-1.5 pb-1 border-b border-slate-100 dark:border-slate-800">
+            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1">
+              <Filter className="w-3 h-3" /> Stock:
+            </span>
+            <button
+              type="button"
+              onClick={() => setProductModalStockFilter('ALL')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                productModalStockFilter === 'ALL'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              All ({products.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setProductModalStockFilter('OUT_OF_STOCK')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                productModalStockFilter === 'OUT_OF_STOCK'
+                  ? 'bg-rose-600 text-white shadow-2xs'
+                  : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200/70 dark:border-rose-800/70'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+              Out of Stock ({products.filter(p => (p.currentStock || 0) <= 0).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setProductModalStockFilter('LOW_STOCK')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                productModalStockFilter === 'LOW_STOCK'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200/70 dark:border-amber-800/70'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              Low Stock ({products.filter(p => { const s = p.currentStock || 0; return s > 0 && s <= (p.minStockAlert || 5); }).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setProductModalStockFilter('IN_STOCK')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                productModalStockFilter === 'IN_STOCK'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/70 dark:border-emerald-800/70'
+              }`}
+            >
+              In Stock ({products.filter(p => (p.currentStock || 0) > (p.minStockAlert || 5)).length})
+            </button>
+          </div>
+
+          {/* Category Pills (if categories exist) */}
+          {productCategories.length > 0 && (
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-xs modal-content-scroll">
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mr-1 shrink-0">
+                Category:
+              </span>
+              <button
+                type="button"
+                onClick={() => setProductModalCategoryFilter('ALL')}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium shrink-0 transition-colors cursor-pointer ${
+                  productModalCategoryFilter === 'ALL'
+                    ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                }`}
+              >
+                All
+              </button>
+              {productCategories.map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setProductModalCategoryFilter(cat)}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium shrink-0 transition-colors cursor-pointer ${
+                    productModalCategoryFilter === cat
+                      ? 'bg-indigo-600 text-white font-bold'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Product Cards List */}
+          <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-1 modal-content-scroll">
+            {modalFilteredProducts.length > 0 ? (
+              modalFilteredProducts.map(p => {
+                const pStock = p.currentStock || 0;
+                const isOutOfStock = pStock <= 0;
+                const isLowStock = !isOutOfStock && pStock <= (p.minStockAlert || 5);
+                const costPrice = (p.purchasePrice !== undefined && p.purchasePrice > 0)
+                  ? p.purchasePrice
+                  : (p.sellingPrice ? round2(p.sellingPrice * 0.7) : 0);
+
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => handleSelectFromProductModal(p)}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      isOutOfStock
+                        ? 'bg-rose-50/20 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/40 hover:border-indigo-400 dark:hover:border-indigo-600 hover:shadow-xs'
+                        : 'bg-white dark:bg-slate-800/70 border-slate-200 dark:border-slate-700/80 hover:border-indigo-400 dark:hover:border-indigo-600 hover:shadow-xs'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+                          {p.name}
+                        </span>
+                        {p.sku && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {p.sku}
+                          </span>
+                        )}
+                        {p.barcode && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                            Barcode: {p.barcode}
+                          </span>
+                        )}
+                        {p.category && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 font-medium">
+                            {p.category}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                        <span>
+                          Cost Price: <strong className="text-indigo-600 dark:text-indigo-400 font-bold">₹{costPrice}</strong>
+                        </span>
+                        <span>•</span>
+                        <span>MRP: ₹{p.sellingPrice || 0}</span>
+                        <span>•</span>
+                        <span>GST: <strong className="font-semibold text-slate-700 dark:text-slate-300">{p.gstRate}%</strong></span>
+                        {p.hsnCode && (
+                          <>
+                            <span>•</span>
+                            <span>HSN: <strong className="font-mono">{p.hsnCode}</strong></span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                      <div>
+                        {isOutOfStock ? (
+                          <div className="text-left sm:text-right">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-rose-100 dark:bg-rose-950/90 text-rose-700 dark:text-rose-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                              Out of Stock (0 {p.unit || 'PCS'})
+                            </span>
+                            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                              Inwards into inventory
+                            </div>
+                          </div>
+                        ) : isLowStock ? (
+                          <div className="text-left sm:text-right">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 dark:bg-amber-950/90 text-amber-800 dark:text-amber-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                              Low Stock: {pStock} {p.unit || 'PCS'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-left sm:text-right">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              Stock: {pStock} {p.unit || 'PCS'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectFromProductModal(p);
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
+                      >
+                        Select
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-8 text-center space-y-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                <Package className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+                <div className="space-y-1">
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    No products found matching "{productModalSearchQuery}"
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                    This item is not yet in your inventory catalog. You can create it now, and it will be immediately linked to this purchase bill.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProductSearchModalOpen(false);
+                    openQuickAddProduct(productSearchTargetRowIndex, productModalSearchQuery);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  <PackagePlus className="w-4 h-4" />
+                  <span>Create "{productModalSearchQuery}" in Catalog</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </DesktopModal>
 
       {/* HSN Lookup Dialog for Quick Add Product */}
