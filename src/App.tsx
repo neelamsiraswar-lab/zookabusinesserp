@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AppProvider, useApp } from './context/AppContext';
+import { AppProvider, useApp, isUrlAdminRoute } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { AnnouncementBanner } from './components/layout/AnnouncementBanner';
@@ -27,6 +27,7 @@ import { SettingsView } from './components/settings/SettingsView';
 import { UsersAndRolesView } from './components/auth/UsersAndRolesView';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { SuperAdminPortal } from './components/admin/SuperAdminPortal';
+import { SuperAdminLoginScreen } from './components/admin/SuperAdminLoginScreen';
 import { AccessRestricted } from './components/auth/AccessRestricted';
 import { UserAuthModal } from './components/auth/UserAuthModal';
 import { LockScreenOverlay } from './components/auth/LockScreenOverlay';
@@ -133,27 +134,51 @@ const MainContent: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedInvoiceIdForPrint, setSelectedInvoiceIdForPrint, toggleSidebarCollapse]);
 
+  // Admin Route Handling (/admin, /superadmin, or activeTab === 'super_admin_dashboard')
+  const isAdminRoute = isUrlAdminRoute() || activeTab === 'super_admin_dashboard';
+  const isSuperAdminAuthenticated = isAuthenticated && currentUser.role === 'SUPER_ADMIN';
+
+  if (isAdminRoute) {
+    if (isSuperAdminAuthenticated) {
+      return (
+        <>
+          <SuperAdminPortal />
+          <ToastContainer />
+          <UserAuthModal />
+          <JwtSessionModal 
+            isOpen={isJwtModalOpen} 
+            onClose={() => setIsJwtModalOpen(false)} 
+          />
+        </>
+      );
+    }
+
+    // When opening app url/admin without superadmin authentication, show Super Admin Login Flow
+    return (
+      <>
+        <SuperAdminLoginScreen 
+          onSwitchToCompanyLogin={() => {
+            setActiveTab('dashboard');
+            if (typeof window !== 'undefined') {
+              try {
+                window.history.pushState({}, '', '/');
+              } catch (e) {
+                window.location.hash = '';
+              }
+            }
+          }}
+        />
+        <ToastContainer />
+      </>
+    );
+  }
+
   // Mandate Login Screen when user is not authenticated
   if (!isAuthenticated) {
     return (
       <>
         <LoginScreen />
         <ToastContainer />
-      </>
-    );
-  }
-
-  // Dedicated Separate Super Admin Dashboard
-  if (currentUser.role === 'SUPER_ADMIN' && activeTab === 'super_admin_dashboard') {
-    return (
-      <>
-        <SuperAdminPortal />
-        <ToastContainer />
-        <UserAuthModal />
-        <JwtSessionModal 
-          isOpen={isJwtModalOpen} 
-          onClose={() => setIsJwtModalOpen(false)} 
-        />
       </>
     );
   }
@@ -360,13 +385,6 @@ const MainContent: React.FC = () => {
                   )
                 )}
                 {activeTab === 'users' && <UsersAndRolesView />}
-                {activeTab === 'super_admin_dashboard' && (
-                  currentUser.role === 'SUPER_ADMIN' ? (
-                    <SuperAdminDashboard />
-                  ) : (
-                    <AccessRestricted moduleName="Super Admin Master Governance" allowedRoles={['SUPER_ADMIN']} />
-                  )
-                )}
                 {activeTab === 'settings' && (
                   can('settings', 'view') ? (
                     <SettingsView />

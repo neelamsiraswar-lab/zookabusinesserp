@@ -324,6 +324,7 @@ interface AppContextType {
   auditLogs: SecurityAuditLog[];
   logSecurityEvent: (action: string, module: string, details: string) => void;
   verifySuperAdminKey: (key: string) => boolean;
+  authenticateSuperAdmin: (passwordOrPin: string, identifier?: string) => { success: boolean; error?: string };
   loginAsSuperAdmin: () => void;
   logoutSuperAdmin: () => void;
 
@@ -371,7 +372,7 @@ const STORAGE_PREFIX = 'zookabusiness_v2_cloud_';
 const LEGACY_STORAGE_PREFIX = 'vyaparflow_v2_cloud_';
 
 // Helper to check if current URL points to Admin / SuperAdmin
-const isUrlAdminRoute = (): boolean => {
+export const isUrlAdminRoute = (): boolean => {
   if (typeof window === 'undefined') return false;
   const path = window.location.pathname.toLowerCase();
   const hash = window.location.hash.toLowerCase();
@@ -584,7 +585,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   });
   const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    return isAdminRouteInitially ? DEFAULT_SUPER_ADMIN.id : loadState('currentUserId', cleanDefaultAdminUser.id);
+    const token = getAuthToken();
+    if (token) {
+      const verified = verifyJwtToken(token);
+      if (verified && verified.isValid && !verified.isExpired) {
+        if (verified.payload.role === 'SUPER_ADMIN' || verified.payload.sub === DEFAULT_SUPER_ADMIN.id) {
+          return DEFAULT_SUPER_ADMIN.id;
+        }
+        return verified.payload.sub || loadState('currentUserId', cleanDefaultAdminUser.id);
+      }
+    }
+    return loadState('currentUserId', cleanDefaultAdminUser.id);
   });
   const [auditLogs, setAuditLogs] = useState<SecurityAuditLog[]>(() => loadState('auditLogs', []));
 
@@ -2270,7 +2281,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutSuperAdmin = () => {
-    logout();
+    clearAuthToken();
+    setJwtToken(null);
+    setIsAuthenticated(false);
+    setIsSessionLocked(false);
+    setIsAuthModalOpen(false);
+    setAuthModalTargetUser(null);
+
+    const defaultUser = users.find(u => u.role === 'ADMIN' && u.isActive) || users[0] || cleanDefaultAdminUser;
+    setCurrentUserId(defaultUser.id);
+    localStorage.setItem(STORAGE_PREFIX + 'currentUserId', JSON.stringify(defaultUser.id));
+    localStorage.setItem(`${STORAGE_PREFIX}c_${currentCompanyId}_currentUserId`, JSON.stringify(defaultUser.id));
+
+    setActiveTab('super_admin_dashboard');
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.replaceState({ tab: 'super_admin_dashboard' }, '', '/admin');
+      } catch (e) {
+        window.location.hash = '#/admin';
+      }
+    }
+
+    logSecurityEvent('USER_LOGOUT', 'Super Admin Auth', 'Super Administrator logged out.');
+    showToast('info', 'Super Admin Logged Out', 'Super Admin session terminated. Enter master credentials to sign back in.');
   };
 
   const sessionTimeoutConfig = useMemo(() => {
@@ -2468,12 +2501,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
            cleanKey === '9999';
   };
 
+  const authenticateSuperAdmin = (passwordOrPin: string, identifier?: string): { success: boolean; error?: string } => {
+    const cleanInput = passwordOrPin.trim();
+    const cleanIdentifier = identifier?.trim().toLowerCase();
+
+    // If identifier is provided, verify it matches super admin email or name or 'superadmin' or 'admin'
+    if (cleanIdentifier) {
+      const allowedIdentifiers = [
+        (superAdminAuth.email || '').toLowerCase(),
+        (superAdminAuth.name || '').toLowerCase(),
+        DEFAULT_SUPER_ADMIN.email.toLowerCase(),
+        DEFAULT_SUPER_ADMIN.name.toLowerCase(),
+        'superadmin',
+        'admin',
+        'super_admin',
+        'kuldeep',
+        'kuldeep.siraswar@gmail.com'
+      ].filter(Boolean);
+
+      const isIdentifierMatch = allowedIdentifiers.some(id => 
+        id === cleanIdentifier || cleanIdentifier.includes(id) || id.includes(cleanIdentifier)
+      );
+
+      if (!isIdentifierMatch) {
+        return { 
+          success: false, 
+          error: `Unrecognized Super Admin identifier "${identifier}". Please enter "${superAdminAuth.email || DEFAULT_SUPER_ADMIN.email}" or "superadmin".` 
+        };
+      }
+    }
+
+    const isSuperMatch = 
+      cleanInput === superAdminAuth.password || 
+      cleanInput === superAdminAuth.pin || 
+      verifySuperAdminKey(cleanInput);
+
+    if (isSuperMatch) {
+      setCurrentUserId(DEFAULT_SUPER_ADMIN.id);
+      setIsAuthenticated(true);
+      setIsSessionLocked(false);
+      setIsAuthModalOpen(false);
+      setAuthModalTargetUser(null);
+      setActiveTab('super_admin_dashboard');
+
+      // Generate and persist cryptographically signed JWT token for Super Admin
+      const timeoutMins = business.sessionTimeoutSettings?.timeoutMinutes || 480;
+      const { token } = generateJwtToken(superAdminUser, currentCompany, timeoutMins);
+      saveAuthToken(token);
+      setJwtToken(token);
+
+      // Ensure URL is set to /admin
+      if (typeof window !== 'undefined') {
+        try {
+          window.history.pushState({ tab: 'super_admin_dashboard' }, '', '/admin');
+        } catch (e) {
+          window.location.hash = '#/admin';
+        }
+      }
+
+      logSecurityEvent('USER_AUTHENTICATED', 'Super Admin Auth', 'Master Super Administrator logged in');
+      logSecurityEvent('JWT_TOKEN_ISSUED', 'Cryptographic Auth', `Issued cryptographic JWT access token for ${superAdminUser.name} (SUPER_ADMIN)`);
+      showToast('success', 'Super Admin Authenticated', 'Master platform governance unlocked with cryptographic JWT session.');
+      return { success: true };
+    }
+    return { success: false, error: 'Invalid Super Admin master password or PIN.' };
+  };
+
   const loginAsSuperAdmin = () => {
     if (currentUser.role === 'SUPER_ADMIN' && isAuthenticated && !isSessionLocked) {
       setActiveTab('super_admin_dashboard');
+      if (typeof window !== 'undefined') {
+        try {
+          window.history.pushState({ tab: 'super_admin_dashboard' }, '', '/admin');
+        } catch (e) {
+          window.location.hash = '#/admin';
+        }
+      }
       showToast('info', 'Super Admin Dashboard', 'Active Super Administrator session.');
     } else {
-      openAuthModal(superAdminUser);
+      setActiveTab('super_admin_dashboard');
+      if (typeof window !== 'undefined') {
+        try {
+          window.history.pushState({ tab: 'super_admin_dashboard' }, '', '/admin');
+        } catch (e) {
+          window.location.hash = '#/admin';
+        }
+      }
     }
   };
 
@@ -5523,6 +5636,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         auditLogs,
         logSecurityEvent,
         verifySuperAdminKey,
+        authenticateSuperAdmin,
         loginAsSuperAdmin,
         jwtToken,
         jwtSessionInfo,

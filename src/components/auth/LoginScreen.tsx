@@ -50,7 +50,8 @@ export const LoginScreen: React.FC = () => {
     platformConfig,
     cloudSyncStatus,
     isCloudSyncing,
-    triggerCloudSync
+    triggerCloudSync,
+    setActiveTab
   } = useApp();
 
   // Screen Flow Step: 'company_login' (default), 'login_credentials' (user login), or 'super_admin_credentials'
@@ -287,11 +288,14 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleGoToSuperAdminLogin = () => {
-    setSelectedUserId(DEFAULT_SUPER_ADMIN.id);
-    setPasswordInput('');
-    setErrorMessage(null);
-    setShowPassword(false);
-    setLoginStep('super_admin_credentials');
+    setActiveTab('super_admin_dashboard');
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.pushState({ tab: 'super_admin_dashboard' }, '', '/admin');
+      } catch (e) {
+        window.location.hash = '#/admin';
+      }
+    }
   };
 
   const handleSwitchCompanyBack = () => {
@@ -878,6 +882,7 @@ export const LoginScreen: React.FC = () => {
                             setPasswordInput(e.target.value);
                             if (errorMessage) setErrorMessage(null);
                           }}
+                          autoComplete="new-password"
                           placeholder={authMode === 'password' ? 'Enter password...' : '••••'}
                           maxLength={authMode === 'pin' ? 6 : 50}
                           autoFocus
@@ -1040,6 +1045,7 @@ export const LoginScreen: React.FC = () => {
                         setPasswordInput(e.target.value);
                         if (errorMessage) setErrorMessage(null);
                       }}
+                      autoComplete="new-password"
                       placeholder={authMode === 'password' ? 'Enter master password...' : '••••'}
                       maxLength={authMode === 'pin' ? 6 : 50}
                       autoFocus
