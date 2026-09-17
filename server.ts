@@ -5,11 +5,13 @@ import fs from "fs";
 async function startServer() {
   const app = express();
   
-  // In the AI Studio development container, CONTROL_PLANE_PORT is set and dev servers MUST listen on port 3000.
-  // In deployed Cloud Run services, the container MUST listen on the port provided by Cloud Run via process.env.PORT.
-  const isDevContainer = Boolean(process.env.CONTROL_PLANE_PORT);
-  const isProduction = !isDevContainer || process.env.NODE_ENV === "production";
-  const PORT = isDevContainer ? 3000 : (Number(process.env.PORT) || 3000);
+  // AI Studio infrastructure runs an Nginx reverse proxy on port 8080 (Cloud Run PORT)
+  // that routes all external traffic exclusively to the application listening on port 3000.
+  // The server MUST always bind to port 3000 on 0.0.0.0.
+  const PORT = 3000;
+  // In CJS, __filename and __dirname are available; in ESM, process.cwd() is used.
+  const isCJS = typeof __filename !== "undefined";
+  const isProduction = process.env.NODE_ENV === "production" || (isCJS && __filename.endsWith(".cjs"));
 
   // JSON body parser
   app.use(express.json());
@@ -30,11 +32,12 @@ async function startServer() {
   } else {
     // Resolve static assets directory
     let distPath = path.join(process.cwd(), "dist");
-    if (!fs.existsSync(distPath)) {
-      distPath = path.join(__dirname, "dist");
+    const baseDir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
+    if (!fs.existsSync(distPath) || !fs.existsSync(path.join(distPath, "index.html"))) {
+      distPath = baseDir;
     }
-    if (!fs.existsSync(distPath)) {
-      distPath = __dirname;
+    if (!fs.existsSync(path.join(distPath, "index.html"))) {
+      distPath = path.join(baseDir, "dist");
     }
 
     app.use(express.static(distPath));
