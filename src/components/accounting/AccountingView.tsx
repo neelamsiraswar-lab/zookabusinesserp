@@ -1004,14 +1004,15 @@ export const AccountingView: React.FC = () => {
   }, [coaSearch, coaCategoryFilter]);
 
   const totalCoaPages = Math.max(1, Math.ceil(filteredChartOfAccounts.length / coaPageSize));
+  const safeCoaPage = Math.min(Math.max(1, coaPage), totalCoaPages);
   useEffect(() => {
     if (coaPage > totalCoaPages) setCoaPage(totalCoaPages);
   }, [coaPage, totalCoaPages]);
 
   const paginatedChartOfAccounts = useMemo(() => {
-    const start = (coaPage - 1) * coaPageSize;
+    const start = (safeCoaPage - 1) * coaPageSize;
     return filteredChartOfAccounts.slice(start, start + coaPageSize);
-  }, [filteredChartOfAccounts, coaPage, coaPageSize]);
+  }, [filteredChartOfAccounts, safeCoaPage, coaPageSize]);
 
   // 2. General Ledger Statement Pagination
   const [glPage, setGlPage] = useState<number>(1);
@@ -1022,14 +1023,15 @@ export const AccountingView: React.FC = () => {
   }, [selectedAccountId, ledgerSearch, ledgerStartDate, ledgerEndDate]);
 
   const totalGlPages = Math.max(1, Math.ceil(currentAccountPostings.length / glPageSize));
+  const safeGlPage = Math.min(Math.max(1, glPage), totalGlPages);
   useEffect(() => {
     if (glPage > totalGlPages) setGlPage(totalGlPages);
   }, [glPage, totalGlPages]);
 
   const paginatedAccountPostings = useMemo(() => {
-    const start = (glPage - 1) * glPageSize;
+    const start = (safeGlPage - 1) * glPageSize;
     return currentAccountPostings.slice(start, start + glPageSize);
-  }, [currentAccountPostings, glPage, glPageSize]);
+  }, [currentAccountPostings, safeGlPage, glPageSize]);
 
   // 3. Daybook Entries Pagination
   const [daybookPage, setDaybookPage] = useState<number>(1);
@@ -1040,14 +1042,15 @@ export const AccountingView: React.FC = () => {
   }, [daybookSearch, daybookAccountFilter, daybookTypeFilter]);
 
   const totalDaybookPages = Math.max(1, Math.ceil(filteredDaybookEntries.length / daybookPageSize));
+  const safeDaybookPage = Math.min(Math.max(1, daybookPage), totalDaybookPages);
   useEffect(() => {
     if (daybookPage > totalDaybookPages) setDaybookPage(totalDaybookPages);
   }, [daybookPage, totalDaybookPages]);
 
   const paginatedDaybookEntries = useMemo(() => {
-    const start = (daybookPage - 1) * daybookPageSize;
+    const start = (safeDaybookPage - 1) * daybookPageSize;
     return filteredDaybookEntries.slice(start, start + daybookPageSize);
-  }, [filteredDaybookEntries, daybookPage, daybookPageSize]);
+  }, [filteredDaybookEntries, safeDaybookPage, daybookPageSize]);
 
   // =========================================================================
   // ACCOUNT HEAD (LEDGER MASTER) HANDLERS
@@ -2089,7 +2092,7 @@ export const AccountingView: React.FC = () => {
 
             {filteredChartOfAccounts.length > 0 && (
               <Pagination
-                currentPage={coaPage}
+                currentPage={safeCoaPage}
                 totalItems={filteredChartOfAccounts.length}
                 pageSize={coaPageSize}
                 pageSizeOptions={[10, 25, 50, 100]}
@@ -2364,7 +2367,7 @@ export const AccountingView: React.FC = () => {
 
             {currentAccountPostings.length > 0 && (
               <Pagination
-                currentPage={glPage}
+                currentPage={safeGlPage}
                 totalItems={currentAccountPostings.length}
                 pageSize={glPageSize}
                 pageSizeOptions={[10, 15, 25, 50, 100]}
@@ -2572,7 +2575,7 @@ export const AccountingView: React.FC = () => {
 
           {filteredDaybookEntries.length > 0 && (
             <Pagination
-              currentPage={daybookPage}
+              currentPage={safeDaybookPage}
               totalItems={filteredDaybookEntries.length}
               pageSize={daybookPageSize}
               pageSizeOptions={[10, 25, 50, 100]}

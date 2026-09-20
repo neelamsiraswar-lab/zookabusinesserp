@@ -123,32 +123,29 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
   const isCompanyUserLoggedIn = isAuthenticated && currentUser.role !== 'SUPER_ADMIN';
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-between relative overflow-hidden font-sans text-slate-100 selection:bg-purple-600 selection:text-white">
-      {/* Dynamic Ambient Background Illumination */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-purple-600/15 blur-[140px] rounded-full" />
-        <div className="absolute top-1/3 -left-40 w-[600px] h-[600px] bg-indigo-600/10 blur-[130px] rounded-full" />
-        <div className="absolute -bottom-40 right-0 w-[700px] h-[500px] bg-violet-600/10 blur-[150px] rounded-full" />
-        <div className="absolute inset-0 bg-[radial-gradient(#6b21a8_1px,transparent_1px)] [background-size:24px_24px] opacity-15" />
-      </div>
+    <div className="min-h-screen bg-slate-950 flex flex-col justify-between relative overflow-hidden font-sans text-slate-100 selection:bg-indigo-500 selection:text-white">
+      {/* Calm Slate Canvas with Subtle Top Ambient Lighting */}
+      <div className="pointer-events-none absolute inset-x-0 -top-32 h-96 bg-gradient-to-b from-indigo-500/10 via-slate-850/10 to-transparent blur-3xl opacity-70" />
+      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[720px] h-48 bg-indigo-500/5 blur-[120px] rounded-full" />
 
       {/* Top Brand Header */}
       <header className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <AppLogo 
             size="md" 
-            className="shadow-xl shadow-purple-900/40 ring-1 ring-purple-500/30" 
+            className="ring-1 ring-slate-800 rounded-xl" 
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black tracking-tight text-base sm:text-lg text-white">
+              <span className="font-bold tracking-tight text-base sm:text-lg text-white">
                 {platformConfig?.appName || 'Zooka Business'}
               </span>
-              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                Super Admin
+              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1">
+                <Crown className="w-2.5 h-2.5 text-amber-400" />
+                <span>Super Admin Gateway</span>
               </span>
             </div>
-            <p className="text-xs text-purple-300/70 hidden sm:block">
+            <p className="text-xs text-slate-400 hidden sm:block">
               {platformConfig?.appTagline || 'Platform Governance & Enterprise Management'}
             </p>
           </div>
@@ -158,7 +155,7 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
         <button
           type="button"
           onClick={handleBackToWorkspaceOrCompany}
-          className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:border-slate-600 active:scale-95"
+          className="px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-medium rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer"
         >
           <Building2 className="w-3.5 h-3.5 text-slate-400" />
           <span>{isCompanyUserLoggedIn ? 'Return to Workspace' : 'Company Login'}</span>
@@ -171,16 +168,16 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
         
         {/* Notice for Users Already Logged in as Company Members */}
         {isCompanyUserLoggedIn && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-indigo-950/60 border border-indigo-700/50 backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="mb-4 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 backdrop-blur-sm flex items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-indigo-600/30 text-indigo-300 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center shrink-0">
                 <Briefcase className="w-4 h-4" />
               </div>
               <div className="min-w-0 text-xs">
-                <p className="font-semibold text-indigo-200 truncate">
+                <p className="font-semibold text-slate-200 truncate">
                   Active Workspace Session: <strong className="text-white">{currentCompany?.tradeName || currentCompany?.name}</strong>
                 </p>
-                <p className="text-[11px] text-indigo-300/80">
+                <p className="text-[11px] text-slate-400">
                   Logged in as {currentUser.name} ({currentUser.role}). Enter Super Admin credentials to elevate session.
                 </p>
               </div>
@@ -188,46 +185,47 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
             <button
               type="button"
               onClick={handleBackToWorkspaceOrCompany}
-              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-600/40 hover:bg-indigo-600/60 text-indigo-100 border border-indigo-500/40 transition-all shrink-0 cursor-pointer"
+              className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors shrink-0 cursor-pointer"
             >
               Back
             </button>
           </div>
         )}
 
-        <div className="bg-gradient-to-b from-slate-900/95 via-purple-950/40 to-slate-900/95 border border-purple-800/50 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-purple-950/80 backdrop-blur-xl">
+        {/* Focused Authentication Card */}
+        <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm space-y-6">
           
           {/* Card Header */}
-          <div className="flex items-center gap-4 pb-5 border-b border-purple-900/40">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-600 text-amber-300 flex items-center justify-center shadow-lg shadow-purple-600/40 shrink-0 ring-2 ring-purple-400/40">
-              <Crown className="w-7 h-7 animate-pulse" />
+          <div className="flex items-center gap-3.5 pb-5 border-b border-slate-800">
+            <div className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center shrink-0">
+              <Crown className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="font-black text-white text-lg tracking-tight truncate">
-                  Super Administrator Login
+                <h1 className="font-bold text-white text-base sm:text-lg tracking-tight truncate">
+                  Super Administrator Gateway
                 </h1>
-                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md border bg-purple-500/30 text-purple-200 border-purple-400/40 shrink-0">
-                  Level 0 Gate
+                <span className="text-[9px] font-semibold uppercase px-2 py-0.5 rounded-md border bg-slate-800 text-slate-300 border-slate-700 shrink-0">
+                  Level 0
                 </span>
               </div>
-              <p className="text-xs text-purple-300/80 mt-0.5">
-                Master Governance & Multi-Company Control
+              <p className="text-xs text-slate-400 mt-0.5">
+                Master Governance & Multi-Company Ledger Control
               </p>
             </div>
           </div>
 
           {/* Login Form */}
-          <form onSubmit={handleLoginSubmit} autoComplete="off" className="mt-6 space-y-5">
+          <form onSubmit={handleLoginSubmit} autoComplete="off" className="space-y-5">
             
             {/* Super Admin Email / Identifier */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-purple-400" />
+                <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
                   <span>Master Email or Username</span>
                 </label>
-                <span className="text-[10px] text-purple-400 font-semibold">
+                <span className="text-[11px] text-slate-500 font-medium">
                   Administrator ID
                 </span>
               </div>
@@ -241,17 +239,23 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
                   }}
                   autoComplete="off"
                   placeholder="kuldeep.siraswar@gmail.com or superadmin"
-                  className="w-full px-4 py-3 text-sm bg-slate-950/90 border border-purple-900/60 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all placeholder:text-slate-600"
+                  className="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600"
                 />
               </div>
             </div>
 
-            {/* Authentication Mode Selector (Password vs PIN) */}
+            {/* Streamlined Authentication Mode Selector (Clean Segmented Control) */}
             <div>
-              <label className="text-xs font-bold text-slate-200 mb-1.5 block">
-                Verification Method
-              </label>
-              <div className="flex items-center bg-slate-950/90 p-1.5 rounded-2xl border border-purple-900/60">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-slate-200">
+                  Verification Method
+                </label>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Select credential type
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
                 <button
                   type="button"
                   onClick={() => {
@@ -259,10 +263,10 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
                     setSecretInput('');
                     setErrorMessage(null);
                   }}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`py-2 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
                     authMode === 'password'
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-slate-800 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <KeyRound className="w-3.5 h-3.5" />
@@ -275,10 +279,10 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
                     setSecretInput('');
                     setErrorMessage(null);
                   }}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`py-2 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
                     authMode === 'pin'
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-slate-800 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <Fingerprint className="w-3.5 h-3.5" />
@@ -290,11 +294,11 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
             {/* Password / PIN Input Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-slate-200">
+                <label className="text-xs font-semibold text-slate-200">
                   {authMode === 'password' ? 'Super Admin Master Password' : '4-Digit Master PIN'}
                 </label>
                 {isCapsOn && (
-                  <span className="text-[10px] text-amber-400 font-bold animate-pulse">
+                  <span className="text-[10px] text-amber-400 font-medium">
                     Caps Lock is ON
                   </span>
                 )}
@@ -313,8 +317,10 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
                   placeholder={authMode === 'password' ? 'Enter master password...' : '••••'}
                   maxLength={authMode === 'pin' ? 6 : 60}
                   autoFocus
-                  className={`w-full px-4 py-3 pr-12 text-sm bg-slate-950/90 border rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono transition-all placeholder:text-slate-600 ${
-                    errorMessage ? 'border-rose-500 ring-1 ring-rose-500/50' : 'border-purple-900/60'
+                  className={`w-full px-3.5 py-2.5 sm:py-3 pr-12 text-sm bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
+                    authMode === 'pin' ? 'font-mono tracking-widest text-center text-base sm:text-lg' : 'font-mono'
+                  } ${
+                    errorMessage ? 'border-rose-500/80 ring-1 ring-rose-500/30' : 'border-slate-800 hover:border-slate-700'
                   }`}
                 />
                 <button
@@ -328,7 +334,7 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
               </div>
 
               {errorMessage && (
-                <div className="flex items-center gap-2 text-xs text-rose-400 mt-2.5 font-medium animate-in fade-in p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50">
+                <div className="flex items-center gap-2 text-xs text-rose-400 mt-2.5 font-medium animate-in fade-in p-2.5 rounded-xl bg-rose-950/30 border border-rose-800/40">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{errorMessage}</span>
                 </div>
@@ -339,7 +345,7 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3.5 px-5 text-sm font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 rounded-2xl shadow-xl shadow-purple-900/40 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 px-4 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
@@ -348,8 +354,8 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
                 </span>
               ) : (
                 <>
-                  <Crown className="w-4 h-4 text-amber-300" />
-                  <span>Unlock Super Admin Portal</span>
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span>Access Governance Console</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -357,25 +363,25 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
           </form>
 
           {/* Access Info Notice */}
-          <div className="mt-5 pt-4 border-t border-purple-900/40">
+          <div className="pt-4 border-t border-slate-800">
             <button
               type="button"
               onClick={() => setShowHints(!showHints)}
-              className="text-purple-400 hover:text-purple-300 flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
+              className="text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer text-xs font-medium"
             >
-              <HelpCircle className="w-3.5 h-3.5" />
+              <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
               <span>{showHints ? 'Hide Access Info' : 'Master Access Info'}</span>
             </button>
 
             {showHints && (
-              <div className="mt-3 p-3 rounded-xl bg-slate-950/80 border border-purple-900/50 text-[11px] text-purple-200/90 space-y-1.5 animate-in fade-in">
+              <div className="mt-3 p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300 space-y-1.5 animate-in fade-in">
                 <p className="flex items-center justify-between">
                   <span className="text-slate-400">Master Account:</span>
-                  <code className="font-mono text-white bg-purple-950/80 px-1.5 py-0.5 rounded border border-purple-800/40">
+                  <code className="font-mono text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
                     {superAdminAuth?.email || DEFAULT_SUPER_ADMIN.email}
                   </code>
                 </p>
-                <p className="text-slate-400 text-[11px] mt-1">
+                <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
                   Enter your master password or PIN to verify identity and unlock system governance.
                 </p>
               </div>
@@ -383,12 +389,12 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
           </div>
 
           {/* Security Footnote */}
-          <div className="mt-4 pt-3 border-t border-purple-900/30 flex items-center justify-between text-[11px] text-purple-300/70">
-            <span className="flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-purple-400" />
-              <span>SHA-256 JWT Signed</span>
+          <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+            <span className="flex items-center gap-1.5 text-slate-500">
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
+              <span>Master Key Protected</span>
             </span>
-            <span className="flex items-center gap-1.5 text-emerald-400">
+            <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Encrypted Gateway</span>
             </span>
@@ -400,7 +406,7 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
           <button
             type="button"
             onClick={handleBackToWorkspaceOrCompany}
-            className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer inline-flex items-center gap-1.5 py-1 px-3 rounded-lg hover:bg-slate-900/60"
+            className="text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer inline-flex items-center gap-1.5 py-1 px-3 rounded-lg hover:bg-slate-900/60"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Switch to Standard Company Workspace Login</span>
@@ -414,11 +420,11 @@ export const SuperAdminLoginScreen: React.FC<SuperAdminLoginScreenProps> = ({
           © {new Date().getFullYear()} {platformConfig?.appName || 'Zooka Business'} • Platform Master Governance
         </p>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-purple-400">
+          <span className="flex items-center gap-1.5 text-slate-400">
             <Crown className="w-3.5 h-3.5 text-amber-400" />
             <span>Executive Authority</span>
           </span>
-          <span className="text-slate-600">•</span>
+          <span className="text-slate-700">•</span>
           <span>Developed by.Kuldeep Siraswar</span>
         </div>
       </footer>

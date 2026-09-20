@@ -230,6 +230,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
   }, [searchQuery, selectedCategory, showLowStockOnly, itemTypeFilter, sortField, sortDirection]);
 
   const totalPages = Math.max(1, Math.ceil(sortedProducts.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
@@ -237,9 +239,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
   }, [currentPage, totalPages]);
 
   const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return sortedProducts.slice(start, start + pageSize);
-  }, [sortedProducts, currentPage, pageSize]);
+  }, [sortedProducts, safeCurrentPage, pageSize]);
 
   const totalInventoryValuation = health.totalValuation;
   const lowStockCount = health.lowStockItems;
@@ -1518,7 +1520,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
 
         {sortedProducts.length > 0 && (
           <Pagination
-            currentPage={currentPage}
+            currentPage={safeCurrentPage}
             totalItems={sortedProducts.length}
             pageSize={pageSize}
             pageSizeOptions={[10, 25, 50, 100]}

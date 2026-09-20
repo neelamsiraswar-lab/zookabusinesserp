@@ -123,6 +123,8 @@ export const PartiesView: React.FC = () => {
   }, [searchQuery, partyTypeFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredParties.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
@@ -130,9 +132,9 @@ export const PartiesView: React.FC = () => {
   }, [currentPage, totalPages]);
 
   const paginatedParties = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredParties.slice(start, start + pageSize);
-  }, [filteredParties, currentPage, pageSize]);
+  }, [filteredParties, safeCurrentPage, pageSize]);
 
   const { totalReceivables, totalPayables, partyBalances } = useMemo(() => {
     return calculateReceivablesAndPayables(parties, invoices, purchaseBills, payments);
@@ -546,7 +548,7 @@ export const PartiesView: React.FC = () => {
 
         {filteredParties.length > 0 && (
           <Pagination
-            currentPage={currentPage}
+            currentPage={safeCurrentPage}
             totalItems={filteredParties.length}
             pageSize={pageSize}
             pageSizeOptions={[10, 25, 50, 100]}

@@ -224,6 +224,8 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
   }, [searchQuery, statusFilter, typeFilter, sortField, sortDirection]);
 
   const totalPages = Math.max(1, Math.ceil(sortedInvoices.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
@@ -231,9 +233,9 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
   }, [currentPage, totalPages]);
 
   const paginatedInvoices = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return sortedInvoices.slice(start, start + pageSize);
-  }, [sortedInvoices, currentPage, pageSize]);
+  }, [sortedInvoices, safeCurrentPage, pageSize]);
 
   const handleOpenPayment = (inv: Invoice) => {
     setPaymentModalInvoice(inv);
@@ -1309,7 +1311,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
 
     {sortedInvoices.length > 0 && (
       <Pagination
-        currentPage={currentPage}
+        currentPage={safeCurrentPage}
         totalItems={sortedInvoices.length}
         pageSize={pageSize}
         pageSizeOptions={[10, 25, 50, 100]}

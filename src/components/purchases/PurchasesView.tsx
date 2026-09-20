@@ -878,24 +878,26 @@ export const PurchasesView: React.FC = () => {
   }, [searchQuery, activeTab]);
 
   const totalBillsPages = Math.max(1, Math.ceil(filteredBills.length / billsPageSize));
+  const safeBillsPage = Math.min(Math.max(1, billsPage), totalBillsPages);
   useEffect(() => {
     if (billsPage > totalBillsPages) setBillsPage(totalBillsPages);
   }, [billsPage, totalBillsPages]);
 
   const paginatedBills = useMemo(() => {
-    const start = (billsPage - 1) * billsPageSize;
+    const start = (safeBillsPage - 1) * billsPageSize;
     return filteredBills.slice(start, start + billsPageSize);
-  }, [filteredBills, billsPage, billsPageSize]);
+  }, [filteredBills, safeBillsPage, billsPageSize]);
 
   const totalExpensesPages = Math.max(1, Math.ceil(filteredExpenses.length / expensesPageSize));
+  const safeExpensesPage = Math.min(Math.max(1, expensesPage), totalExpensesPages);
   useEffect(() => {
     if (expensesPage > totalExpensesPages) setExpensesPage(totalExpensesPages);
   }, [expensesPage, totalExpensesPages]);
 
   const paginatedExpenses = useMemo(() => {
-    const start = (expensesPage - 1) * expensesPageSize;
+    const start = (safeExpensesPage - 1) * expensesPageSize;
     return filteredExpenses.slice(start, start + expensesPageSize);
-  }, [filteredExpenses, expensesPage, expensesPageSize]);
+  }, [filteredExpenses, safeExpensesPage, expensesPageSize]);
 
   return (
     <div className="space-y-4">
@@ -1125,7 +1127,7 @@ export const PurchasesView: React.FC = () => {
 
           {filteredBills.length > 0 && (
             <Pagination
-              currentPage={billsPage}
+              currentPage={safeBillsPage}
               totalItems={filteredBills.length}
               pageSize={billsPageSize}
               pageSizeOptions={[10, 25, 50, 100]}
@@ -1192,7 +1194,7 @@ export const PurchasesView: React.FC = () => {
 
           {filteredExpenses.length > 0 && (
             <Pagination
-              currentPage={expensesPage}
+              currentPage={safeExpensesPage}
               totalItems={filteredExpenses.length}
               pageSize={expensesPageSize}
               pageSizeOptions={[10, 25, 50, 100]}

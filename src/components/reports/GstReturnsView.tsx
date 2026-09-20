@@ -42,7 +42,7 @@ import {
   HardDrive
 } from 'lucide-react';
 import { formatINR } from '../../utils/formatters';
-import { HSN_MASTER_LIST, COMMON_HSN_CODES, STANDARD_UNITS } from '../../utils/constants';
+import { STANDARD_UNITS } from '../../utils/constants';
 import { CustomHsnCode, GstTaxRate } from '../../types';
 import { ModalWrapper } from '../common/Portal';
 
@@ -68,7 +68,6 @@ export const GstReturnsView: React.FC = () => {
   const [hsnSearchQuery, setHsnSearchQuery] = useState('');
 
   // HSN & SAC Tariff Directory State
-  const [hsnScopeFilter, setHsnScopeFilter] = useState<'ALL' | 'CUSTOM' | 'STANDARD'>('ALL');
   const [hsnTypeFilter, setHsnTypeFilter] = useState<'ALL' | 'HSN' | 'SAC'>('ALL');
   const [hsnRateFilter, setHsnRateFilter] = useState<'ALL' | '0' | '5' | '12' | '18' | '28'>('ALL');
 
@@ -575,12 +574,6 @@ export const GstReturnsView: React.FC = () => {
   const combinedTariffDirectory = useMemo(() => {
     const q = hsnSearchQuery.trim().toLowerCase();
 
-    // Map custom codes by uppercase code string
-    const customCodesMap = new Map<string, CustomHsnCode>();
-    customHsnCodes.forEach(c => {
-      customCodesMap.set(c.code.toUpperCase(), c);
-    });
-
     interface DirectoryEntry {
       id: string;
       code: string;
@@ -589,51 +582,23 @@ export const GstReturnsView: React.FC = () => {
       gstRate: GstTaxRate;
       uqc: string;
       isCustom: boolean;
-      isStandard: boolean;
-      customData?: CustomHsnCode;
+      customData: CustomHsnCode;
     }
 
-    const list: DirectoryEntry[] = [];
-
-    // First add all custom codes (synced with cloud database)
-    customHsnCodes.forEach(c => {
-      list.push({
-        id: c.id,
-        code: c.code,
-        description: c.description,
-        type: c.type || (c.code.startsWith('99') ? 'SAC' : 'HSN'),
-        gstRate: c.gstRate,
-        uqc: c.uqc || (c.code.startsWith('99') ? 'OTH' : 'PCS'),
-        isCustom: true,
-        isStandard: COMMON_HSN_CODES.some(std => std.code === c.code),
-        customData: c
-      });
-    });
-
-    // Then add standard codes that aren't yet in custom list
-    COMMON_HSN_CODES.forEach(std => {
-      const isSac = std.code.startsWith('99');
-      const alreadyCustom = customCodesMap.has(std.code.toUpperCase());
-      if (!alreadyCustom) {
-        list.push({
-          id: `std-${std.code}`,
-          code: std.code,
-          description: std.description,
-          type: isSac ? 'SAC' : 'HSN',
-          gstRate: (std.defaultGst as GstTaxRate) || 18,
-          uqc: isSac ? 'OTH' : 'PCS',
-          isCustom: false,
-          isStandard: true
-        });
-      }
-    });
+    // Populate exclusively from company's cloud database custom codes (standard catalog removed)
+    const list: DirectoryEntry[] = customHsnCodes.map(c => ({
+      id: c.id,
+      code: c.code,
+      description: c.description,
+      type: c.type || (c.code.startsWith('99') ? 'SAC' : 'HSN'),
+      gstRate: c.gstRate,
+      uqc: c.uqc || (c.code.startsWith('99') ? 'OTH' : 'PCS'),
+      isCustom: true,
+      customData: c
+    }));
 
     // Apply filters
     return list.filter(item => {
-      // Scope filter
-      if (hsnScopeFilter === 'CUSTOM' && !item.isCustom) return false;
-      if (hsnScopeFilter === 'STANDARD' && item.isCustom) return false;
-
       // Type filter
       if (hsnTypeFilter !== 'ALL' && item.type !== hsnTypeFilter) return false;
 
@@ -650,7 +615,7 @@ export const GstReturnsView: React.FC = () => {
 
       return true;
     });
-  }, [customHsnCodes, hsnSearchQuery, hsnScopeFilter, hsnTypeFilter, hsnRateFilter]);
+  }, [customHsnCodes, hsnSearchQuery, hsnTypeFilter, hsnRateFilter]);
 
   // =========================================================================
   // PAGINATION CONTROLS
@@ -664,14 +629,15 @@ export const GstReturnsView: React.FC = () => {
   }, [filterMode, selectedMonth, startDate, endDate, searchQuery, salesTypeFilter]);
 
   const totalSalesPages = Math.max(1, Math.ceil(filteredSalesInvoices.length / salesPageSize));
+  const safeSalesPage = Math.min(Math.max(1, salesPage), totalSalesPages);
   useEffect(() => {
     if (salesPage > totalSalesPages) setSalesPage(totalSalesPages);
   }, [salesPage, totalSalesPages]);
 
   const paginatedSalesInvoices = useMemo(() => {
-    const start = (salesPage - 1) * salesPageSize;
+    const start = (safeSalesPage - 1) * salesPageSize;
     return filteredSalesInvoices.slice(start, start + salesPageSize);
-  }, [filteredSalesInvoices, salesPage, salesPageSize]);
+  }, [filteredSalesInvoices, safeSalesPage, salesPageSize]);
 
   // 2. Purchase Register Pagination
   const [purchasePage, setPurchasePage] = useState<number>(1);
@@ -682,14 +648,15 @@ export const GstReturnsView: React.FC = () => {
   }, [filterMode, selectedMonth, startDate, endDate, searchQuery, purchaseItcFilter]);
 
   const totalPurchasePages = Math.max(1, Math.ceil(filteredPurchaseBills.length / purchasePageSize));
+  const safePurchasePage = Math.min(Math.max(1, purchasePage), totalPurchasePages);
   useEffect(() => {
     if (purchasePage > totalPurchasePages) setPurchasePage(totalPurchasePages);
   }, [purchasePage, totalPurchasePages]);
 
   const paginatedPurchaseBills = useMemo(() => {
-    const start = (purchasePage - 1) * purchasePageSize;
+    const start = (safePurchasePage - 1) * purchasePageSize;
     return filteredPurchaseBills.slice(start, start + purchasePageSize);
-  }, [filteredPurchaseBills, purchasePage, purchasePageSize]);
+  }, [filteredPurchaseBills, safePurchasePage, purchasePageSize]);
 
   // 3. GSTR-1 Table 4 (B2B Invoices) Pagination
   const [gstr1B2bPage, setGstr1B2bPage] = useState<number>(1);
@@ -697,17 +664,18 @@ export const GstReturnsView: React.FC = () => {
 
   useEffect(() => {
     setGstr1B2bPage(1);
-  }, [selectedPeriod, invoices]);
+  }, [selectedPeriod]);
 
   const totalGstr1B2bPages = Math.max(1, Math.ceil(b2bInvoices.length / gstr1B2bPageSize));
+  const safeGstr1B2bPage = Math.min(Math.max(1, gstr1B2bPage), totalGstr1B2bPages);
   useEffect(() => {
     if (gstr1B2bPage > totalGstr1B2bPages) setGstr1B2bPage(totalGstr1B2bPages);
   }, [gstr1B2bPage, totalGstr1B2bPages]);
 
   const paginatedB2bInvoices = useMemo(() => {
-    const start = (gstr1B2bPage - 1) * gstr1B2bPageSize;
+    const start = (safeGstr1B2bPage - 1) * gstr1B2bPageSize;
     return b2bInvoices.slice(start, start + gstr1B2bPageSize);
-  }, [b2bInvoices, gstr1B2bPage, gstr1B2bPageSize]);
+  }, [b2bInvoices, safeGstr1B2bPage, gstr1B2bPageSize]);
 
   // 4. GSTR-1 Table 12 (HSN Summary) Pagination
   const [gstr1HsnPage, setGstr1HsnPage] = useState<number>(1);
@@ -715,17 +683,18 @@ export const GstReturnsView: React.FC = () => {
 
   useEffect(() => {
     setGstr1HsnPage(1);
-  }, [selectedPeriod, invoices]);
+  }, [selectedPeriod]);
 
   const totalGstr1HsnPages = Math.max(1, Math.ceil(hsnSummaryList.length / gstr1HsnPageSize));
+  const safeGstr1HsnPage = Math.min(Math.max(1, gstr1HsnPage), totalGstr1HsnPages);
   useEffect(() => {
     if (gstr1HsnPage > totalGstr1HsnPages) setGstr1HsnPage(totalGstr1HsnPages);
   }, [gstr1HsnPage, totalGstr1HsnPages]);
 
   const paginatedHsnSummaryList = useMemo(() => {
-    const start = (gstr1HsnPage - 1) * gstr1HsnPageSize;
+    const start = (safeGstr1HsnPage - 1) * gstr1HsnPageSize;
     return hsnSummaryList.slice(start, start + gstr1HsnPageSize);
-  }, [hsnSummaryList, gstr1HsnPage, gstr1HsnPageSize]);
+  }, [hsnSummaryList, safeGstr1HsnPage, gstr1HsnPageSize]);
 
   // 5. HSN & SAC Tariff Directory Pagination
   const [tariffPage, setTariffPage] = useState<number>(1);
@@ -733,17 +702,18 @@ export const GstReturnsView: React.FC = () => {
 
   useEffect(() => {
     setTariffPage(1);
-  }, [hsnSearchQuery, hsnScopeFilter, hsnTypeFilter, hsnRateFilter, customHsnCodes]);
+  }, [hsnSearchQuery, hsnTypeFilter, hsnRateFilter]);
 
   const totalTariffPages = Math.max(1, Math.ceil(combinedTariffDirectory.length / tariffPageSize));
+  const safeTariffPage = Math.min(Math.max(1, tariffPage), totalTariffPages);
   useEffect(() => {
     if (tariffPage > totalTariffPages) setTariffPage(totalTariffPages);
   }, [tariffPage, totalTariffPages]);
 
   const paginatedTariffDirectory = useMemo(() => {
-    const start = (tariffPage - 1) * tariffPageSize;
+    const start = (safeTariffPage - 1) * tariffPageSize;
     return combinedTariffDirectory.slice(start, start + tariffPageSize);
-  }, [combinedTariffDirectory, tariffPage, tariffPageSize]);
+  }, [combinedTariffDirectory, safeTariffPage, tariffPageSize]);
 
   const handleOpenAddHsn = (initialCode = '', initialType: 'HSN' | 'SAC' = 'HSN') => {
     setEditingHsnId(null);
@@ -762,29 +732,6 @@ export const GstReturnsView: React.FC = () => {
     setFormType(item.type || (item.code.startsWith('99') ? 'SAC' : 'HSN'));
     setFormGstRate(item.gstRate);
     setFormUqc(item.uqc || (item.code.startsWith('99') ? 'OTH' : 'PCS'));
-    setIsHsnModalOpen(true);
-  };
-
-  const handleCloneStandardHsn = (std: { code: string; description: string; defaultGst: number }) => {
-    const isSac = std.code.startsWith('99');
-    const newCode = addCustomHsnCode({
-      code: std.code,
-      description: std.description,
-      type: isSac ? 'SAC' : 'HSN',
-      gstRate: (std.defaultGst as GstTaxRate) || 18,
-      uqc: isSac ? 'OTH' : 'PCS',
-      isCustom: true
-    });
-    showToast('success', 'Saved to Cloud Database', `Added ${newCode.code} to your custom cloud tariff directory.`);
-  };
-
-  const handleCustomizeStandardHsn = (std: { code: string; description: string; gstRate: GstTaxRate; uqc: string; type: 'HSN' | 'SAC' }) => {
-    setEditingHsnId(null);
-    setFormCode(std.code);
-    setFormDescription(std.description);
-    setFormType(std.type);
-    setFormGstRate(std.gstRate);
-    setFormUqc(std.uqc);
     setIsHsnModalOpen(true);
   };
 
@@ -894,7 +841,7 @@ export const GstReturnsView: React.FC = () => {
       item.gstRate / 2,
       item.gstRate,
       `"${item.uqc}"`,
-      item.isCustom ? '"Custom Cloud Saved"' : '"Standard Reference"'
+      '"Custom Cloud Saved"'
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -1559,7 +1506,7 @@ export const GstReturnsView: React.FC = () => {
 
             {filteredSalesInvoices.length > 0 && (
               <Pagination
-                currentPage={salesPage}
+                currentPage={safeSalesPage}
                 totalItems={filteredSalesInvoices.length}
                 pageSize={salesPageSize}
                 pageSizeOptions={[10, 25, 50, 100]}
@@ -1910,7 +1857,7 @@ export const GstReturnsView: React.FC = () => {
 
             {filteredPurchaseBills.length > 0 && (
               <Pagination
-                currentPage={purchasePage}
+                currentPage={safePurchasePage}
                 totalItems={filteredPurchaseBills.length}
                 pageSize={purchasePageSize}
                 pageSizeOptions={[10, 25, 50, 100]}
@@ -2017,7 +1964,7 @@ export const GstReturnsView: React.FC = () => {
 
             {b2bInvoices.length > 0 && (
               <Pagination
-                currentPage={gstr1B2bPage}
+                currentPage={safeGstr1B2bPage}
                 totalItems={b2bInvoices.length}
                 pageSize={gstr1B2bPageSize}
                 pageSizeOptions={[10, 25, 50]}
@@ -2078,7 +2025,7 @@ export const GstReturnsView: React.FC = () => {
 
             {hsnSummaryList.length > 0 && (
               <Pagination
-                currentPage={gstr1HsnPage}
+                currentPage={safeGstr1HsnPage}
                 totalItems={hsnSummaryList.length}
                 pageSize={gstr1HsnPageSize}
                 pageSizeOptions={[10, 25, 50]}
@@ -2346,24 +2293,6 @@ export const GstReturnsView: React.FC = () => {
 
               {/* Filter Pills */}
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                {/* Scope Filters */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl text-slate-700 dark:text-slate-300 font-bold">
-                  {(['ALL', 'CUSTOM', 'STANDARD'] as const).map(scope => (
-                    <button
-                      key={scope}
-                      type="button"
-                      onClick={() => setHsnScopeFilter(scope)}
-                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                        hsnScopeFilter === scope
-                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      {scope === 'ALL' ? 'All Codes' : scope === 'CUSTOM' ? `Custom Cloud (${customHsnCodes.length})` : 'Standard Catalog'}
-                    </button>
-                  ))}
-                </div>
-
                 {/* Type Filters */}
                 <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl text-slate-700 dark:text-slate-300 font-bold">
                   {(['ALL', 'HSN', 'SAC'] as const).map(type => (
@@ -2405,9 +2334,13 @@ export const GstReturnsView: React.FC = () => {
                   <Tag className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">No HSN / SAC Codes Found</h4>
+                  <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                    {customHsnCodes.length === 0 ? 'No HSN / SAC Codes in Directory' : 'No Matching Tariff Codes Found'}
+                  </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
-                    No matching tariff codes found for your search criteria. Add a custom code, adjust filters, or bulk import codes.
+                    {customHsnCodes.length === 0
+                      ? "You haven't added any custom tariff codes yet. Add codes manually or bulk import them to build your business directory."
+                      : "No tariff codes matched your search and filter criteria. Adjust filters or search terms."}
                   </p>
                 </div>
                 <div className="flex items-center justify-center gap-2 pt-2">
@@ -2421,16 +2354,25 @@ export const GstReturnsView: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setHsnSearchQuery('');
-                      setHsnScopeFilter('ALL');
-                      setHsnTypeFilter('ALL');
-                      setHsnRateFilter('ALL');
-                    }}
-                    className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                    onClick={() => setIsBulkImportOpen(true)}
+                    className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                   >
-                    Reset All Filters
+                    <Upload className="w-4 h-4" />
+                    <span>Bulk Import</span>
                   </button>
+                  {(hsnSearchQuery || hsnTypeFilter !== 'ALL' || hsnRateFilter !== 'ALL') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHsnSearchQuery('');
+                        setHsnTypeFilter('ALL');
+                        setHsnRateFilter('ALL');
+                      }}
+                      className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                    >
+                      Reset Filters
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -2518,62 +2460,31 @@ export const GstReturnsView: React.FC = () => {
 
                         {/* Database Storage Badge */}
                         <td className="py-3 px-4 text-center">
-                          {item.isCustom ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                              <Cloud className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                              <span>Cloud Synced</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                              <BookOpen className="w-3 h-3 text-slate-400" />
-                              <span>Standard Catalog</span>
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <Cloud className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                            <span>Cloud Synced</span>
+                          </span>
                         </td>
 
                         {/* Actions */}
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {item.isCustom && item.customData ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditHsn(item.customData!)}
-                                  className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors cursor-pointer"
-                                  title="Edit custom code"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteConfirmHsn(item.customData!)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer"
-                                  title="Delete custom code"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            ) : (
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleCloneStandardHsn({ code: item.code, description: item.description, defaultGst: item.gstRate })}
-                                  className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-bold rounded-lg text-[11px] border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer flex items-center gap-1"
-                                  title="Add copy to your cloud custom directory"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  <span>Add to Custom</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCustomizeStandardHsn({ code: item.code, description: item.description, gstRate: item.gstRate, uqc: item.uqc, type: item.type })}
-                                  className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                                  title="Customize before saving"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleEditHsn(item.customData)}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-colors cursor-pointer"
+                              title="Edit custom code"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmHsn(item.customData)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete custom code"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -2582,7 +2493,7 @@ export const GstReturnsView: React.FC = () => {
                 </table>
 
                 <Pagination
-                  currentPage={tariffPage}
+                  currentPage={safeTariffPage}
                   totalItems={combinedTariffDirectory.length}
                   pageSize={tariffPageSize}
                   pageSizeOptions={[10, 15, 25, 50, 100]}
@@ -2600,7 +2511,7 @@ export const GstReturnsView: React.FC = () => {
                 <span>All custom entries are automatically synced to Firebase Firestore database</span>
               </div>
               <div className="font-mono text-slate-600 dark:text-slate-400">
-                Showing {combinedTariffDirectory.length} of {COMMON_HSN_CODES.length + customHsnCodes.length} total entries
+                Showing {combinedTariffDirectory.length} of {customHsnCodes.length} custom directory entries
               </div>
             </div>
 

@@ -398,14 +398,16 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
   }, [roleFilter, balanceFilter, searchQuery, sortBy]);
 
   const totalPartiesPages = Math.max(1, Math.ceil(filteredParties.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPartiesPages);
+
   useEffect(() => {
     if (currentPage > totalPartiesPages) setCurrentPage(totalPartiesPages);
   }, [currentPage, totalPartiesPages]);
 
   const paginatedParties = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredParties.slice(start, start + pageSize);
-  }, [filteredParties, currentPage, pageSize]);
+  }, [filteredParties, safeCurrentPage, pageSize]);
 
   // =========================================================================
   // 2. DETAILED LEDGER POSTINGS GENERATOR (FOR SELECTED PARTY)
@@ -607,14 +609,16 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
   }, [selectedPartyForLedger, ledgerSearch]);
 
   const totalModalPages = Math.max(1, Math.ceil(filteredLedgerPostings.length / modalPageSize));
+  const safeModalPage = Math.min(Math.max(1, modalPage), totalModalPages);
+
   useEffect(() => {
     if (modalPage > totalModalPages) setModalPage(totalModalPages);
   }, [modalPage, totalModalPages]);
 
   const paginatedLedgerPostings = useMemo(() => {
-    const start = (modalPage - 1) * modalPageSize;
+    const start = (safeModalPage - 1) * modalPageSize;
     return filteredLedgerPostings.slice(start, start + modalPageSize);
-  }, [filteredLedgerPostings, modalPage, modalPageSize]);
+  }, [filteredLedgerPostings, safeModalPage, modalPageSize]);
 
   // WhatsApp Reminder Handler
   const handleSendWhatsAppReminder = (detail: DebtorCreditorPartyDetail) => {
@@ -1262,7 +1266,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
 
         {filteredParties.length > 0 && (
           <Pagination
-            currentPage={currentPage}
+            currentPage={safeCurrentPage}
             totalItems={filteredParties.length}
             pageSize={pageSize}
             pageSizeOptions={[10, 25, 50, 100]}
@@ -1440,7 +1444,7 @@ export const DebtorsCreditorsView: React.FC<DebtorsCreditorsViewProps> = ({
               {filteredLedgerPostings.length > 0 && (
                 <div className="mt-3">
                   <Pagination
-                    currentPage={modalPage}
+                    currentPage={safeModalPage}
                     totalItems={filteredLedgerPostings.length}
                     pageSize={modalPageSize}
                     pageSizeOptions={[10, 25, 50]}

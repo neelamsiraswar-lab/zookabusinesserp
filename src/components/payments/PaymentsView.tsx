@@ -295,6 +295,8 @@ export const PaymentsView: React.FC = () => {
     : filteredPayments.length;
 
   const totalPages = Math.max(1, Math.ceil(currentTotal / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
@@ -302,29 +304,29 @@ export const PaymentsView: React.FC = () => {
   }, [currentPage, totalPages]);
 
   const paginatedPendingInvoices = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredPendingInvoices.slice(start, start + pageSize);
-  }, [filteredPendingInvoices, currentPage, pageSize]);
+  }, [filteredPendingInvoices, safeCurrentPage, pageSize]);
 
   const paginatedDebtorsWithReceivables = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredDebtorsWithReceivables.slice(start, start + pageSize);
-  }, [filteredDebtorsWithReceivables, currentPage, pageSize]);
+  }, [filteredDebtorsWithReceivables, safeCurrentPage, pageSize]);
 
   const paginatedPendingBills = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredPendingBills.slice(start, start + pageSize);
-  }, [filteredPendingBills, currentPage, pageSize]);
+  }, [filteredPendingBills, safeCurrentPage, pageSize]);
 
   const paginatedCreditorsWithPayables = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredCreditorsWithPayables.slice(start, start + pageSize);
-  }, [filteredCreditorsWithPayables, currentPage, pageSize]);
+  }, [filteredCreditorsWithPayables, safeCurrentPage, pageSize]);
 
   const paginatedPayments = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredPayments.slice(start, start + pageSize);
-  }, [filteredPayments, currentPage, pageSize]);
+  }, [filteredPayments, safeCurrentPage, pageSize]);
 
   // Available Customers & Creditors for dropdowns
   const customers = useMemo(() => parties.filter(p => p.type === 'CUSTOMER' || p.type === 'BOTH'), [parties]);
@@ -1106,7 +1108,7 @@ export const PaymentsView: React.FC = () => {
 
                 {filteredPendingInvoices.length > 0 && (
                   <Pagination
-                    currentPage={currentPage}
+                    currentPage={safeCurrentPage}
                     totalItems={filteredPendingInvoices.length}
                     pageSize={pageSize}
                     pageSizeOptions={[10, 25, 50, 100]}
@@ -1182,7 +1184,7 @@ export const PaymentsView: React.FC = () => {
 
                 {filteredDebtorsWithReceivables.length > 0 && (
                   <Pagination
-                    currentPage={currentPage}
+                    currentPage={safeCurrentPage}
                     totalItems={filteredDebtorsWithReceivables.length}
                     pageSize={pageSize}
                     pageSizeOptions={[10, 25, 50, 100]}
@@ -1320,7 +1322,7 @@ export const PaymentsView: React.FC = () => {
 
                 {filteredPendingBills.length > 0 && (
                   <Pagination
-                    currentPage={currentPage}
+                    currentPage={safeCurrentPage}
                     totalItems={filteredPendingBills.length}
                     pageSize={pageSize}
                     pageSizeOptions={[10, 25, 50, 100]}
@@ -1396,7 +1398,7 @@ export const PaymentsView: React.FC = () => {
 
                 {filteredCreditorsWithPayables.length > 0 && (
                   <Pagination
-                    currentPage={currentPage}
+                    currentPage={safeCurrentPage}
                     totalItems={filteredCreditorsWithPayables.length}
                     pageSize={pageSize}
                     pageSizeOptions={[10, 25, 50, 100]}
@@ -1560,7 +1562,7 @@ export const PaymentsView: React.FC = () => {
 
           {filteredPayments.length > 0 && (
             <Pagination
-              currentPage={currentPage}
+              currentPage={safeCurrentPage}
               totalItems={filteredPayments.length}
               pageSize={pageSize}
               pageSizeOptions={[10, 25, 50, 100]}

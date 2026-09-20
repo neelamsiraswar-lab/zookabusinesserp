@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CustomHsnCode, GstTaxRate } from '../../types';
-import { STANDARD_UNITS, COMMON_HSN_CODES } from '../../utils/constants';
+import { STANDARD_UNITS } from '../../utils/constants';
 import { ModalWrapper } from './Portal';
 import { 
   X, 
@@ -45,7 +45,7 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [activeTab, setActiveTab] = useState<'LIST' | 'ADD' | 'IMPORT' | 'TARIFF_DIRECTORY'>('LIST');
+  const [activeTab, setActiveTab] = useState<'LIST' | 'ADD' | 'IMPORT'>('LIST');
   const [filterType, setFilterType] = useState<'ALL' | 'HSN' | 'SAC'>('ALL');
 
   // Form State for Add / Edit
@@ -184,19 +184,6 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
     setActiveTab('LIST');
   };
 
-  const handleCopyStandardTariff = (tariff: { code: string; description: string; defaultGst: number }) => {
-    const isSac = tariff.code.startsWith('99');
-    addCustomHsnCode({
-      code: tariff.code,
-      description: tariff.description,
-      type: isSac ? 'SAC' : 'HSN',
-      gstRate: tariff.defaultGst as GstTaxRate,
-      uqc: isSac ? 'OTH' : 'PCS',
-      isCustom: true
-    });
-    showToast('success', 'Added to Custom Directory', `Copied ${tariff.code} to your business directory.`);
-  };
-
   // Filtered List
   const filteredCustomCodes = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -208,13 +195,6 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
       return matchType && matchQuery;
     });
   }, [customHsnCodes, searchQuery, filterType]);
-
-  const filteredStandardTariff = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    return COMMON_HSN_CODES.filter(item => {
-      return !q || item.code.toLowerCase().includes(q) || item.description.toLowerCase().includes(q);
-    });
-  }, [searchQuery]);
 
   return (
     <ModalWrapper isOpen={isOpen} onClose={onClose} zIndex={9999}>
@@ -283,18 +263,6 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Bulk Import</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('TARIFF_DIRECTORY')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'TARIFF_DIRECTORY'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Tariff Lookup</span>
             </button>
           </div>
         </div>
@@ -373,11 +341,11 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('TARIFF_DIRECTORY')}
+                      onClick={() => setActiveTab('IMPORT')}
                       className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                     >
-                      <BookOpen className="w-4 h-4" />
-                      <span>Browse Tariff Directory</span>
+                      <Upload className="w-4 h-4" />
+                      <span>Bulk Import Codes</span>
                     </button>
                   </div>
                 </div>
@@ -658,69 +626,6 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
                   <Upload className="w-4 h-4" />
                   <span>Parse & Import Codes</span>
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: STANDARD TARIFF LOOKUP */}
-          {activeTab === 'TARIFF_DIRECTORY' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-xs text-slate-800">GST Tariff Directory Reference</h4>
-                  <p className="text-[11px] text-slate-500">
-                    Click "+ Add to Custom Directory" to copy any standard code into your personal business master.
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 text-slate-600 uppercase text-[10px] font-bold">
-                    <tr>
-                      <th className="py-2.5 px-3 font-mono">Standard Code</th>
-                      <th className="py-2.5 px-3">Tariff Description</th>
-                      <th className="py-2.5 px-3 text-center">GST Slab</th>
-                      <th className="py-2.5 px-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredStandardTariff.map(tariff => {
-                      const alreadyInCustom = customHsnCodes.some(c => c.code === tariff.code);
-                      return (
-                        <tr key={tariff.code} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-2.5 px-3 font-mono font-bold text-indigo-600">
-                            {tariff.code}
-                          </td>
-                          <td className="py-2.5 px-3 font-medium text-slate-800">
-                            {tariff.description}
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            <span className="px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 text-[11px]">
-                              {tariff.defaultGst}%
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            {alreadyInCustom ? (
-                              <span className="text-[10px] font-bold text-emerald-600 flex items-center justify-end gap-1">
-                                <Check className="w-3 h-3" />
-                                <span>In Directory</span>
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleCopyStandardTariff(tariff)}
-                                className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                              >
-                                + Add to Custom
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
               </div>
             </div>
           )}
