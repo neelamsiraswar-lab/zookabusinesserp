@@ -203,12 +203,12 @@ export const PlatformAnnouncementsView: React.FC = () => {
       {/* Header Description & Primary Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Megaphone className="w-5 h-5 text-purple-400" />
-            <span>Platform Announcements & Feature Broadcasts</span>
+          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Megaphone className="w-5 h-5 text-slate-400" />
+            <span>Platform Announcements & Broadcasts</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Publish prominent announcement banners directly under the header across all business workspaces to introduce new features, compliance notices, or maintenance updates.
+            Publish prominent announcement banners directly under the header across all workspaces for release notes, compliance notices, or maintenance updates.
           </p>
         </div>
 
@@ -217,30 +217,30 @@ export const PlatformAnnouncementsView: React.FC = () => {
           <button
             type="button"
             onClick={handleToggleActiveState}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border shadow-sm ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 cursor-pointer border ${
               enabled
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
                 : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
             }`}
           >
-            <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-            <span>{enabled ? 'Broadcast Status: Active' : 'Broadcast Status: Inactive'}</span>
+            <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+            <span>{enabled ? 'Broadcast: Active' : 'Broadcast: Inactive'}</span>
           </button>
 
           <button
             type="button"
             onClick={handleBroadcast}
             disabled={isBroadcasting}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-md shadow-purple-900/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+            className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-950 bg-white hover:bg-slate-100 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             {isBroadcasting ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 <span>Broadcasting...</span>
               </>
             ) : broadcastSuccess ? (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Broadcast Live</span>
               </>
             ) : (
@@ -254,10 +254,10 @@ export const PlatformAnnouncementsView: React.FC = () => {
       </div>
 
       {/* Quick Template Presets */}
-      <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800 space-y-2">
-        <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+      <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-2">
+        <span className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Quick Announcement Templates (Click to Populate):</span>
+          <span>Quick Announcement Templates:</span>
         </span>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {ANNOUNCEMENT_TEMPLATES.map((tpl) => (
@@ -265,9 +265,9 @@ export const PlatformAnnouncementsView: React.FC = () => {
               key={tpl.id}
               type="button"
               onClick={() => applyTemplate(tpl)}
-              className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-left transition-all cursor-pointer group"
+              className="p-2.5 rounded-lg bg-slate-950 hover:bg-slate-850 border border-slate-800 text-left transition-colors cursor-pointer group"
             >
-              <div className="text-xs font-bold text-slate-200 group-hover:text-purple-300 truncate">
+              <div className="text-xs font-semibold text-slate-200 group-hover:text-white truncate">
                 {tpl.name}
               </div>
               <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
@@ -281,21 +281,21 @@ export const PlatformAnnouncementsView: React.FC = () => {
       {/* Live Interactive Preview Box */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Eye className="w-3.5 h-3.5 text-purple-400" />
-            <span>Interactive Live Banner Preview (As Seen Under Top Header)</span>
+          <span className="text-xs font-mono uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+            <Eye className="w-3.5 h-3.5 text-slate-400" />
+            <span>Interactive Banner Preview (Under Top Header)</span>
           </span>
-          <span className="text-[11px] text-slate-400">
-            {draftAnnouncement.enabled ? '🟢 Banner is visible' : '⚪ Banner is currently turned off'}
+          <span className="text-[11px] text-slate-400 font-mono">
+            {draftAnnouncement.enabled ? '● Active' : '○ Inactive'}
           </span>
         </div>
 
-        <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+        <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
           {/* Simulated Fake Header Bar */}
           <div className="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-              <span className="text-slate-300 font-bold">Top Navigation Header</span>
+              <span className="w-2 h-2 rounded-full bg-slate-700" />
+              <span className="text-slate-300 font-medium">Top Navigation Header</span>
             </div>
             <span>Preview Mode</span>
           </div>
@@ -316,8 +316,8 @@ export const PlatformAnnouncementsView: React.FC = () => {
                 />
               </div>
             ) : (
-              <div className="w-full py-6 text-center text-xs text-slate-400 italic">
-                Announcement banner is currently disabled. Toggle &quot;Enable Banner Broadcast&quot; below to make it live under the header.
+              <div className="w-full py-6 text-center text-xs text-slate-500 italic">
+                Announcement banner is currently disabled. Toggle broadcast status or enable below to preview.
               </div>
             )}
           </div>
@@ -325,16 +325,16 @@ export const PlatformAnnouncementsView: React.FC = () => {
       </div>
 
       {/* Main Broadcast Configuration Form */}
-      <form onSubmit={handleBroadcast} className="bg-slate-900/80 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-6">
+      <form onSubmit={handleBroadcast} className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-sm space-y-6">
         
         {/* Row 1: Active Toggle & Category Type */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4 border-b border-slate-800">
           
           {/* Active Switch */}
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950 border border-slate-800">
             <div>
-              <div className="text-sm font-bold text-white flex items-center gap-2">
-                <Power className="w-4 h-4 text-purple-400" />
+              <div className="text-sm font-semibold text-white flex items-center gap-2">
+                <Power className="w-4 h-4 text-slate-400" />
                 <span>Enable Banner Broadcast</span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -348,30 +348,30 @@ export const PlatformAnnouncementsView: React.FC = () => {
                 onChange={(e) => setEnabled(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-white peer-checked:after:bg-slate-950"></div>
             </label>
           </div>
 
           {/* Announcement Category */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
-              Announcement Category & Color Archetype
+            <label className="block text-xs font-medium text-slate-300">
+              Announcement Category & Archetype
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { id: 'feature', label: 'Feature', color: 'from-purple-900 to-indigo-950 text-purple-300' },
-                { id: 'info', label: 'Info', color: 'from-blue-900 to-cyan-950 text-cyan-300' },
-                { id: 'alert', label: 'Alert', color: 'from-amber-900 to-orange-950 text-amber-300' },
-                { id: 'maintenance', label: 'Maintenance', color: 'from-slate-800 to-zinc-900 text-slate-300' }
+                { id: 'feature', label: 'Feature' },
+                { id: 'info', label: 'Info' },
+                { id: 'alert', label: 'Alert' },
+                { id: 'maintenance', label: 'Maintenance' }
               ].map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
                   onClick={() => setType(cat.id as any)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold capitalize transition-all cursor-pointer text-center ${
+                  className={`py-2 px-3 rounded-lg border text-xs font-medium capitalize transition-colors cursor-pointer text-center ${
                     type === cat.id
-                      ? 'border-purple-500 bg-purple-600/20 text-white ring-1 ring-purple-500/40'
-                      : 'border-slate-800 bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                      ? 'border-slate-600 bg-slate-800 text-white font-semibold ring-1 ring-slate-600'
+                      : 'border-slate-800 bg-slate-950 text-slate-400 hover:bg-slate-850 hover:text-slate-200'
                   }`}
                 >
                   {cat.label}
@@ -384,7 +384,7 @@ export const PlatformAnnouncementsView: React.FC = () => {
         {/* Row 2: Title, Badge, and Target Audience */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-6 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-medium text-slate-300">
               Announcement Title <span className="text-rose-400">*</span>
             </label>
             <input
@@ -392,13 +392,13 @@ export const PlatformAnnouncementsView: React.FC = () => {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Super Admin Governance & Multi-Workspace Architecture"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+              placeholder="e.g. Multi-Workspace Architecture & Super Admin Portal"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
             />
           </div>
 
           <div className="md:col-span-3 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-medium text-slate-300">
               Pill Badge Text
             </label>
             <input
@@ -406,18 +406,18 @@ export const PlatformAnnouncementsView: React.FC = () => {
               value={badgeText}
               onChange={(e) => setBadgeText(e.target.value.toUpperCase())}
               placeholder="e.g. NEW FEATURE"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white uppercase font-mono font-bold focus:outline-none focus:border-purple-500 transition-colors"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 uppercase font-mono font-semibold focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
             />
           </div>
 
           <div className="md:col-span-3 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-medium text-slate-300">
               Target Audience
             </label>
             <select
               value={targetAudience}
               onChange={(e) => setTargetAudience(e.target.value as any)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors cursor-pointer"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors cursor-pointer"
             >
               <option value="ALL">All Business Workspaces</option>
               <option value="ADMINS_ONLY">Admins & Managers Only</option>
@@ -427,7 +427,7 @@ export const PlatformAnnouncementsView: React.FC = () => {
 
         {/* Row 3: Headline Summary Message */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-300">
+          <label className="block text-xs font-medium text-slate-300">
             Banner Broadcast Message <span className="text-rose-400">*</span>
           </label>
           <textarea
@@ -436,9 +436,9 @@ export const PlatformAnnouncementsView: React.FC = () => {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Brief 1-2 sentence description visible on the top banner strip..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors resize-none"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors resize-none"
           />
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Keep this concise so it fits comfortably on mobile screens and desktop headers.
           </p>
         </div>
@@ -446,7 +446,7 @@ export const PlatformAnnouncementsView: React.FC = () => {
         {/* Row 4: Action Button & In-App Navigation Destination */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-medium text-slate-300">
               Action Button Label
             </label>
             <input
@@ -454,18 +454,18 @@ export const PlatformAnnouncementsView: React.FC = () => {
               value={actionLabel}
               onChange={(e) => setActionLabel(e.target.value)}
               placeholder="e.g. Explore Features, Open POS"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-medium text-slate-300">
               Destination App View / Tab
             </label>
             <select
               value={actionTab}
               onChange={(e) => setActionTab(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors cursor-pointer"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors cursor-pointer"
             >
               <option value="dashboard">Dashboard</option>
               <option value="invoices">Invoices & Billing</option>
@@ -483,7 +483,7 @@ export const PlatformAnnouncementsView: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-medium text-slate-300">
               Or External URL (Optional)
             </label>
             <input
@@ -491,23 +491,23 @@ export const PlatformAnnouncementsView: React.FC = () => {
               value={actionUrl}
               onChange={(e) => setActionUrl(e.target.value)}
               placeholder="https://documentation.example.com"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
             />
           </div>
         </div>
 
         {/* Row 5: Extended Release Notes / Documentation ("Learn More" Modal Content) */}
         <div className="space-y-1.5 pt-2 border-t border-slate-800">
-          <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
+          <label className="block text-xs font-medium text-slate-300 flex items-center justify-between">
             <span>Extended Release Notes / &quot;Learn More&quot; Modal Content</span>
-            <span className="text-[10px] text-slate-400 font-normal">Supports markdown formatting & bullet points</span>
+            <span className="text-[10px] text-slate-500 font-mono">Markdown supported</span>
           </label>
           <textarea
             rows={4}
             value={learnMoreContent}
             onChange={(e) => setLearnMoreContent(e.target.value)}
             placeholder="Detailed guide, release bullet points, or instructions shown when a user clicks 'Learn More' on the banner..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors font-mono"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors font-mono"
           />
         </div>
 
@@ -518,7 +518,7 @@ export const PlatformAnnouncementsView: React.FC = () => {
               type="checkbox"
               checked={dismissible}
               onChange={(e) => setDismissible(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-purple-500"
+              className="rounded bg-slate-950 border-slate-800 text-slate-200 focus:ring-slate-600"
             />
             <span>Allow users to dismiss the banner for their browser session</span>
           </label>
@@ -526,10 +526,10 @@ export const PlatformAnnouncementsView: React.FC = () => {
           <button
             type="submit"
             disabled={isBroadcasting}
-            className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="px-5 py-2 rounded-lg text-xs font-semibold text-slate-950 bg-white hover:bg-slate-100 transition-colors shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <Send className="w-4 h-4" />
-            <span>{isBroadcasting ? 'Broadcasting to Cloud...' : 'Broadcast Announcement to All Businesses'}</span>
+            <span>{isBroadcasting ? 'Broadcasting to Cloud...' : 'Broadcast Announcement'}</span>
           </button>
         </div>
       </form>

@@ -53,12 +53,12 @@ import { AnnouncementBanner } from '../layout/AnnouncementBanner';
 type SuperAdminTab = 'overview' | 'workspaces' | 'users' | 'branding' | 'announcements' | 'audit_logs' | 'security' | 'database';
 
 const SUPER_ADMIN_AVATAR_THEMES = [
-  { id: 'purple', name: 'Royal Purple', class: 'bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-700' },
-  { id: 'emerald', name: 'Emerald Teal', class: 'bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-700' },
-  { id: 'sapphire', name: 'Sapphire Blue', class: 'bg-gradient-to-tr from-blue-600 via-indigo-700 to-slate-900' },
-  { id: 'amber', name: 'Amber Bronze', class: 'bg-gradient-to-tr from-amber-600 via-orange-600 to-red-700' },
-  { id: 'rose', name: 'Rose Velvet', class: 'bg-gradient-to-tr from-rose-600 via-pink-600 to-purple-800' },
-  { id: 'obsidian', name: 'Obsidian Dark', class: 'bg-gradient-to-tr from-slate-800 via-zinc-900 to-black' },
+  { id: 'slate', name: 'Obsidian Slate', class: 'bg-slate-800 text-slate-100 border border-slate-700' },
+  { id: 'indigo', name: 'Deep Midnight', class: 'bg-slate-900 text-indigo-300 border border-indigo-900/60' },
+  { id: 'charcoal', name: 'Pure Charcoal', class: 'bg-zinc-800 text-zinc-100 border border-zinc-700' },
+  { id: 'stone', name: 'Warm Bronze', class: 'bg-stone-800 text-stone-200 border border-stone-700' },
+  { id: 'emerald', name: 'Forest Teal', class: 'bg-emerald-950 text-emerald-300 border border-emerald-800/80' },
+  { id: 'monochrome', name: 'Titanium White', class: 'bg-slate-100 text-slate-950 border border-slate-300' },
 ];
 
 export const SuperAdminPortal: React.FC = () => {
@@ -337,34 +337,34 @@ export const SuperAdminPortal: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-purple-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-slate-800 selection:text-white">
       {/* ------------------------------------------------------------- */}
       {/* TOP MASTER GOVERNANCE HEADER                                   */}
       {/* ------------------------------------------------------------- */}
-      <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-purple-900/40 shadow-xl">
+      <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand & Portal Title with Platform Custom Branding */}
           <div className="flex items-center gap-3">
             <div className="relative group cursor-pointer" onClick={() => setActiveAdminTab('branding')} title="Click to customize Platform Identity & Branding">
-              <AppLogo config={platformConfig} size="md" className="shadow-lg shadow-purple-900/40 ring-2 ring-purple-400/40 transition-transform group-hover:scale-105" />
-              <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-xs" title="Super Admin Master Authority">
-                <Crown className="w-2.5 h-2.5" />
+              <AppLogo config={platformConfig} size="md" className="ring-1 ring-slate-800 transition-opacity hover:opacity-90" />
+              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center shadow-xs" title="Super Admin Authority">
+                <Crown className="w-2 h-2" />
               </div>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-white tracking-tight">
+                <span className="text-sm font-semibold text-white tracking-tight">
                   {platformConfig?.appName || 'Zooka Business'}
                 </span>
-                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700/60">
                   {platformConfig?.brandBadgeText || 'PRO'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wide bg-slate-800 text-slate-300 border border-slate-700/60 flex items-center gap-1">
                   <Crown className="w-2.5 h-2.5 text-amber-400" />
                   <span>Super Admin</span>
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium truncate max-w-[260px] sm:max-w-md">
+              <p className="text-[11px] text-slate-400 truncate max-w-[260px] sm:max-w-md">
                 {platformConfig?.appTagline || 'Smart Business, GST & E-Invoicing Suite'} • Master Governance
               </p>
             </div>
@@ -372,22 +372,22 @@ export const SuperAdminPortal: React.FC = () => {
 
           {/* Quick Stats & Cloud DB Sync Badge */}
           <div className="hidden md:flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs">
-              <Server className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-slate-400">Firestore:</span>
-              <span className={`flex items-center gap-1.5 font-semibold ${cloudSyncStatus === 'online' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                <span className={`w-2 h-2 rounded-full ${cloudSyncStatus === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                {cloudSyncStatus === 'online' ? 'Online & Synced' : 'Cached'}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+              <Server className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-slate-400 font-normal">Firestore:</span>
+              <span className={`flex items-center gap-1.5 font-medium ${cloudSyncStatus === 'online' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${cloudSyncStatus === 'online' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                {cloudSyncStatus === 'online' ? 'Synchronized' : 'Cached'}
               </span>
             </div>
 
             <button
               onClick={() => triggerCloudSync()}
               disabled={isCloudSyncing}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all border border-slate-700 cursor-pointer disabled:opacity-50"
+              className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors border border-slate-800 cursor-pointer disabled:opacity-50"
               title="Force sync cloud Firestore database"
             >
-              <RefreshCw className={`w-4 h-4 ${isCloudSyncing ? 'animate-spin text-purple-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin text-slate-200' : ''}`} />
             </button>
           </div>
 
@@ -396,17 +396,17 @@ export const SuperAdminPortal: React.FC = () => {
             {/* Super Admin User Profile Chip */}
             <div 
               onClick={() => setIsEditProfileModalOpen(true)}
-              className="flex items-center gap-2.5 pl-2.5 pr-3 py-1 rounded-xl bg-purple-950/60 hover:bg-purple-900/60 border border-purple-700/50 cursor-pointer transition-all"
+              className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 cursor-pointer transition-colors"
               title="Click to edit Super Admin profile details"
             >
-              <div className={`w-7 h-7 rounded-lg ${superAdminAuth.avatarBg || 'bg-gradient-to-tr from-purple-600 to-indigo-600'} text-amber-300 text-xs font-black flex items-center justify-center shadow-xs`}>
+              <div className={`w-7 h-7 rounded-md ${superAdminAuth.avatarBg || 'bg-slate-800 text-slate-200 border border-slate-700'} text-xs font-mono font-semibold flex items-center justify-center shadow-xs`}>
                 {superAdminAuth.avatarText || 'KS'}
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-xs font-bold text-white leading-tight truncate max-w-[130px]">
+                <p className="text-xs font-medium text-slate-200 leading-tight truncate max-w-[130px]">
                   {superAdminAuth.name || 'Kuldeep Siraswar'}
                 </p>
-                <p className="text-[10px] text-purple-300/80 leading-tight truncate max-w-[130px]">
+                <p className="text-[10px] text-slate-400 font-mono leading-tight truncate max-w-[130px]">
                   {superAdminAuth.email || 'kuldeep.siraswar@gmail.com'}
                 </p>
               </div>
@@ -415,7 +415,7 @@ export const SuperAdminPortal: React.FC = () => {
             {/* Logout Button */}
             <button
               onClick={logoutSuperAdmin}
-              className="p-2 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 hover:text-white transition-all border border-rose-800/60 cursor-pointer"
+              className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors border border-slate-800 cursor-pointer"
               title="Lock Super Admin session and exit"
             >
               <LogOut className="w-4 h-4" />
@@ -424,56 +424,56 @@ export const SuperAdminPortal: React.FC = () => {
         </div>
 
         {/* Horizontal Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex items-center gap-1 overflow-x-auto py-2 scrollbar-none text-xs font-bold">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-850">
+          <nav className="flex items-center gap-1.5 overflow-x-auto py-2 scrollbar-none text-xs">
             <button
               onClick={() => setActiveAdminTab('overview')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'overview'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Platform Overview</span>
+              <span>Overview</span>
             </button>
 
             <button
               onClick={() => setActiveAdminTab('workspaces')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'workspaces'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>Workspaces & Tenants</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-purple-300">
+              <span>Workspaces</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${activeAdminTab === 'workspaces' ? 'bg-slate-900 text-slate-200' : 'bg-slate-900 text-slate-400'}`}>
                 {companies.length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveAdminTab('users')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'users'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Cross-Tenant Users</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-purple-300">
+              <span>Users</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${activeAdminTab === 'users' ? 'bg-slate-900 text-slate-200' : 'bg-slate-900 text-slate-400'}`}>
                 {crossTenantUsers.length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveAdminTab('branding')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'branding'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <Palette className="w-3.5 h-3.5" />
@@ -482,53 +482,53 @@ export const SuperAdminPortal: React.FC = () => {
 
             <button
               onClick={() => setActiveAdminTab('announcements')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'announcements'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <Megaphone className="w-3.5 h-3.5" />
-              <span>Broadcast Banners</span>
+              <span>Announcements</span>
               {platformConfig?.announcement?.enabled && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Announcement banner is active" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Announcement banner is active" />
               )}
             </button>
 
             <button
               onClick={() => setActiveAdminTab('audit_logs')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'audit_logs'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <Activity className="w-3.5 h-3.5" />
-              <span>Security Audit Trail</span>
+              <span>Audit Trail</span>
             </button>
 
             <button
               onClick={() => setActiveAdminTab('security')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'security'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <KeyRound className="w-3.5 h-3.5" />
-              <span>Master Credentials</span>
+              <span>Credentials</span>
             </button>
 
             <button
               onClick={() => setActiveAdminTab('database')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeAdminTab === 'database'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-900/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-slate-800 text-white font-medium shadow-xs border border-slate-700/80'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
               <Database className="w-3.5 h-3.5" />
-              <span>Cloud Firestore & Backup</span>
+              <span>Firestore & Backup</span>
             </button>
           </nav>
         </div>
@@ -559,13 +559,12 @@ export const SuperAdminPortal: React.FC = () => {
         {activeAdminTab === 'overview' && (
           <div className="space-y-6 animate-fadeIn">
             {/* Executive Welcome Hero Banner with Platform Brand Identity */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-purple-950/80 to-slate-900 border border-purple-900/50 p-6 sm:p-8 shadow-2xl">
-              <div className="absolute -right-10 -bottom-10 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-bold">
+            <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6 sm:p-7">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700/60 text-[11px] font-mono">
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    Master Super Admin Console • {platformConfig?.appName || 'Zooka Business'}
+                    <span>Master Governance Console • {platformConfig?.appName || 'Zooka Business'}</span>
                   </div>
                   <div className="flex items-center gap-3.5">
                     <div 
@@ -573,43 +572,43 @@ export const SuperAdminPortal: React.FC = () => {
                       onClick={() => setActiveAdminTab('branding')}
                       title="Click to customize Platform Identity"
                     >
-                      <AppLogo config={platformConfig} size="lg" className="shadow-xl ring-2 ring-purple-500/40 shrink-0 transition-transform group-hover:scale-105" />
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-md">
-                        <Crown className="w-3 h-3" />
+                      <AppLogo config={platformConfig} size="lg" className="ring-1 ring-slate-800 shrink-0 transition-opacity hover:opacity-90" />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center shadow-xs">
+                        <Crown className="w-2.5 h-2.5" />
                       </div>
                     </div>
                     <div>
-                      <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2.5 flex-wrap">
+                      <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2.5 flex-wrap">
                         <span>Welcome back, {superAdminAuth.name || 'Kuldeep Siraswar'}</span>
-                        <span className="px-2 py-0.5 rounded-full text-xs font-black bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-slate-800 text-slate-300 border border-slate-700/60">
                           {platformConfig?.brandBadgeText || 'PRO'}
                         </span>
                       </h1>
-                      <p className="text-xs text-purple-300/90 font-medium mt-0.5">
+                      <p className="text-xs text-slate-400 mt-0.5">
                         {platformConfig?.appTagline || 'Smart Business, GST & E-Invoicing Suite'}
                       </p>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
                     Platform Master Console governing {companies.length} business {companies.length === 1 ? 'workspace' : 'workspaces'} with multi-tenant Google Cloud Firestore real-time replication.
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
                   <button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-lg shadow-purple-900/40 flex items-center gap-2 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-950 text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Create New Workspace</span>
+                    <span>Add Workspace</span>
                   </button>
 
                   <button
                     onClick={handleExportMasterBackup}
-                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all border border-slate-700 flex items-center gap-2 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white text-xs font-medium transition-colors border border-slate-700 flex items-center gap-2 cursor-pointer"
                   >
-                    <Download className="w-4 h-4 text-purple-400" />
-                    <span>Export Master Backup</span>
+                    <Download className="w-4 h-4 text-slate-400" />
+                    <span>Export Snapshot</span>
                   </button>
                 </div>
               </div>
@@ -617,52 +616,56 @@ export const SuperAdminPortal: React.FC = () => {
 
             {/* Core KPI Metrics Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-sm flex items-center justify-between">
+              <div className="bg-slate-900 rounded-xl p-5 border border-slate-800 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Registered Workspaces</p>
-                  <p className="text-2xl font-black text-white mt-1">{crossTenantStats.totalWorkspaces}</p>
-                  <p className="text-[11px] text-emerald-400 mt-0.5 font-medium">{crossTenantStats.activeWorkspaces} Active • {crossTenantStats.suspendedWorkspaces} Suspended</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                  <Building2 className="w-6 h-6" />
-                </div>
-              </div>
-
-              <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cross-Tenant Users</p>
-                  <p className="text-2xl font-black text-white mt-1">{crossTenantUsers.length}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Staff & Admin credentials</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <Users className="w-6 h-6" />
-                </div>
-              </div>
-
-              <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cross-Tenant Invoices</p>
-                  <p className="text-2xl font-black text-white mt-1">{crossTenantStats.totalInvoicesCount}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Total platform billing documents</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <FileText className="w-6 h-6" />
-                </div>
-              </div>
-
-              <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Firestore Cloud DB</p>
-                  <p className="text-sm font-black text-white mt-1 flex items-center gap-1.5">
-                    <span className={`w-2.5 h-2.5 rounded-full ${cloudSyncStatus === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                    {cloudSyncStatus === 'online' ? 'Connected & Healthy' : 'Local Cached'}
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {lastCloudSyncTime ? `Synced at ${lastCloudSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Ready'}
+                  <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Registered Workspaces</p>
+                  <p className="text-2xl font-bold font-mono text-white mt-1.5">{crossTenantStats.totalWorkspaces}</p>
+                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                    <span className="text-emerald-400 font-medium">{crossTenantStats.activeWorkspaces} active</span>
+                    <span>•</span>
+                    <span>{crossTenantStats.suspendedWorkspaces} suspended</span>
                   </p>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
-                  <Database className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-300">
+                  <Building2 className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-slate-900 rounded-xl p-5 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Platform Users</p>
+                  <p className="text-2xl font-bold font-mono text-white mt-1.5">{crossTenantUsers.length}</p>
+                  <p className="text-xs text-slate-400 mt-1">Cross-tenant credentials</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-300">
+                  <Users className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-slate-900 rounded-xl p-5 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Invoices & Documents</p>
+                  <p className="text-2xl font-bold font-mono text-white mt-1.5">{crossTenantStats.totalInvoicesCount}</p>
+                  <p className="text-xs text-slate-400 mt-1">Total multi-tenant records</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-300">
+                  <FileText className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-slate-900 rounded-xl p-5 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Cloud Storage</p>
+                  <p className="text-sm font-semibold font-mono text-emerald-400 mt-1.5 flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${cloudSyncStatus === 'online' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                    {cloudSyncStatus === 'online' ? 'Synchronized' : 'Cached'}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {lastCloudSyncTime ? `Synced at ${lastCloudSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Firestore connected'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-300">
+                  <Database className="w-5 h-5" />
                 </div>
               </div>
             </div>
@@ -670,79 +673,79 @@ export const SuperAdminPortal: React.FC = () => {
             {/* Quick Governance Controls: Custom Branding & Header Announcements */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Branding Quick Card */}
-              <div className="bg-gradient-to-br from-slate-900 via-purple-950/40 to-slate-900 rounded-2xl p-5 border border-purple-900/40 shadow-sm flex flex-col justify-between gap-4">
+              <div className="bg-slate-900 rounded-xl p-5 border border-slate-800 flex flex-col justify-between gap-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold">
-                      <Palette className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-lg bg-slate-800 text-slate-300 border border-slate-700/60 flex items-center justify-center">
+                      <Palette className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Platform Identity & Branding</h3>
-                      <p className="text-xs text-slate-300 mt-0.5">
-                        Brand Name: <strong className="text-purple-300">{platformConfig?.appName || 'Zooka Business'}</strong>
+                      <h3 className="text-sm font-semibold text-white">Platform Identity & Branding</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Brand Name: <span className="text-slate-200 font-medium">{platformConfig?.appName || 'Zooka Business'}</span>
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
                     {platformConfig?.brandBadgeText || 'PRO'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-purple-900/30">
+                <div className="flex items-center justify-between text-xs pt-3 border-t border-slate-800">
                   <span className="text-slate-400 text-[11px] truncate max-w-[200px]">
                     {platformConfig?.appTagline || 'Smart Business, GST & E-Invoicing Suite'}
                   </span>
                   <button
                     onClick={() => setActiveAdminTab('branding')}
-                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
                   >
-                    <span>Customize Brand</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Configure</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
                   </button>
                 </div>
               </div>
 
               {/* Announcement Quick Card */}
-              <div className="bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 rounded-2xl p-5 border border-indigo-900/40 shadow-sm flex flex-col justify-between gap-4">
+              <div className="bg-slate-900 rounded-xl p-5 border border-slate-800 flex flex-col justify-between gap-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold">
-                      <Megaphone className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-lg bg-slate-800 text-slate-300 border border-slate-700/60 flex items-center justify-center">
+                      <Megaphone className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Broadcast Announcement Banner</h3>
-                      <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${platformConfig?.announcement?.enabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                        <span>Status: <strong className={platformConfig?.announcement?.enabled ? 'text-emerald-400' : 'text-slate-400'}>{platformConfig?.announcement?.enabled ? 'Active Under Header' : 'Inactive'}</strong></span>
+                      <h3 className="text-sm font-semibold text-white">Broadcast Announcement Banner</h3>
+                      <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${platformConfig?.announcement?.enabled ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                        <span>Status: <span className={platformConfig?.announcement?.enabled ? 'text-emerald-400 font-medium' : 'text-slate-400'}>{platformConfig?.announcement?.enabled ? 'Active Under Header' : 'Inactive'}</span></span>
                       </p>
                     </div>
                   </div>
                   {platformConfig?.announcement?.badgeText && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-500/30">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
                       {platformConfig.announcement.badgeText}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-indigo-900/30">
+                <div className="flex items-center justify-between text-xs pt-3 border-t border-slate-800">
                   <span className="text-slate-400 text-[11px] truncate max-w-[200px]">
-                    {platformConfig?.announcement?.title || 'No active announcement'}
+                    {platformConfig?.announcement?.title || 'No active announcement banner'}
                   </span>
                   <button
                     onClick={() => setActiveAdminTab('announcements')}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
                   >
-                    <span>Manage Broadcast</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Manage</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Quick Workspaces Hub Grid */}
-            <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-800 shadow-sm space-y-4">
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-purple-400" />
+                  <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-slate-400" />
                     <span>Business Workspaces Quick Switcher</span>
                   </h2>
                   <p className="text-xs text-slate-400">Instantly switch active tenant workspace or inspect partition state</p>
@@ -750,7 +753,7 @@ export const SuperAdminPortal: React.FC = () => {
 
                 <button
                   onClick={() => setActiveAdminTab('workspaces')}
-                  className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-medium text-slate-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <span>View All {companies.length} Workspaces</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -765,25 +768,25 @@ export const SuperAdminPortal: React.FC = () => {
                   return (
                     <div
                       key={comp.id}
-                      className={`p-5 rounded-2xl border transition-all ${
+                      className={`p-5 rounded-xl border transition-colors ${
                         isCurrent
-                          ? 'border-purple-500 bg-purple-950/20 ring-1 ring-purple-500/30'
-                          : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                          ? 'border-slate-600 bg-slate-950 ring-1 ring-slate-700/80'
+                          : 'border-slate-800/90 bg-slate-950/60 hover:border-slate-700'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-white truncate">
+                          <h3 className="text-sm font-semibold text-white truncate">
                             {comp.tradeName || comp.name}
                           </h3>
                           <p className="text-xs text-slate-400 truncate">{comp.name}</p>
                         </div>
                         {isCompActive ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800 shrink-0">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 shrink-0">
                             Active
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-950/60 text-rose-400 border border-rose-800 shrink-0">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-rose-950/60 text-rose-400 border border-rose-800/60 shrink-0">
                             Suspended
                           </span>
                         )}
@@ -793,25 +796,25 @@ export const SuperAdminPortal: React.FC = () => {
                         {comp.gstin && (
                           <p className="font-mono text-[11px] text-slate-300">GSTIN: {comp.gstin}</p>
                         )}
-                        <p className="truncate flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-slate-500" />
+                        <p className="truncate flex items-center gap-1 text-slate-400">
+                          <MapPin className="w-3 h-3 text-slate-400" />
                           {comp.city ? `${comp.city}, ` : ''}{comp.state}
                         </p>
                       </div>
 
-                      <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                      <div className="pt-3 border-t border-slate-850 flex items-center justify-between gap-2">
                         <button
                           onClick={() => {
                             setEditingCompany(comp);
                           }}
-                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700/80 transition-colors cursor-pointer"
                         >
                           Configure
                         </button>
 
                         <button
                           onClick={() => handleEnterWorkspace(comp.id)}
-                          className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-white text-slate-950 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
                         >
                           <span>Enter Workspace</span>
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -826,43 +829,43 @@ export const SuperAdminPortal: React.FC = () => {
             {/* Platform Security Protocol & Recent Logs Preview */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Security Protocol Card */}
-              <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-800 shadow-sm space-y-4">
+              <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-4">
                 <div className="flex items-center gap-2.5">
-                  <ShieldCheck className="w-5 h-5 text-purple-400" />
-                  <h3 className="text-sm font-bold text-white">Platform Governance & Security Architecture</h3>
+                  <ShieldCheck className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-sm font-semibold text-white">Platform Governance & Security Architecture</h3>
                 </div>
                 <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
-                  <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-white">Strict Multi-Tenancy Partitioning:</strong> Each business workspace data (ledgers, invoices, inventory) is completely isolated by partition IDs and cannot cross-contaminate.
+                      <strong className="text-white font-medium">Strict Multi-Tenancy Partitioning:</strong> Each business workspace data (ledgers, invoices, inventory) is completely isolated by partition IDs and cannot cross-contaminate.
                     </div>
                   </div>
-                  <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-white">Master Authority Protection:</strong> Super Admin credentials exist above all tenant accounts and cannot be modified or suspended by tenant company admins.
+                      <strong className="text-white font-medium">Master Authority Protection:</strong> Super Admin credentials exist above all tenant accounts and cannot be modified or suspended by tenant company admins.
                     </div>
                   </div>
-                  <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-white">Cloud Firestore Integrity:</strong> All master credential changes and company lifecycle operations replicate directly to the persistent Firestore systemState document.
+                      <strong className="text-white font-medium">Cloud Firestore Integrity:</strong> All master credential changes and company lifecycle operations replicate directly to the persistent Firestore systemState document.
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Recent Audit Events Preview */}
-              <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-800 shadow-sm space-y-4">
+              <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <Activity className="w-5 h-5 text-indigo-400" />
-                    <h3 className="text-sm font-bold text-white">Recent Security Audit Logs</h3>
+                    <Activity className="w-4 h-4 text-slate-400" />
+                    <h3 className="text-sm font-semibold text-white">Recent Security Audit Logs</h3>
                   </div>
                   <button
                     onClick={() => setActiveAdminTab('audit_logs')}
-                    className="text-xs font-bold text-purple-400 hover:text-purple-300 cursor-pointer"
+                    className="text-xs font-medium text-slate-300 hover:text-white cursor-pointer transition-colors"
                   >
                     View All
                   </button>
@@ -870,17 +873,17 @@ export const SuperAdminPortal: React.FC = () => {
 
                 <div className="space-y-2.5">
                   {auditLogs.slice(0, 4).map((log, idx) => (
-                    <div key={idx} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs flex items-center justify-between gap-3">
+                    <div key={idx} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-white truncate">{log.action}</span>
-                          <span className="text-[10px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-400 uppercase font-mono">
+                          <span className="font-medium text-white truncate">{log.action}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 uppercase font-mono">
                             {log.module}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 truncate mt-0.5">{log.details}</p>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                      <span className="text-[10px] text-slate-400 font-mono shrink-0">
                         {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -899,11 +902,11 @@ export const SuperAdminPortal: React.FC = () => {
             {/* Header and Controls */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-purple-400" />
-                  <span>Registered Business Workspaces ({filteredCompanies.length})</span>
+                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-slate-400" />
+                  <span>Workspaces ({filteredCompanies.length})</span>
                 </h1>
-                <p className="text-xs text-slate-400">Configure business profiles, tax configurations, and operational switches</p>
+                <p className="text-xs text-slate-400">Configure business profiles, tax settings, and tenant lifecycles</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">
@@ -914,14 +917,14 @@ export const SuperAdminPortal: React.FC = () => {
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Search name, GSTIN, city..."
-                    className="pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-700 bg-slate-900 text-white placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:outline-hidden w-48 sm:w-64"
+                    className="pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-800 bg-slate-900 text-slate-100 placeholder-slate-500 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden w-48 sm:w-64"
                   />
                 </div>
 
                 <select
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value as any)}
-                  className="px-3 py-2 text-xs rounded-xl border border-slate-700 bg-slate-900 text-slate-200 focus:ring-2 focus:ring-purple-500 focus:outline-hidden font-medium"
+                  className="px-3 py-2 text-xs rounded-lg border border-slate-800 bg-slate-900 text-slate-300 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden font-medium"
                 >
                   <option value="ALL">All Status</option>
                   <option value="ACTIVE">Active Only</option>
@@ -930,7 +933,7 @@ export const SuperAdminPortal: React.FC = () => {
 
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-950 text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Workspace</span>
@@ -940,9 +943,9 @@ export const SuperAdminPortal: React.FC = () => {
 
             {/* Companies List */}
             {filteredCompanies.length === 0 ? (
-              <div className="py-16 text-center text-slate-500 space-y-2 bg-slate-900/60 rounded-3xl border border-slate-800">
-                <Building2 className="w-12 h-12 mx-auto opacity-30 text-slate-400" />
-                <p className="text-sm font-semibold">No business profiles matching your filter.</p>
+              <div className="py-16 text-center text-slate-500 space-y-2 bg-slate-900 rounded-2xl border border-slate-800">
+                <Building2 className="w-10 h-10 mx-auto opacity-30 text-slate-400" />
+                <p className="text-sm font-medium">No business profiles matching your filter.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -953,11 +956,11 @@ export const SuperAdminPortal: React.FC = () => {
                   return (
                     <div
                       key={comp.id}
-                      className={`p-5 rounded-2xl border transition-all ${
+                      className={`p-5 rounded-xl border transition-colors ${
                         isCurrent
-                          ? 'border-purple-500/80 bg-purple-950/20 ring-1 ring-purple-500/30'
+                          ? 'border-slate-600 bg-slate-900 ring-1 ring-slate-700/80'
                           : isCompActive
-                          ? 'border-slate-800 bg-slate-900/70 hover:border-slate-700'
+                          ? 'border-slate-800 bg-slate-900/80 hover:border-slate-700'
                           : 'border-rose-900/40 bg-rose-950/20'
                       }`}
                     >
@@ -965,28 +968,28 @@ export const SuperAdminPortal: React.FC = () => {
                         {/* Company Info */}
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-bold text-base text-white">
+                            <span className="font-semibold text-sm sm:text-base text-white">
                               {comp.tradeName || comp.name}
                             </span>
                             {comp.tradeName && comp.tradeName !== comp.name && (
-                              <span className="text-xs text-slate-400 font-medium">
+                              <span className="text-xs text-slate-400">
                                 ({comp.name})
                               </span>
                             )}
 
                             {/* Status Badge */}
                             {isCompActive ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 flex items-center gap-1">
                                 <CheckCircle2 className="w-2.5 h-2.5" /> Active
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-950/80 text-rose-400 border border-rose-800/80 flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-rose-950/60 text-rose-400 border border-rose-800/60 flex items-center gap-1">
                                 <XCircle className="w-2.5 h-2.5" /> Suspended
                               </span>
                             )}
 
                             {isCurrent && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-purple-900/60 text-purple-300 border border-purple-700/60">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-slate-800 text-slate-300 border border-slate-700">
                                 Current Active
                               </span>
                             )}
@@ -994,21 +997,21 @@ export const SuperAdminPortal: React.FC = () => {
 
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
                             {comp.gstin && (
-                              <span className="font-mono bg-slate-800 px-2 py-0.5 rounded text-[11px] text-slate-200">
+                              <span className="font-mono bg-slate-950 px-2 py-0.5 rounded text-[11px] text-slate-300 border border-slate-800">
                                 GSTIN: {comp.gstin}
                               </span>
                             )}
                             {comp.pan && (
-                              <span className="font-mono text-[11px]">PAN: {comp.pan}</span>
+                              <span className="font-mono text-[11px] text-slate-400">PAN: {comp.pan}</span>
                             )}
                             {comp.state && (
-                              <span className="flex items-center gap-1">
+                              <span className="flex items-center gap-1 text-slate-400">
                                 <MapPin className="w-3 h-3 text-slate-500" />
                                 {comp.city ? `${comp.city}, ` : ''}{comp.state} ({comp.stateCode})
                               </span>
                             )}
                             {comp.phone && (
-                              <span className="flex items-center gap-1">
+                              <span className="flex items-center gap-1 text-slate-400">
                                 <Phone className="w-3 h-3 text-slate-500" /> {comp.phone}
                               </span>
                             )}
@@ -1028,10 +1031,10 @@ export const SuperAdminPortal: React.FC = () => {
                             type="button"
                             onClick={() => toggleCompanyStatus(comp.id, !isCompActive)}
                             title={isCompActive ? 'Suspend Business' : 'Enable Business'}
-                            className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            className={`p-2 rounded-lg text-xs transition-colors cursor-pointer border ${
                               isCompActive
-                                ? 'bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-800'
-                                : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800'
+                                ? 'bg-slate-800 hover:bg-amber-950/60 text-slate-400 hover:text-amber-300 border-slate-700'
+                                : 'bg-slate-800 hover:bg-emerald-950/60 text-slate-400 hover:text-emerald-300 border-slate-700'
                             }`}
                           >
                             {isCompActive ? <ShieldAlert className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
@@ -1042,7 +1045,7 @@ export const SuperAdminPortal: React.FC = () => {
                             type="button"
                             onClick={() => setEditingCompany(comp)}
                             title="Edit Business Details & Header Settings"
-                            className="p-2 rounded-xl text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer border border-slate-700"
+                            className="p-2 rounded-lg text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer border border-slate-700"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
@@ -1052,7 +1055,7 @@ export const SuperAdminPortal: React.FC = () => {
                             type="button"
                             onClick={() => handleEnterWorkspace(comp.id)}
                             title="Enter this company workspace"
-                            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-white text-slate-950 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                           >
                             <span>Enter</span>
                             <ArrowRight className="w-3.5 h-3.5" />
@@ -1064,7 +1067,7 @@ export const SuperAdminPortal: React.FC = () => {
                             disabled={companies.length <= 1}
                             onClick={() => setDeletingCompany(comp)}
                             title={companies.length <= 1 ? 'Cannot delete only remaining company' : 'Permanently Delete Workspace'}
-                            className="p-2 rounded-xl text-rose-400 hover:bg-rose-950 hover:text-rose-300 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed border border-rose-900/40"
+                            className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed border border-slate-800 hover:border-rose-900/50"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1085,11 +1088,11 @@ export const SuperAdminPortal: React.FC = () => {
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Users className="w-5 h-5 text-purple-400" />
-                  <span>Cross-Tenant Staff & Users Directory ({filteredUsers.length})</span>
+                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-slate-400" />
+                  <span>Platform Users ({filteredUsers.length})</span>
                 </h1>
-                <p className="text-xs text-slate-400">Unified oversight of user accounts and permissions across all registered companies</p>
+                <p className="text-xs text-slate-400">Unified oversight of user accounts and access levels across all registered companies</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">
@@ -1100,14 +1103,14 @@ export const SuperAdminPortal: React.FC = () => {
                     value={userSearchQuery}
                     onChange={e => setUserSearchQuery(e.target.value)}
                     placeholder="Search name, email, role..."
-                    className="pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-700 bg-slate-900 text-white placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:outline-hidden w-48 sm:w-60"
+                    className="pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-800 bg-slate-900 text-slate-100 placeholder-slate-500 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden w-48 sm:w-60"
                   />
                 </div>
 
                 <select
                   value={userCompanyFilter}
                   onChange={e => setUserCompanyFilter(e.target.value)}
-                  className="px-3 py-2 text-xs rounded-xl border border-slate-700 bg-slate-900 text-slate-200 focus:ring-2 focus:ring-purple-500 focus:outline-hidden font-medium"
+                  className="px-3 py-2 text-xs rounded-lg border border-slate-800 bg-slate-900 text-slate-300 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden font-medium"
                 >
                   <option value="ALL">All Workspaces</option>
                   {companies.map(c => (
@@ -1118,7 +1121,7 @@ export const SuperAdminPortal: React.FC = () => {
                 <select
                   value={userRoleFilter}
                   onChange={e => setUserRoleFilter(e.target.value)}
-                  className="px-3 py-2 text-xs rounded-xl border border-slate-700 bg-slate-900 text-slate-200 focus:ring-2 focus:ring-purple-500 focus:outline-hidden font-medium"
+                  className="px-3 py-2 text-xs rounded-lg border border-slate-800 bg-slate-900 text-slate-300 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden font-medium"
                 >
                   <option value="ALL">All Roles</option>
                   <option value="ADMIN">ADMIN</option>
@@ -1131,31 +1134,31 @@ export const SuperAdminPortal: React.FC = () => {
             </div>
 
             {filteredUsers.length === 0 ? (
-              <div className="py-16 text-center text-slate-500 space-y-2 bg-slate-900/60 rounded-3xl border border-slate-800">
-                <Users className="w-12 h-12 mx-auto opacity-30 text-slate-400" />
-                <p className="text-sm font-semibold">No user records matching the filter criteria.</p>
+              <div className="py-16 text-center text-slate-500 space-y-2 bg-slate-900 rounded-2xl border border-slate-800">
+                <Users className="w-10 h-10 mx-auto opacity-30 text-slate-400" />
+                <p className="text-sm font-medium">No user records matching the filter criteria.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredUsers.map(({ user, company }, idx) => (
-                  <div key={idx} className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all space-y-3">
+                  <div key={idx} className="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-xl ${user.avatarBg || 'bg-indigo-600'} text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm`}>
+                        <div className={`w-9 h-9 rounded-lg ${user.avatarBg || 'bg-slate-800 border border-slate-700'} text-slate-200 font-mono font-bold text-xs flex items-center justify-center shrink-0 shadow-xs`}>
                           {user.avatarText || user.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-white truncate">{user.name}</h3>
-                          <p className="text-xs text-purple-300 font-semibold">{user.role}</p>
+                          <h3 className="text-sm font-semibold text-white truncate">{user.name}</h3>
+                          <p className="text-xs text-slate-400 font-mono">{user.role}</p>
                         </div>
                       </div>
 
                       {user.isActive ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800 shrink-0">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 shrink-0">
                           Active
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/60 text-rose-400 border border-rose-800 shrink-0">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-rose-950/60 text-rose-400 border border-rose-800/60 shrink-0">
                           Disabled
                         </span>
                       )}
@@ -1177,15 +1180,16 @@ export const SuperAdminPortal: React.FC = () => {
                     </div>
 
                     <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-                      <span className="text-slate-500 truncate max-w-[160px]">
-                        🏢 {company.tradeName || company.name}
+                      <span className="text-slate-400 truncate max-w-[160px] flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate">{company.tradeName || company.name}</span>
                       </span>
                       <button
                         onClick={() => handleEnterWorkspace(company.id)}
-                        className="text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1 cursor-pointer"
+                        className="text-slate-300 hover:text-white font-medium flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <span>Workspace</span>
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3 h-3 text-slate-400" />
                       </button>
                     </div>
                   </div>
@@ -1202,9 +1206,9 @@ export const SuperAdminPortal: React.FC = () => {
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-purple-400" />
-                  <span>Master Security Audit Trail ({filteredAuditLogs.length})</span>
+                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-slate-400" />
+                  <span>Audit Trail ({filteredAuditLogs.length})</span>
                 </h1>
                 <p className="text-xs text-slate-400">Cryptographically verifiable immutable audit records for authentication, company lifecycle, and data mutations</p>
               </div>
@@ -1217,54 +1221,54 @@ export const SuperAdminPortal: React.FC = () => {
                     value={auditSearchQuery}
                     onChange={e => setAuditSearchQuery(e.target.value)}
                     placeholder="Search logs..."
-                    className="pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-700 bg-slate-900 text-white placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:outline-hidden w-48 sm:w-60"
+                    className="pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-800 bg-slate-900 text-slate-100 placeholder-slate-500 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden w-48 sm:w-60"
                   />
                 </div>
 
                 <button
                   onClick={handleExportAuditCSV}
                   disabled={filteredAuditLogs.length === 0}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-slate-700 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-medium transition-colors border border-slate-700 flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <Download className="w-4 h-4 text-purple-400" />
+                  <Download className="w-4 h-4 text-slate-400" />
                   <span>Export CSV</span>
                 </button>
               </div>
             </div>
 
             {filteredAuditLogs.length === 0 ? (
-              <div className="py-16 text-center text-slate-500 space-y-2 bg-slate-900/60 rounded-3xl border border-slate-800">
-                <Activity className="w-12 h-12 mx-auto opacity-30 text-slate-400" />
-                <p className="text-sm font-semibold">No audit logs match your search.</p>
+              <div className="py-16 text-center text-slate-500 space-y-2 bg-slate-900 rounded-2xl border border-slate-800">
+                <Activity className="w-10 h-10 mx-auto opacity-30 text-slate-400" />
+                <p className="text-sm font-medium">No audit logs match your search.</p>
               </div>
             ) : (
-              <div className="bg-slate-900/80 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-950/80 text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
+                    <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
                       <tr>
-                        <th className="py-3 px-4 font-bold">Timestamp</th>
-                        <th className="py-3 px-4 font-bold">Action</th>
-                        <th className="py-3 px-4 font-bold">Module</th>
-                        <th className="py-3 px-4 font-bold">Actor</th>
-                        <th className="py-3 px-4 font-bold">Details</th>
+                        <th className="py-3 px-4 font-semibold">Timestamp</th>
+                        <th className="py-3 px-4 font-semibold">Action</th>
+                        <th className="py-3 px-4 font-semibold">Module</th>
+                        <th className="py-3 px-4 font-semibold">Actor</th>
+                        <th className="py-3 px-4 font-semibold">Details</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                    <tbody className="divide-y divide-slate-850 text-slate-300">
                       {filteredAuditLogs.map((log, i) => (
-                        <tr key={i} className="hover:bg-slate-800/40 transition-colors">
+                        <tr key={i} className="hover:bg-slate-850/40 transition-colors">
                           <td className="py-3 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
                             {new Date(log.timestamp).toLocaleString()}
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/80 text-purple-300 border border-purple-800">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
                               {log.action}
                             </span>
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap text-slate-400 font-medium">
+                          <td className="py-3 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
                             {log.module}
                           </td>
-                          <td className="py-3 px-4 whitespace-nowrap font-bold text-white">
+                          <td className="py-3 px-4 whitespace-nowrap font-medium text-white">
                             {log.userName}
                           </td>
                           <td className="py-3 px-4 text-slate-300 max-w-md truncate">
@@ -1300,78 +1304,78 @@ export const SuperAdminPortal: React.FC = () => {
         {activeAdminTab === 'security' && (
           <div className="space-y-6 max-w-4xl mx-auto animate-fadeIn">
             <div>
-              <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-purple-400" />
-                <span>Master Super Admin Identity & Credentials</span>
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-slate-400" />
+                <span>Super Admin Identity & Security</span>
               </h1>
-              <p className="text-xs text-slate-400">Master executive credentials and security configuration replicated to Cloud Firestore</p>
+              <p className="text-xs text-slate-400">Master executive credentials and security configuration synchronized with Cloud Firestore</p>
             </div>
 
             {/* Profile Identity Card */}
-            <div className="bg-gradient-to-br from-slate-900 via-purple-950/70 to-slate-900 rounded-3xl p-6 sm:p-8 border border-purple-800/50 shadow-2xl space-y-6">
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
-                  <div className={`w-16 h-16 rounded-2xl ${superAdminAuth.avatarBg || 'bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-700'} text-amber-300 font-black text-xl flex items-center justify-center shadow-xl ring-2 ring-purple-400/40 shrink-0`}>
+                  <div className={`w-14 h-14 rounded-xl ${superAdminAuth.avatarBg || 'bg-slate-800 border border-slate-700'} text-white font-mono font-bold text-lg flex items-center justify-center shrink-0`}>
                     {superAdminAuth.avatarText || 'KS'}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-black text-white">{superAdminAuth.name || 'Kuldeep Siraswar'}</h2>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-500/20 text-purple-200 border border-purple-400/40">
+                      <h2 className="text-base font-semibold text-white">{superAdminAuth.name || 'Kuldeep Siraswar'}</h2>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-slate-800 text-slate-300 border border-slate-700">
                         SUPER ADMIN
                       </span>
                     </div>
-                    <p className="text-xs text-purple-200 font-semibold">{superAdminAuth.roleTitle || 'Platform Super Administrator'}</p>
-                    <p className="text-[11px] text-purple-300/80">{superAdminAuth.department || 'Executive Governance & Board'}</p>
+                    <p className="text-xs text-slate-300 font-medium">{superAdminAuth.roleTitle || 'Platform Super Administrator'}</p>
+                    <p className="text-[11px] text-slate-400">{superAdminAuth.department || 'Executive Governance & Board'}</p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setIsEditProfileModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer self-start sm:self-center"
+                  className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-medium transition-colors border border-slate-700 flex items-center gap-2 cursor-pointer self-start sm:self-center"
                 >
-                  <UserCog className="w-4 h-4 text-amber-300" />
-                  <span>Edit Profile Details</span>
+                  <UserCog className="w-4 h-4 text-slate-400" />
+                  <span>Edit Profile</span>
                 </button>
               </div>
 
               {/* Profile Details List */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-950/60 p-4 rounded-2xl border border-purple-900/40">
-                <div className="flex items-center gap-2.5 text-purple-200">
-                  <Mail className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span className="truncate">Email: <strong className="text-white">{superAdminAuth.email || 'kuldeep.siraswar@gmail.com'}</strong></span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-2.5 text-slate-300">
+                  <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="truncate">Email: <strong className="text-white font-mono">{superAdminAuth.email || 'kuldeep.siraswar@gmail.com'}</strong></span>
                 </div>
-                <div className="flex items-center gap-2.5 text-purple-200">
-                  <Phone className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span className="truncate">Phone: <strong className="text-white">{superAdminAuth.phone || '+91 99999 88888'}</strong></span>
+                <div className="flex items-center gap-2.5 text-slate-300">
+                  <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="truncate">Phone: <strong className="text-white font-mono">{superAdminAuth.phone || '+91 99999 88888'}</strong></span>
                 </div>
-                <div className="flex items-center gap-2.5 text-purple-200">
-                  <KeyRound className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span>Master PIN: <span className="font-mono text-white font-bold">•••• (Configured)</span></span>
+                <div className="flex items-center gap-2.5 text-slate-300">
+                  <KeyRound className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span>Master PIN: <span className="font-mono text-white">•••• (Active)</span></span>
                 </div>
-                <div className="flex items-center gap-2.5 text-purple-200">
-                  <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span>Status: <strong className="text-emerald-400 font-bold">Active & Authority Enforced</strong></span>
+                <div className="flex items-center gap-2.5 text-slate-300">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Status: <strong className="text-emerald-400">Enforced & Synchronized</strong></span>
                 </div>
               </div>
             </div>
 
             {/* Master Credentials Change Card */}
-            <div className="bg-slate-900/80 rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-5">
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                  <Lock className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
+                  <Lock className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Change Master Password & 4-Digit Unlock PIN</h3>
+                  <h3 className="text-sm font-semibold text-white">Change Master Password & 4-Digit Unlock PIN</h3>
                   <p className="text-xs text-slate-400">Updates will synchronize immediately to Google Cloud Firestore</p>
                 </div>
               </div>
 
               <form onSubmit={handleUpdateMasterCredentials} className="space-y-4">
                 {credentialsMsg && (
-                  <div className={`p-3.5 rounded-xl text-xs flex items-start gap-2 ${
-                    credentialsMsg.type === 'success' ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800' : 'bg-rose-950/80 text-rose-300 border border-rose-800'
+                  <div className={`p-3 rounded-lg text-xs flex items-start gap-2 ${
+                    credentialsMsg.type === 'success' ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/60' : 'bg-rose-950/60 text-rose-300 border border-rose-800/60'
                   }`}>
                     {credentialsMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />}
                     <span>{credentialsMsg.text}</span>
@@ -1379,7 +1383,7 @@ export const SuperAdminPortal: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     Current Super Admin Password or Master PIN *
                   </label>
                   <div className="relative">
@@ -1389,7 +1393,7 @@ export const SuperAdminPortal: React.FC = () => {
                       onChange={e => setCurrentAuthInput(e.target.value)}
                       placeholder="Enter current password or PIN to authorize"
                       required
-                      className="w-full pl-3.5 pr-10 py-2.5 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                      className="w-full pl-3.5 pr-10 py-2.5 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
                     />
                     <button
                       type="button"
@@ -1403,7 +1407,7 @@ export const SuperAdminPortal: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
                       New Master Password (Optional)
                     </label>
                     <div className="relative">
@@ -1412,7 +1416,7 @@ export const SuperAdminPortal: React.FC = () => {
                         value={newPasswordInput}
                         onChange={e => setNewPasswordInput(e.target.value)}
                         placeholder="Leave blank to keep unchanged"
-                        className="w-full pl-3.5 pr-10 py-2.5 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                        className="w-full pl-3.5 pr-10 py-2.5 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
                       />
                       <button
                         type="button"
@@ -1425,7 +1429,7 @@ export const SuperAdminPortal: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
                       New 4-Digit Master PIN (Optional)
                     </label>
                     <input
@@ -1434,7 +1438,7 @@ export const SuperAdminPortal: React.FC = () => {
                       value={newPinInput}
                       onChange={e => setNewPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       placeholder="e.g. 9999"
-                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden font-mono tracking-widest"
+                      className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden font-mono tracking-widest"
                     />
                   </div>
                 </div>
@@ -1443,7 +1447,7 @@ export const SuperAdminPortal: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isUpdatingAuth}
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-900/30 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-2.5 px-4 rounded-lg text-xs font-semibold text-slate-950 bg-white hover:bg-slate-100 transition-colors shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     <Lock className="w-3.5 h-3.5" />
                     <span>{isUpdatingAuth ? 'Updating & Syncing...' : 'Update Master Credentials'}</span>
@@ -1460,22 +1464,22 @@ export const SuperAdminPortal: React.FC = () => {
         {activeAdminTab === 'database' && (
           <div className="space-y-6 max-w-4xl mx-auto animate-fadeIn">
             <div>
-              <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                <Database className="w-5 h-5 text-purple-400" />
-                <span>Cloud Firestore Multi-Tenant Storage & Backups</span>
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <Database className="w-5 h-5 text-slate-400" />
+                <span>Cloud Firestore & Backups</span>
               </h1>
               <p className="text-xs text-slate-400">Persistent database state and disaster recovery snapshots</p>
             </div>
 
             {/* Cloud Status Card */}
-            <div className="bg-slate-900/80 rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-6">
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                    <Server className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
+                    <Server className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-white">Google Cloud Firestore</h2>
+                    <h2 className="text-sm font-semibold text-white">Google Cloud Firestore</h2>
                     <p className="text-xs text-slate-400">Database ID: <span className="font-mono text-slate-300">ai-studio-zookabussinesssm-847724b3-bd62-4e2e-8d54-4fd3f6a5a143</span></p>
                   </div>
                 </div>
@@ -1483,29 +1487,29 @@ export const SuperAdminPortal: React.FC = () => {
                 <button
                   onClick={() => triggerCloudSync()}
                   disabled={isCloudSyncing}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-medium transition-colors border border-slate-700 flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isCloudSyncing ? 'animate-spin text-white' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin text-slate-300' : 'text-slate-400'}`} />
                   <span>{isCloudSyncing ? 'Synchronizing...' : 'Force Cloud Sync'}</span>
                 </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Sync Status</p>
-                  <p className={`text-base font-black mt-1 ${cloudSyncStatus === 'online' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                  <p className="text-[10px] uppercase font-mono text-slate-400 tracking-wider">Sync Status</p>
+                  <p className={`text-sm font-semibold mt-1 ${cloudSyncStatus === 'online' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {cloudSyncStatus === 'online' ? 'Online & Active' : 'Cached Locally'}
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Partitions</p>
-                  <p className="text-base font-black text-white mt-1">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                  <p className="text-[10px] uppercase font-mono text-slate-400 tracking-wider">Total Partitions</p>
+                  <p className="text-sm font-semibold text-white mt-1">
                     {companies.length} Workspaces
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Last Replication</p>
-                  <p className="text-base font-black text-slate-300 mt-1">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                  <p className="text-[10px] uppercase font-mono text-slate-400 tracking-wider">Last Replication</p>
+                  <p className="text-sm font-mono text-slate-300 mt-1">
                     {lastCloudSyncTime ? lastCloudSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Ready'}
                   </p>
                 </div>
@@ -1513,28 +1517,28 @@ export const SuperAdminPortal: React.FC = () => {
             </div>
 
             {/* Disaster Recovery Master Backup Card */}
-            <div className="bg-slate-900/80 rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-4">
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <Download className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
+                  <Download className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Export Complete Multi-Tenant System Snapshot (JSON)</h3>
-                  <p className="text-xs text-slate-400">Downloads all company partitions, invoices, parties, products, users, and audit records</p>
+                  <h3 className="text-sm font-semibold text-white">System Snapshot Export (.JSON)</h3>
+                  <p className="text-xs text-slate-400">Downloads all workspace partitions, ledgers, products, users, and audit records</p>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Generates a single self-contained JSON backup archive of the entire multi-company database structure. Useful for air-gapped archiving, local compliance, or disaster restore testing.
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Generates a single self-contained JSON archive of the entire multi-tenant database structure. Useful for air-gapped archiving, local compliance, or disaster recovery testing.
               </p>
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <button
                   onClick={handleExportMasterBackup}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-900/30 flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-950 text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Full Multi-Company Snapshot (.JSON)</span>
+                  <span>Download System Snapshot</span>
                 </button>
               </div>
             </div>
@@ -1545,21 +1549,21 @@ export const SuperAdminPortal: React.FC = () => {
       {/* ------------------------------------------------------------- */}
       {/* SUPER ADMIN MASTER GOVERNANCE FOOTER                          */}
       {/* ------------------------------------------------------------- */}
-      <footer className="mt-auto border-t border-purple-900/40 bg-slate-900/90 backdrop-blur-md py-5 px-4 sm:px-6 lg:px-8 text-xs text-slate-400">
+      <footer className="mt-auto border-t border-slate-800 bg-slate-950 py-5 px-4 sm:px-6 lg:px-8 text-xs text-slate-400">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <AppLogo config={platformConfig} size="sm" className="shadow-md ring-1 ring-purple-500/30 shrink-0" />
+            <AppLogo config={platformConfig} size="sm" className="shadow-xs shrink-0" />
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black text-white">{platformConfig?.appName || 'Zooka Business'}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-950 text-purple-300 border border-purple-800/60 font-bold">
+                <span className="font-semibold text-white">{platformConfig?.appName || 'Zooka Business'}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono">
                   {platformConfig?.brandBadgeText || 'PRO'}
                 </span>
-                <span className="text-slate-600">•</span>
-                <span className="text-[11px] text-slate-300 font-semibold">Master Governance Console</span>
+                <span className="text-slate-700">•</span>
+                <span className="text-[11px] text-slate-400">Master Governance Console</span>
               </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                {platformConfig?.appTagline || 'Smart Business, GST & E-Invoicing Suite'} • Multi-Tenant Google Cloud Firestore
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {platformConfig?.appTagline || 'Smart Business, GST & E-Invoicing Suite'} • Multi-Tenant Firestore
               </p>
             </div>
           </div>
@@ -1567,23 +1571,23 @@ export const SuperAdminPortal: React.FC = () => {
           <div className="flex items-center gap-4 text-[11px]">
             <button
               onClick={() => setActiveAdminTab('branding')}
-              className="text-slate-300 hover:text-purple-300 transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
+              className="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Palette className="w-3.5 h-3.5 text-purple-400" />
-              <span>Platform Branding</span>
+              <Palette className="w-3.5 h-3.5 text-slate-500" />
+              <span>Branding</span>
             </button>
             <button
               onClick={() => setActiveAdminTab('announcements')}
-              className="text-slate-300 hover:text-purple-300 transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
+              className="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Megaphone className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Broadcast Banners</span>
+              <Megaphone className="w-3.5 h-3.5 text-slate-500" />
+              <span>Broadcasts</span>
             </button>
             <button
               onClick={() => setActiveAdminTab('database')}
-              className="text-slate-300 hover:text-purple-300 transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
+              className="text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Server className="w-3.5 h-3.5 text-emerald-400" />
+              <Server className="w-3.5 h-3.5 text-slate-500" />
               <span>Firestore Sync</span>
             </button>
           </div>
@@ -1623,17 +1627,17 @@ export const SuperAdminPortal: React.FC = () => {
       {/* Delete Company Confirmation Modal */}
       {deletingCompany && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-800 space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-              <AlertTriangle className="w-6 h-6" />
+          <div className="bg-slate-900 rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-800 space-y-4">
+            <div className="w-10 h-10 rounded-lg bg-rose-950/60 border border-rose-900/60 flex items-center justify-center text-rose-400">
+              <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Delete Workspace?</h3>
+              <h3 className="text-base font-semibold text-white">Delete Workspace</h3>
               <p className="text-xs text-slate-400 mt-1">
                 Are you sure you want to permanently remove <strong className="text-white">{deletingCompany.tradeName || deletingCompany.name}</strong>?
               </p>
-              <div className="mt-3 p-3 rounded-xl bg-rose-950/60 border border-rose-900/60 text-[11px] text-rose-300">
-                ⚠️ <strong>Warning:</strong> This permanently deletes all invoices, inventory products, ledgers, and transactions for this company in Google Cloud Firestore.
+              <div className="mt-3 p-3 rounded-lg bg-rose-950/40 border border-rose-900/40 text-[11px] text-rose-300">
+                This permanently deletes all invoices, inventory products, ledgers, and transactions for this company in Google Cloud Firestore.
               </div>
             </div>
 
@@ -1641,17 +1645,17 @@ export const SuperAdminPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDeletingCompany(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+                className="px-3.5 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Yes, Delete Workspace</span>
+                <span>Delete Workspace</span>
               </button>
             </div>
           </div>
@@ -1732,14 +1736,14 @@ const EditSuperAdminProfileModal: React.FC<EditSuperAdminProfileModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-      <div className="bg-slate-900 rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-slate-800 space-y-4 my-auto">
+      <div className="bg-slate-900 rounded-2xl shadow-xl max-w-lg w-full p-6 border border-slate-800 space-y-4 my-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+            <div className="p-2 rounded-lg bg-slate-800 text-slate-300">
               <UserCog className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Edit Super Admin Details</h3>
+              <h3 className="text-base font-semibold text-white">Edit Super Admin Details</h3>
               <p className="text-xs text-slate-400">Master executive profile governing all workspaces</p>
             </div>
           </div>
@@ -1749,7 +1753,7 @@ const EditSuperAdminProfileModal: React.FC<EditSuperAdminProfileModalProps> = ({
         </div>
 
         {errorMessage && (
-          <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -1757,7 +1761,7 @@ const EditSuperAdminProfileModal: React.FC<EditSuperAdminProfileModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1">Full Display Name *</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1">Full Display Name *</label>
             <input
               type="text"
               required
@@ -1769,64 +1773,64 @@ const EditSuperAdminProfileModal: React.FC<EditSuperAdminProfileModalProps> = ({
                   setAvatarText(parts.map(p => p[0]).join('').slice(0, 2).toUpperCase());
                 }
               }}
-              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+              className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Email Address *</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Email Address *</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Contact Phone</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Contact Phone</label>
               <input
                 type="text"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Role Title</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Role Title</label>
               <input
                 type="text"
                 value={roleTitle}
                 onChange={e => setRoleTitle(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Department</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Department</label>
               <input
                 type="text"
                 value={department}
                 onChange={e => setDepartment(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
           </div>
 
           {/* Avatar Theme Selector */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-2">Avatar Gradient Theme</label>
-            <div className="grid grid-cols-6 gap-2">
+            <label className="block text-xs font-medium text-slate-300 mb-2">Avatar Theme</label>
+            <div className="grid grid-cols-5 gap-2">
               {SUPER_ADMIN_AVATAR_THEMES.map(theme => (
                 <button
                   key={theme.id}
                   type="button"
                   onClick={() => setAvatarBg(theme.class)}
-                  className={`h-9 rounded-xl ${theme.class} flex items-center justify-center text-white font-bold text-xs cursor-pointer transition-all ${
-                    avatarBg === theme.class ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-105' : 'opacity-80 hover:opacity-100'
+                  className={`h-9 rounded-lg ${theme.class} flex items-center justify-center font-mono font-bold text-xs cursor-pointer transition-all ${
+                    avatarBg === theme.class ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900' : 'opacity-80 hover:opacity-100'
                   }`}
                 >
                   {avatarBg === theme.class && <Check className="w-3.5 h-3.5" />}
@@ -1837,7 +1841,7 @@ const EditSuperAdminProfileModal: React.FC<EditSuperAdminProfileModalProps> = ({
 
           {/* Security Authorization Field */}
           <div className="pt-2 border-t border-slate-800">
-            <label className="block text-xs font-bold text-amber-400 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Authorize Changes with Current Password or PIN *
             </label>
             <div className="relative">
@@ -1847,7 +1851,7 @@ const EditSuperAdminProfileModal: React.FC<EditSuperAdminProfileModalProps> = ({
                 value={currentAuth}
                 onChange={e => setCurrentAuth(e.target.value)}
                 placeholder="Enter current password or PIN"
-                className="w-full pl-3.5 pr-10 py-2 text-xs rounded-xl border border-amber-500/50 bg-slate-950 text-white focus:ring-2 focus:ring-amber-400 focus:outline-hidden"
+                className="w-full pl-3.5 pr-10 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
               <button
                 type="button"
@@ -1863,14 +1867,14 @@ const EditSuperAdminProfileModal: React.FC<EditSuperAdminProfileModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+              className="px-3.5 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-2 text-xs font-semibold text-slate-950 bg-white hover:bg-slate-100 rounded-lg transition-colors shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               <Check className="w-4 h-4" />
               <span>{isSaving ? 'Saving...' : 'Save Profile'}</span>
@@ -1949,14 +1953,14 @@ const EditCompanyWorkspaceModal: React.FC<EditCompanyWorkspaceModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-      <div className="bg-slate-900 rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-slate-800 space-y-4 my-auto">
+      <div className="bg-slate-900 rounded-2xl shadow-xl max-w-lg w-full p-6 border border-slate-800 space-y-4 my-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+            <div className="p-2 rounded-lg bg-slate-800 text-slate-300">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Configure Workspace Profile</h3>
+              <h3 className="text-base font-semibold text-white">Configure Workspace Profile</h3>
               <p className="text-xs text-slate-400">{company.tradeName || company.name}</p>
             </div>
           </div>
@@ -1968,56 +1972,56 @@ const EditCompanyWorkspaceModal: React.FC<EditCompanyWorkspaceModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Company Legal Name *</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Company Legal Name *</label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Trade / Brand Name</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Trade / Brand Name</label>
               <input
                 type="text"
                 value={tradeName}
                 onChange={e => setTradeName(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">GSTIN</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">GSTIN</label>
               <input
                 type="text"
                 value={gstin}
                 onChange={e => setGstin(e.target.value.toUpperCase())}
                 placeholder="27AABCU9603R1ZM"
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white font-mono uppercase focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 font-mono uppercase focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">PAN</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">PAN</label>
               <input
                 type="text"
                 value={pan}
                 onChange={e => setPan(e.target.value.toUpperCase())}
                 placeholder="ABCDE1234F"
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white font-mono uppercase focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 font-mono uppercase focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">State</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">State</label>
               <select
                 value={state}
                 onChange={e => setState(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-200 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               >
                 {INDIAN_STATES.map(s => (
                   <option key={s.code} value={s.name}>{s.code} - {s.name}</option>
@@ -2025,43 +2029,43 @@ const EditCompanyWorkspaceModal: React.FC<EditCompanyWorkspaceModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">City</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">City</label>
               <input
                 type="text"
                 value={city}
                 onChange={e => setCity(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1">Registered Address</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1">Registered Address</label>
             <input
               type="text"
               value={address}
               onChange={e => setAddress(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+              className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Phone</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Phone</label>
               <input
                 type="text"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Email</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-700 bg-slate-950 text-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden"
               />
             </div>
           </div>
@@ -2070,13 +2074,13 @@ const EditCompanyWorkspaceModal: React.FC<EditCompanyWorkspaceModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+              className="px-3.5 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2 text-xs font-semibold text-slate-950 bg-white hover:bg-slate-100 rounded-lg transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
             >
               <Check className="w-4 h-4" />
               <span>Save Workspace</span>

@@ -134,12 +134,12 @@ export const PlatformBrandingView: React.FC = () => {
       {/* Header Description */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Palette className="w-5 h-5 text-purple-400" />
-            <span>Platform Identity & Custom Branding</span>
+          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Palette className="w-5 h-5 text-slate-400" />
+            <span>Platform Identity & Branding</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Personalize the platform application name, logo, tagline, and brand badge broadcasted across all business workspaces.
+            Configure application name, logo, tagline, and brand badge broadcasted across all business workspaces.
           </p>
         </div>
 
@@ -147,7 +147,7 @@ export const PlatformBrandingView: React.FC = () => {
           <button
             type="button"
             onClick={handleReset}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
             title="Reset platform branding to default factory values"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -158,16 +158,16 @@ export const PlatformBrandingView: React.FC = () => {
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-md shadow-purple-900/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+            className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-950 bg-white hover:bg-slate-100 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             {isSaving ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 <span>Saving...</span>
               </>
             ) : savedSuccess ? (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Saved & Live</span>
               </>
             ) : (
@@ -185,17 +185,17 @@ export const PlatformBrandingView: React.FC = () => {
         
         {/* Left Column: Form Settings (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          <form onSubmit={handleSave} className="bg-slate-900/80 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-6">
+          <form onSubmit={handleSave} className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-sm space-y-6">
             
             {/* Section 1: Brand Text Attributes */}
             <div className="space-y-4">
-              <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-3">
-                <Tag className="w-4 h-4 text-purple-400" />
+              <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-3">
+                <Tag className="w-4 h-4 text-slate-400" />
                 <span>Platform Names & Tagline</span>
               </h2>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-300">
+                <label className="block text-xs font-medium text-slate-300">
                   Application / Brand Name <span className="text-rose-400">*</span>
                 </label>
                 <input
@@ -204,16 +204,16 @@ export const PlatformBrandingView: React.FC = () => {
                   value={appName}
                   onChange={(e) => setAppName(e.target.value)}
                   placeholder="e.g. Zooka Business, Enterprise ERP"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
                 />
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   Displayed on sidebar headers, login splash, PDF footers, and browser tab titles.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2 space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-300">
+                  <label className="block text-xs font-medium text-slate-300">
                     Tagline / Subtitle
                   </label>
                   <input
@@ -221,15 +221,15 @@ export const PlatformBrandingView: React.FC = () => {
                     value={appTagline}
                     onChange={(e) => setAppTagline(e.target.value)}
                     placeholder="e.g. Smart Business, GST & E-Invoicing Suite"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
                   />
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-500">
                     Appears underneath the brand title in the main sidebar.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-300">
+                  <label className="block text-xs font-medium text-slate-300">
                     Brand Badge Text
                   </label>
                   <input
@@ -238,9 +238,9 @@ export const PlatformBrandingView: React.FC = () => {
                     value={brandBadgeText}
                     onChange={(e) => setBrandBadgeText(e.target.value.toUpperCase())}
                     placeholder="e.g. PRO, SUITE"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white uppercase font-mono font-bold focus:outline-none focus:border-purple-500 transition-colors"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-xs text-slate-100 uppercase font-mono font-semibold focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
                   />
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-500">
                     Badge pill next to name.
                   </p>
                 </div>
@@ -250,19 +250,19 @@ export const PlatformBrandingView: React.FC = () => {
             {/* Section 2: Logo Representation */}
             <div className="space-y-4 pt-2 border-t border-slate-800">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-purple-400" />
+                <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-slate-400" />
                   <span>Logo Type & Asset</span>
                 </h2>
 
                 {/* Switcher Pill */}
-                <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 text-xs font-bold">
+                <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-medium">
                   <button
                     type="button"
                     onClick={() => setAppLogoType('icon')}
-                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
                       appLogoType === 'icon' 
-                        ? 'bg-purple-600 text-white shadow-xs' 
+                        ? 'bg-slate-800 text-white font-semibold' 
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
@@ -271,9 +271,9 @@ export const PlatformBrandingView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setAppLogoType('image')}
-                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
                       appLogoType === 'image' 
-                        ? 'bg-purple-600 text-white shadow-xs' 
+                        ? 'bg-slate-800 text-white font-semibold' 
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
@@ -284,9 +284,9 @@ export const PlatformBrandingView: React.FC = () => {
 
               {/* Vector Icon Options */}
               {appLogoType === 'icon' && (
-                <div className="space-y-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80">
+                <div className="space-y-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold text-slate-300">
+                    <label className="block text-xs font-medium text-slate-300">
                       Select Vector Symbol
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -295,24 +295,24 @@ export const PlatformBrandingView: React.FC = () => {
                           key={item.id}
                           type="button"
                           onClick={() => setAppLogoIcon(item.id)}
-                          className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                          className={`p-2.5 rounded-lg border text-center transition-colors cursor-pointer flex flex-col items-center gap-1.5 ${
                             appLogoIcon === item.id
-                              ? 'bg-purple-600/20 border-purple-500 text-white shadow-sm ring-1 ring-purple-500/40'
-                              : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                              ? 'bg-slate-800 border-slate-600 text-white ring-1 ring-slate-600'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200'
                           }`}
                         >
                           <AppLogo 
                             config={{ appLogoType: 'icon', appLogoIcon: item.id, appLogoGradient }} 
                             size="sm" 
                           />
-                          <span className="text-[10px] font-bold line-clamp-1">{item.label.split('&')[0]}</span>
+                          <span className="text-[10px] font-medium line-clamp-1">{item.label.split('&')[0]}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="space-y-2 pt-2 border-t border-slate-800/60">
-                    <label className="block text-xs font-bold text-slate-300">
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <label className="block text-xs font-medium text-slate-300">
                       Icon Gradient Background Preset
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -321,16 +321,16 @@ export const PlatformBrandingView: React.FC = () => {
                           key={preset.id}
                           type="button"
                           onClick={() => setAppLogoGradient(preset.class)}
-                          className={`p-2 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                          className={`p-2 rounded-lg border text-left flex items-center gap-2.5 transition-colors cursor-pointer ${
                             appLogoGradient === preset.class
-                              ? 'border-purple-500 bg-purple-950/20 ring-1 ring-purple-500/30'
-                              : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                              ? 'border-slate-600 bg-slate-800 ring-1 ring-slate-600'
+                              : 'border-slate-800 bg-slate-900 hover:border-slate-700'
                           }`}
                         >
-                          <div className={`w-5 h-5 rounded-lg ${preset.class} shrink-0 ring-1 ring-white/20`} />
-                          <span className="text-xs font-bold text-slate-200 truncate">{preset.name}</span>
+                          <div className={`w-5 h-5 rounded-md ${preset.class} shrink-0 ring-1 ring-white/20`} />
+                          <span className="text-xs font-medium text-slate-200 truncate">{preset.name}</span>
                           {appLogoGradient === preset.class && (
-                            <Check className="w-3.5 h-3.5 text-purple-400 ml-auto shrink-0" />
+                            <Check className="w-3.5 h-3.5 text-slate-300 ml-auto shrink-0" />
                           )}
                         </button>
                       ))}
@@ -341,17 +341,17 @@ export const PlatformBrandingView: React.FC = () => {
 
               {/* Custom Image Upload & URL Options */}
               {appLogoType === 'image' && (
-                <div className="space-y-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80">
+                <div className="space-y-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
                   {/* Drag and Drop Zone */}
                   <div
                     onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                     onDragLeave={() => setIsDragOver(false)}
                     onDrop={handleFileDrop}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 ${
+                    className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer flex flex-col items-center justify-center gap-2 ${
                       isDragOver
-                        ? 'border-purple-500 bg-purple-950/30'
-                        : 'border-slate-700 bg-slate-900/60 hover:border-slate-600 hover:bg-slate-900'
+                        ? 'border-slate-500 bg-slate-900'
+                        : 'border-slate-800 bg-slate-900/60 hover:border-slate-700 hover:bg-slate-900'
                     }`}
                   >
                     <input
@@ -365,14 +365,14 @@ export const PlatformBrandingView: React.FC = () => {
                         }
                       }}
                     />
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
-                      <Upload className="w-5 h-5" />
+                    <div className="w-9 h-9 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center">
+                      <Upload className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-200">
+                      <span className="text-xs font-medium text-slate-200">
                         Click to upload logo or drag and drop
                       </span>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-0.5">
                         PNG, JPG, SVG, or WebP (Recommended: Square aspect ratio, transparent background)
                       </p>
                     </div>
@@ -380,7 +380,7 @@ export const PlatformBrandingView: React.FC = () => {
 
                   {/* Or image URL input */}
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-300">
+                    <label className="block text-xs font-medium text-slate-300">
                       Or Direct Image Web URL
                     </label>
                     <div className="flex gap-2">
@@ -389,13 +389,13 @@ export const PlatformBrandingView: React.FC = () => {
                         value={appLogoUrl}
                         onChange={(e) => setAppLogoUrl(e.target.value)}
                         placeholder="https://example.com/logo.png"
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 transition-colors"
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-xs text-slate-100 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 focus:outline-hidden transition-colors"
                       />
                       {appLogoUrl && (
                         <button
                           type="button"
                           onClick={() => setAppLogoUrl('')}
-                          className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors cursor-pointer"
+                          className="p-2 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors cursor-pointer"
                           title="Clear Image"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -406,7 +406,7 @@ export const PlatformBrandingView: React.FC = () => {
 
                   {appLogoUrl && (
                     <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-xl border border-slate-800">
-                      <div className="w-12 h-12 bg-white rounded-xl p-1 flex items-center justify-center shrink-0 border border-slate-700">
+                      <div className="w-12 h-12 bg-white rounded-lg p-1 flex items-center justify-center shrink-0 border border-slate-700">
                         <img 
                           src={appLogoUrl} 
                           alt="Logo Preview" 
@@ -415,7 +415,7 @@ export const PlatformBrandingView: React.FC = () => {
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-white truncate">Active Custom Image</div>
+                        <div className="text-xs font-semibold text-white truncate">Active Custom Image</div>
                         <div className="text-[11px] text-emerald-400 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" />
                           <span>Image asset loaded ready for preview</span>
@@ -427,7 +427,7 @@ export const PlatformBrandingView: React.FC = () => {
                           setAppLogoUrl('');
                           setAppLogoType('icon');
                         }}
-                        className="text-xs text-rose-400 hover:text-rose-300 font-semibold cursor-pointer"
+                        className="text-xs text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
                       >
                         Remove
                       </button>
@@ -440,17 +440,17 @@ export const PlatformBrandingView: React.FC = () => {
             {/* Bottom Actions */}
             <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
               <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                <Info className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>Changes sync in real-time to all connected browser sessions via Firestore.</span>
               </span>
 
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-900/30 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-950 bg-white hover:bg-slate-100 transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                <span>{isSaving ? 'Syncing...' : 'Save & Sync Platform Identity'}</span>
+                <span>{isSaving ? 'Syncing...' : 'Save & Sync Branding'}</span>
               </button>
             </div>
           </form>
@@ -458,31 +458,31 @@ export const PlatformBrandingView: React.FC = () => {
 
         {/* Right Column: Real-time Live Visual Previews (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-slate-900/80 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-6">
-            <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-3">
-              <Eye className="w-4 h-4 text-purple-400" />
-              <span>Live Visual Component Previews</span>
+          <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-sm space-y-6">
+            <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Eye className="w-4 h-4 text-slate-400" />
+              <span>Live Visual Previews</span>
             </h2>
 
             {/* Preview 1: Sidebar Header (Expanded) */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-mono uppercase text-slate-400 tracking-wider">
                 1. Expanded Sidebar Header
               </span>
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center gap-3">
                 <AppLogo config={draftConfig} size="md" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-white text-sm tracking-tight truncate">
+                    <span className="font-bold text-white text-sm tracking-tight truncate">
                       {draftConfig.appName}
                     </span>
                     {draftConfig.brandBadgeText && (
-                      <span className="text-[9px] uppercase font-extrabold bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 shrink-0">
+                      <span className="text-[9px] uppercase font-mono font-semibold bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 shrink-0">
                         {draftConfig.brandBadgeText}
                       </span>
                     )}
                   </div>
-                  <p className="text-[10.5px] text-slate-400 font-medium truncate">
+                  <p className="text-[11px] text-slate-400 font-medium truncate">
                     {draftConfig.appTagline}
                   </p>
                 </div>
@@ -491,32 +491,32 @@ export const PlatformBrandingView: React.FC = () => {
 
             {/* Preview 2: Sidebar (Collapsed) */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                2. Collapsed Sidebar Icon Mode
+              <span className="text-xs font-mono uppercase text-slate-400 tracking-wider">
+                2. Collapsed Sidebar Mode
               </span>
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-4">
-                <div className="w-14 h-14 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-center">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-900 rounded-xl border border-slate-800 flex items-center justify-center">
                   <AppLogo config={draftConfig} size="md" />
                 </div>
                 <div className="text-xs text-slate-400">
-                  Compact 20-column view for maximum screen workspace when the sidebar is collapsed.
+                  Compact view for maximum workspace when sidebar is collapsed.
                 </div>
               </div>
             </div>
 
             {/* Preview 3: Browser Window Tab & Title Preview */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-mono uppercase text-slate-400 tracking-wider">
                 3. Browser Tab Preview
               </span>
-              <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
-                <div className="bg-slate-900/90 px-3 py-2 border-b border-slate-800 flex items-center gap-2">
+              <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+                <div className="bg-slate-900 px-3 py-2 border-b border-slate-800 flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700" />
                   </div>
-                  <div className="ml-2 px-3 py-1 bg-slate-950 rounded-t-lg border-t border-x border-slate-800 flex items-center gap-2 text-[11px] text-slate-200 font-medium max-w-[200px] truncate">
+                  <div className="ml-2 px-3 py-1 bg-slate-950 rounded-t border-t border-x border-slate-800 flex items-center gap-2 text-[11px] text-slate-200 font-medium max-w-[200px] truncate">
                     <AppLogo config={draftConfig} size="xs" />
                     <span className="truncate">{draftConfig.appName}</span>
                   </div>
@@ -528,12 +528,12 @@ export const PlatformBrandingView: React.FC = () => {
             </div>
 
             {/* Current Active Status Indicator */}
-            <div className="p-3.5 rounded-2xl bg-purple-950/30 border border-purple-800/40 text-xs text-purple-200 flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold text-white">Cloud Firestore Synced:</span>
-                <p className="text-purple-300/80 text-[11px] mt-0.5">
-                  Any changes saved here apply immediately to all active companies, tenant switchers, and staff users without requiring code redeployment.
+                <span className="font-semibold text-white">Firestore Synchronized:</span>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  Any changes saved here apply immediately to all active workspaces, tenant switchers, and staff users without requiring redeployment.
                 </p>
               </div>
             </div>
