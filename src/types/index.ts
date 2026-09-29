@@ -19,6 +19,8 @@ export interface InvoiceItem {
   quantity: number;
   unit: string;
   rate: number;
+  taxIncludedRate?: number; // Sale rate per unit with tax included (Gross Unit Rate)
+  isTaxInclusive?: boolean; // Whether tax inclusive rate mode is active for this item
   discountPercent: number;
   discountAmount: number;
   taxableAmount: number;
@@ -160,6 +162,7 @@ export interface Product {
   unit: string;
   purchasePrice: number;
   sellingPrice: number;
+  salePriceIncludesTax?: boolean; // When true, sellingPrice is tax-inclusive (Sale Rate with Tax Included)
   gstRate: GstTaxRate;
   cessRate?: number;
   currentStock: number;

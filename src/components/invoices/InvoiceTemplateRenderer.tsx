@@ -267,7 +267,10 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
             <div key={item.id || idx} className="py-1.5 border-b border-dotted border-slate-200 last:border-0">
               <div className="flex justify-between text-[10px]">
                 <div className="truncate max-w-[130px] font-semibold" style={{ color: headingTextColor }}>{item.name}</div>
-                <div style={{ color: bodyTextColor }}>{item.quantity} {item.unit} x ₹{item.rate}</div>
+                <div style={{ color: bodyTextColor }}>
+                  {item.quantity} {item.unit} x ₹{item.isTaxInclusive && item.taxIncludedRate ? item.taxIncludedRate : item.rate}
+                  {item.isTaxInclusive && <span className="ml-0.5 text-[8px] font-sans opacity-75">(Incl)</span>}
+                </div>
                 <div className="font-bold" style={{ color: headingTextColor }}>{formatCurrency(item.totalAmount, '')}</div>
               </div>
               <div className="text-[8.5px] mt-0.5 space-y-0.5" style={{ color: mutedTextColor }}>
@@ -578,7 +581,12 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                       {Number(item.quantity).toFixed(2)} {item.unit || 'Pcs.'}
                     </td>
                     <td className="border-r border-black py-1.5 px-1.5 text-right font-mono font-medium">
-                      {formatCurrency(item.rate, '')}
+                      <div>{formatCurrency(item.rate, '')}</div>
+                      {(item.isTaxInclusive || (item.taxIncludedRate && item.taxIncludedRate !== item.rate)) && (
+                        <div className="text-[8px] font-sans text-slate-500">
+                          (Incl: {formatCurrency(item.taxIncludedRate || (item.rate * (1 + item.gstRate / 100)), '')})
+                        </div>
+                      )}
                     </td>
                     {!invoice.isInterState ? (
                       <>
@@ -1204,7 +1212,14 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                   <td className="py-2 px-2 text-center font-medium align-top" style={{ color: bodyTextColor }}>
                     {item.quantity} <span className="text-[9px]" style={{ color: mutedTextColor }}>{item.unit}</span>
                   </td>
-                  <td className="py-2 px-2 text-right font-mono align-top" style={{ color: bodyTextColor }}>{formatCurrency(item.rate, '')}</td>
+                  <td className="py-2 px-2 text-right font-mono align-top" style={{ color: bodyTextColor }}>
+                    <div>{formatCurrency(item.rate, '')}</div>
+                    {(item.isTaxInclusive || (item.taxIncludedRate && item.taxIncludedRate !== item.rate)) && (
+                      <div className="text-[8.5px] font-sans" style={{ color: mutedTextColor }}>
+                        Incl: {formatCurrency(item.taxIncludedRate || (item.rate * (1 + item.gstRate / 100)), '')}
+                      </div>
+                    )}
+                  </td>
                   <td className="py-2 px-2 text-right font-mono align-top" style={{ color: bodyTextColor }}>{formatCurrency(item.taxableAmount, '')}</td>
                   <td className="py-2 px-2 text-center align-top">
                     <span className="font-bold text-[10px]" style={{ color: bodyTextColor }}>{item.gstRate}%</span>

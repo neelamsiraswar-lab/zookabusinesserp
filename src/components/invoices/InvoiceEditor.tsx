@@ -13,6 +13,9 @@ import { INDIAN_STATES, COMMON_HSN_CODES, STANDARD_UNITS } from '../../utils/con
 import { 
   calculateItemGst, 
   calculateBaseRateFromInclusive,
+  calculateRateWithTax,
+  calculateBaseRateFromRateWithTax,
+  getProductSaleRates,
   recalculateInvoiceTotals, 
   suggestRateForHsn,
   getStateInfoByCode 
@@ -93,6 +96,7 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     updateInvoice, 
     getNextSequentialInvoiceNumber, 
     setSelectedInvoiceIdForPrint, 
+    confirmDelete,
     showToast,
     currentCompanyId
   } = useApp();
@@ -153,13 +157,14 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
   );
   const [isReverseCharge, setIsReverseCharge] = useState<boolean>(initialData?.isReverseCharge || false);
 
-  // Two Flexible Entry Modes: 'EXCLUSIVE' (Base Unit Rate) vs 'INCLUSIVE' (Total Line Sale Amount)
-  const [priceEntryMode, setPriceEntryMode] = useState<'EXCLUSIVE' | 'INCLUSIVE'>('EXCLUSIVE');
+  // Three Flexible Entry Modes: 'EXCLUSIVE' (Base Unit Rate) vs 'RATE_INCLUSIVE' (Unit Sale Rate with Tax) vs 'INCLUSIVE' (Total Line Sale Amount)
+  const [priceEntryMode, setPriceEntryMode] = useState<'EXCLUSIVE' | 'RATE_INCLUSIVE' | 'INCLUSIVE'>('EXCLUSIVE');
 
   // Dedicated Custom Item Sale Amount & Unit Rate Modal state
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
-  const [editPriceMode, setEditPriceMode] = useState<'EXCLUSIVE' | 'INCLUSIVE'>('EXCLUSIVE');
+  const [editPriceMode, setEditPriceMode] = useState<'EXCLUSIVE' | 'RATE_INCLUSIVE' | 'INCLUSIVE'>('EXCLUSIVE');
   const [editRate, setEditRate] = useState<number>(0);
+  const [editRateWithTax, setEditRateWithTax] = useState<number>(0);
   const [editTotal, setEditTotal] = useState<number>(0);
   const [editQuantity, setEditQuantity] = useState<number>(1);
   const [editUnit, setEditUnit] = useState<string>('PCS');
@@ -197,7 +202,8 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     }
     const initialIsInter = (initialData?.placeOfSupplyStateCode || business.stateCode) !== business.stateCode;
     const firstProd = products[0];
-    const defaultRate = firstProd ? firstProd.sellingPrice : 0;
+    const rates = firstProd ? getProductSaleRates(firstProd) : { baseRate: 0, rateWithTax: 0, isTaxInclusive: false };
+    const defaultRate = rates.baseRate;
     const defaultGst = firstProd ? firstProd.gstRate : 18;
     const defaultHsn = firstProd ? firstProd.hsnCode : '';
     const calcs = calculateItemGst(defaultRate, 1, 0, defaultGst, initialIsInter);
@@ -213,6 +219,8 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
         quantity: 1,
         unit: firstProd?.unit || 'PCS',
         rate: defaultRate,
+        taxIncludedRate: rates.rateWithTax,
+        isTaxInclusive: rates.isTaxInclusive,
         discountPercent: 0,
         discountAmount: 0,
         ...calcs
@@ -579,6 +587,9 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
       warranty: lineSettings.defaultWarranty || '1 Year Comprehensive',
       hsnCode: '',
       unit: 'PCS',
+      rate: 0,
+      taxIncludedRate: 0,
+      isTaxInclusive: priceEntryMode === 'RATE_INCLUSIVE',
       ...calcs
     };
 
@@ -603,10 +614,12 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
       showToast('warning', 'Low Stock Warning', `${prod.name} has only ${prod.currentStock} ${prod.unit} left in stock.`);
     }
 
+    const rates = getProductSaleRates(prod);
+
     setItems(prev => {
       const updated = [...prev];
       const calcs = calculateItemGst(
-        prod.sellingPrice,
+        rates.baseRate,
         updated[index]?.quantity || 1,
         updated[index]?.discountPercent || 0,
         prod.gstRate,
@@ -615,7 +628,10 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
       updated[index] = {
         ...updated[index],
         productId: prod.id,
-        originalPrice: prod.sellingPrice,
+        originalPrice: rates.baseRate,
+        isTaxInclusive: rates.isTaxInclusive,
+        rate: rates.baseRate,
+        taxIncludedRate: rates.rateWithTax,
         name: prod.name,
         description: prod.description || updated[index]?.description || '',
         warranty: updated[index]?.warranty || lineSettings.defaultWarranty || '1 Year Comprehensive',
@@ -635,8 +651,10 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     const item = items[index];
     if (!item) return;
     setEditingItemIndex(index);
-    setEditPriceMode(priceEntryMode);
+    setEditPriceMode(item.isTaxInclusive ? 'RATE_INCLUSIVE' : priceEntryMode);
     setEditRate(item.rate);
+    const unitRateWithTax = item.taxIncludedRate || calculateRateWithTax(item.rate, item.gstRate ?? 18, item.cessRate || 0);
+    setEditRateWithTax(unitRateWithTax);
     setEditTotal(item.totalAmount);
     setEditQuantity(item.quantity || 1);
     setEditUnit(item.unit || 'PCS');
@@ -652,7 +670,18 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
   const handleEditRateChange = (val: number) => {
     const r = Math.max(0, val);
     setEditRate(r);
+    const withTax = calculateRateWithTax(r, editGstRate, editCessRate);
+    setEditRateWithTax(withTax);
     const calcs = calculateItemGst(r, editQuantity, editDiscountPercent, editGstRate, isInterState, editCessRate);
+    setEditTotal(calcs.totalAmount);
+  };
+
+  const handleEditRateWithTaxChange = (val: number) => {
+    const rWithTax = Math.max(0, val);
+    setEditRateWithTax(rWithTax);
+    const base = calculateBaseRateFromRateWithTax(rWithTax, editGstRate, editCessRate);
+    setEditRate(base);
+    const calcs = calculateItemGst(base, editQuantity, editDiscountPercent, editGstRate, isInterState, editCessRate);
     setEditTotal(calcs.totalAmount);
   };
 
@@ -661,6 +690,8 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     setEditTotal(t);
     const calculatedRate = calculateBaseRateFromInclusive(t, Math.max(0.0001, editQuantity), editDiscountPercent, editGstRate, editCessRate);
     setEditRate(calculatedRate);
+    const withTax = calculateRateWithTax(calculatedRate, editGstRate, editCessRate);
+    setEditRateWithTax(withTax);
   };
 
   const handleEditQuantityChange = (qty: number) => {
@@ -669,6 +700,12 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     if (editPriceMode === 'INCLUSIVE') {
       const calculatedRate = calculateBaseRateFromInclusive(editTotal, q, editDiscountPercent, editGstRate, editCessRate);
       setEditRate(calculatedRate);
+      setEditRateWithTax(calculateRateWithTax(calculatedRate, editGstRate, editCessRate));
+    } else if (editPriceMode === 'RATE_INCLUSIVE') {
+      const base = calculateBaseRateFromRateWithTax(editRateWithTax, editGstRate, editCessRate);
+      setEditRate(base);
+      const calcs = calculateItemGst(base, q, editDiscountPercent, editGstRate, isInterState, editCessRate);
+      setEditTotal(calcs.totalAmount);
     } else {
       const calcs = calculateItemGst(editRate, q, editDiscountPercent, editGstRate, isInterState, editCessRate);
       setEditTotal(calcs.totalAmount);
@@ -681,6 +718,12 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     if (editPriceMode === 'INCLUSIVE') {
       const calculatedRate = calculateBaseRateFromInclusive(editTotal, Math.max(0.0001, editQuantity), d, editGstRate, editCessRate);
       setEditRate(calculatedRate);
+      setEditRateWithTax(calculateRateWithTax(calculatedRate, editGstRate, editCessRate));
+    } else if (editPriceMode === 'RATE_INCLUSIVE') {
+      const base = calculateBaseRateFromRateWithTax(editRateWithTax, editGstRate, editCessRate);
+      setEditRate(base);
+      const calcs = calculateItemGst(base, editQuantity, d, editGstRate, isInterState, editCessRate);
+      setEditTotal(calcs.totalAmount);
     } else {
       const calcs = calculateItemGst(editRate, editQuantity, d, editGstRate, isInterState, editCessRate);
       setEditTotal(calcs.totalAmount);
@@ -692,9 +735,16 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     if (editPriceMode === 'INCLUSIVE') {
       const calculatedRate = calculateBaseRateFromInclusive(editTotal, Math.max(0.0001, editQuantity), editDiscountPercent, gst, editCessRate);
       setEditRate(calculatedRate);
+      setEditRateWithTax(calculateRateWithTax(calculatedRate, gst, editCessRate));
+    } else if (editPriceMode === 'RATE_INCLUSIVE') {
+      const base = calculateBaseRateFromRateWithTax(editRateWithTax, gst, editCessRate);
+      setEditRate(base);
+      const calcs = calculateItemGst(base, editQuantity, editDiscountPercent, gst, isInterState, editCessRate);
+      setEditTotal(calcs.totalAmount);
     } else {
       const calcs = calculateItemGst(editRate, editQuantity, editDiscountPercent, gst, isInterState, editCessRate);
       setEditTotal(calcs.totalAmount);
+      setEditRateWithTax(calculateRateWithTax(editRate, gst, editCessRate));
     }
   };
 
@@ -703,11 +753,15 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     const target = items[editingItemIndex];
     if (!target) return;
 
-    const finalRate = editPriceMode === 'INCLUSIVE'
-      ? calculateBaseRateFromInclusive(editTotal, Math.max(0.0001, editQuantity), editDiscountPercent, editGstRate, editCessRate)
-      : editRate;
+    let finalRate = editRate;
+    if (editPriceMode === 'INCLUSIVE') {
+      finalRate = calculateBaseRateFromInclusive(editTotal, Math.max(0.0001, editQuantity), editDiscountPercent, editGstRate, editCessRate);
+    } else if (editPriceMode === 'RATE_INCLUSIVE') {
+      finalRate = calculateBaseRateFromRateWithTax(editRateWithTax, editGstRate, editCessRate);
+    }
 
     const calcs = calculateItemGst(finalRate, editQuantity, editDiscountPercent, editGstRate, isInterState, editCessRate);
+    const unitRateWithTax = calculateRateWithTax(finalRate, editGstRate, editCessRate);
 
     setItems(prev => {
       const next = [...prev];
@@ -716,6 +770,8 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
         quantity: editQuantity,
         unit: editUnit,
         rate: finalRate,
+        isTaxInclusive: editPriceMode === 'RATE_INCLUSIVE' || editPriceMode === 'INCLUSIVE',
+        taxIncludedRate: unitRateWithTax,
         discountPercent: editDiscountPercent,
         gstRate: editGstRate,
         cessRate: editCessRate,
@@ -810,8 +866,46 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
         target.cessRate || 0
       );
 
+      const effectiveRate = field === 'rate' ? Number(val) : target.rate;
+      const effectiveGst = field === 'gstRate' ? Number(val) : target.gstRate;
+      const effectiveCess = target.cessRate || 0;
+      const updatedTaxIncludedRate = calculateRateWithTax(effectiveRate, effectiveGst, effectiveCess);
+
       updated[index] = {
         ...target,
+        taxIncludedRate: updatedTaxIncludedRate,
+        ...calcs
+      };
+      return updated;
+    });
+  };
+
+  // Direct Per-Unit Sale Rate (Tax Inclusive) Change Handler
+  // Back-calculates Base Unit Rate, Taxable Value, and item-wise CGST/SGST/IGST breakdown
+  const handleItemRateWithTaxChange = (index: number, val: number) => {
+    const rateWithTax = Math.max(0, val);
+    setItems(prev => {
+      const updated = [...prev];
+      const target = updated[index];
+      if (!target) return prev;
+
+      const gst = target.gstRate || 0;
+      const cess = target.cessRate || 0;
+      const baseRate = calculateBaseRateFromRateWithTax(rateWithTax, gst, cess);
+      const calcs = calculateItemGst(
+        baseRate,
+        target.quantity || 1,
+        target.discountPercent || 0,
+        target.gstRate,
+        isInterState,
+        cess
+      );
+
+      updated[index] = {
+        ...target,
+        rate: baseRate,
+        taxIncludedRate: rateWithTax,
+        isTaxInclusive: true,
         ...calcs
       };
       return updated;
@@ -845,7 +939,19 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     });
   };
 
-  const handleRemoveItem = (index: number) => {
+  const handleRemoveItem = async (index: number) => {
+    const item = items[index];
+    if (item && (item.name?.trim() || item.rate > 0)) {
+      const confirmed = await confirmDelete({
+        title: 'Remove Line Item',
+        itemName: item.name || 'Unnamed Item',
+        itemType: 'Invoice Item',
+        message: `Are you sure you want to remove "${item.name || 'this item'}" from the invoice?`,
+        confirmText: 'Remove Item',
+        variant: 'danger'
+      });
+      if (!confirmed) return;
+    }
     setItems(prev => prev.filter((_, i) => i !== index));
     if (activeSuggestIndex === index) {
       setActiveSuggestIndex(null);
@@ -1398,7 +1504,7 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {/* Two Flexible Entry Modes Selector */}
+                {/* Flexible Entry Modes Selector */}
                 <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
                   <span className="px-2 text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Entry Mode:</span>
                   <button
@@ -1415,13 +1521,25 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                   </button>
                   <button
                     type="button"
+                    onClick={() => setPriceEntryMode('RATE_INCLUSIVE')}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      priceEntryMode === 'RATE_INCLUSIVE'
+                        ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-xs border border-indigo-200 dark:border-indigo-800'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title="Enter unit sale rate inclusive of tax (Tax Inclusive Unit Price)"
+                  >
+                    Sale Rate (Incl. Tax)
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setPriceEntryMode('INCLUSIVE')}
                     className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                       priceEntryMode === 'INCLUSIVE'
                         ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-xs border border-indigo-200 dark:border-indigo-800'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
-                    title="Enter flat final customer amount inclusive of GST (Tax Inclusive)"
+                    title="Enter flat final customer amount inclusive of GST (Tax Inclusive Line Total)"
                   >
                     Line Total (Incl. Tax)
                   </button>
@@ -1494,10 +1612,10 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                       </th>
                       <th className="py-2.5 px-2 w-16 text-center">Qty</th>
                       <th className="py-2.5 px-2 w-20">Unit</th>
-                      <th className={`py-2.5 px-2 w-28 ${priceEntryMode === 'EXCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/70 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
+                      <th className={`py-2.5 px-2 w-32 ${priceEntryMode === 'EXCLUSIVE' || priceEntryMode === 'RATE_INCLUSIVE' ? 'bg-indigo-50/70 dark:bg-indigo-950/70 text-indigo-900 dark:text-indigo-200 font-bold' : ''}`}>
                         <div className="flex items-center gap-1">
-                          <span>Rate (₹ Excl.)</span>
-                          {priceEntryMode === 'EXCLUSIVE' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400"></span>}
+                          <span>{priceEntryMode === 'RATE_INCLUSIVE' ? 'Sale Rate (₹ Incl.)' : 'Rate (₹ Excl.)'}</span>
+                          {(priceEntryMode === 'EXCLUSIVE' || priceEntryMode === 'RATE_INCLUSIVE') && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400"></span>}
                         </div>
                       </th>
                       <th className="py-2.5 px-2 w-16 text-center">Disc %</th>
@@ -1608,14 +1726,20 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                                               )}
                                             </div>
                                           </div>
-                                          <div className="text-right whitespace-nowrap">
-                                            <div className="font-mono font-bold text-xs text-indigo-700 dark:text-indigo-400">
-                                              ₹{p.sellingPrice.toLocaleString('en-IN')}
-                                            </div>
-                                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                                              +{p.gstRate}% GST
-                                            </div>
-                                          </div>
+                                          {(() => {
+                                            const pRates = getProductSaleRates(p);
+                                            return (
+                                              <div className="text-right whitespace-nowrap">
+                                                <div className="font-mono font-bold text-xs text-indigo-700 dark:text-indigo-400">
+                                                  ₹{pRates.rateWithTax.toLocaleString('en-IN')}
+                                                  <span className="text-[9px] font-sans ml-1 px-1 py-0.2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded font-semibold">Incl.</span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                                  Base: ₹{pRates.baseRate.toLocaleString('en-IN')} (+{p.gstRate}% GST)
+                                                </div>
+                                              </div>
+                                            );
+                                          })()}
                                         </div>
                                       );
                                     })}
@@ -1734,34 +1858,63 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                               </select>
                             </td>
 
-                            {/* Base Unit Rate (Tax Exclusive) Column */}
+                            {/* Unit Rate Column: Supports both Excl. Tax Base Rate and Incl. Tax Sale Rate */}
                             <td className="py-2.5 px-2 align-top">
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  value={item.rate}
-                                  onChange={(e) => handleItemChange(idx, 'rate', parseFloat(e.target.value) || 0)}
-                                  className={`w-full px-2 py-1.5 rounded-lg text-xs font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
-                                    priceEntryMode === 'EXCLUSIVE'
-                                      ? 'bg-white dark:bg-slate-900 border-2 border-indigo-400 dark:border-indigo-500 text-indigo-950 dark:text-indigo-200 shadow-2xs font-bold'
-                                      : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
-                                  }`}
-                                  placeholder="0.00"
-                                  required
-                                />
-                              </div>
-                              <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 flex items-center justify-between">
-                                <span>Base Excl.</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditItem(idx)}
-                                  className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold text-[9px] cursor-pointer"
-                                >
-                                  Edit ₹
-                                </button>
-                              </div>
+                              {priceEntryMode === 'RATE_INCLUSIVE' ? (
+                                <>
+                                  <div className="relative">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={item.taxIncludedRate !== undefined ? item.taxIncludedRate : Number((item.rate * (1 + (item.gstRate || 0) / 100)).toFixed(2))}
+                                      onChange={(e) => handleItemRateWithTaxChange(idx, parseFloat(e.target.value) || 0)}
+                                      className="w-full px-2 py-1.5 rounded-lg text-xs font-mono font-bold bg-white dark:bg-slate-900 border-2 border-indigo-500 text-indigo-950 dark:text-indigo-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                                      placeholder="0.00"
+                                      required
+                                    />
+                                  </div>
+                                  <div className="text-[9px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 flex items-center justify-between">
+                                    <span>Base: ₹{item.rate.toFixed(2)}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditItem(idx)}
+                                      className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold text-[9px] cursor-pointer"
+                                    >
+                                      Edit ₹
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="relative">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={item.rate}
+                                      onChange={(e) => handleItemChange(idx, 'rate', parseFloat(e.target.value) || 0)}
+                                      className={`w-full px-2 py-1.5 rounded-lg text-xs font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${
+                                        priceEntryMode === 'EXCLUSIVE'
+                                          ? 'bg-white dark:bg-slate-900 border-2 border-indigo-400 dark:border-indigo-500 text-indigo-950 dark:text-indigo-200 shadow-2xs font-bold'
+                                          : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
+                                      }`}
+                                      placeholder="0.00"
+                                      required
+                                    />
+                                  </div>
+                                  <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5 flex items-center justify-between">
+                                    <span>Incl: ₹{(item.taxIncludedRate || Number((item.rate * (1 + (item.gstRate || 0) / 100)).toFixed(2))).toFixed(2)}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditItem(idx)}
+                                      className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold text-[9px] cursor-pointer"
+                                    >
+                                      Edit ₹
+                                    </button>
+                                  </div>
+                                </>
+                              )}
                             </td>
 
                             {/* Item-Level Discounts with Quick Presets */}
@@ -2250,7 +2403,9 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
         
         const effectiveBaseRate = editPriceMode === 'INCLUSIVE'
           ? calculateBaseRateFromInclusive(editTotal, Math.max(0.0001, editQuantity), editDiscountPercent, editGstRate, editCessRate)
-          : editRate;
+          : (editPriceMode === 'RATE_INCLUSIVE'
+            ? calculateBaseRateFromRateWithTax(editRateWithTax, editGstRate, editCessRate)
+            : editRate);
 
         const liveCalcs = calculateItemGst(
           effectiveBaseRate,
@@ -2338,12 +2493,12 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                   )}
                 </div>
 
-                {/* Two Flexible Entry Modes Selector */}
+                {/* Flexible Entry Modes Selector */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
                     Select Pricing Entry Mode:
                   </label>
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                     <button
                       type="button"
                       onClick={() => {
@@ -2358,10 +2513,32 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                     >
                       <div className="flex items-center gap-1.5">
                         <span className={`w-2 h-2 rounded-full ${editPriceMode === 'EXCLUSIVE' ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
-                        <span>Base Unit Rate (Tax Exclusive)</span>
+                        <span>Base Rate (Excl.)</span>
                       </div>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-3.5">
-                        Enter custom selling rate directly before tax
+                        Price before tax
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditPriceMode('RATE_INCLUSIVE');
+                        const rWithTax = calculateRateWithTax(effectiveBaseRate, editGstRate, editCessRate);
+                        setEditRateWithTax(rWithTax);
+                      }}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all text-left flex flex-col gap-0.5 cursor-pointer ${
+                        editPriceMode === 'RATE_INCLUSIVE'
+                          ? 'bg-white dark:bg-slate-900 text-indigo-900 dark:text-indigo-200 shadow-sm border border-indigo-200 dark:border-indigo-800'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${editPriceMode === 'RATE_INCLUSIVE' ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
+                        <span>Sale Rate (Incl.)</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-3.5">
+                        Unit price with GST
                       </span>
                     </button>
 
@@ -2379,10 +2556,10 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                     >
                       <div className="flex items-center gap-1.5">
                         <span className={`w-2 h-2 rounded-full ${editPriceMode === 'INCLUSIVE' ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
-                        <span>Total Line Sale (Tax Inclusive)</span>
+                        <span>Line Total (Incl.)</span>
                       </div>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-3.5">
-                        Enter flat final customer amount (e.g. ₹1,000 all incl.)
+                        Flat total for all units
                       </span>
                     </button>
                   </div>
@@ -2432,6 +2609,28 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
                         );
                       })}
                     </div>
+                  </div>
+                ) : editPriceMode === 'RATE_INCLUSIVE' ? (
+                  <div className="space-y-2 p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60">
+                    <label className="block text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                      Unit Sale Rate with Tax Included (₹ Incl. Tax):
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-indigo-600 dark:text-indigo-400">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={editRateWithTax || ''}
+                        onChange={(e) => handleEditRateWithTaxChange(parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="w-full pl-8 pr-4 py-2.5 text-base font-bold font-mono bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-xl text-indigo-950 dark:text-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                        autoFocus
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Taxable Base / Unit: <strong className="text-slate-800 dark:text-slate-200 font-mono">₹{effectiveBaseRate.toFixed(2)}</strong> + {editGstRate}% GST.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2 p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60">

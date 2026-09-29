@@ -56,9 +56,14 @@ import {
   getProductStockThreshold, 
   isProductLowStock, 
   isProductCriticalStock, 
-  isProductOutOfStock,
-  computeInventoryHealth
+  isProductOutOfStock, 
+  computeInventoryHealth 
 } from '../../utils/stockUtils';
+import { 
+  calculateRateWithTax, 
+  calculateBaseRateFromRateWithTax, 
+  getProductSaleRates 
+} from '../../utils/gstCalculations';
 
 interface InventoryViewProps {
   onOpenNewInvoiceWithItem?: (product: Product) => void;
@@ -76,7 +81,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
     adjustStock, 
     setActiveTab, 
     showToast,
-    can 
+    can,
+    confirmDelete
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -151,10 +157,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
   const [unit, setUnit] = useState('PCS');
   const [purchasePrice, setPurchasePrice] = useState<number>(0);
   const [sellingPrice, setSellingPrice] = useState<number>(0);
+  const [salePriceIncludesTax, setSalePriceIncludesTax] = useState<boolean>(false);
+  const [salePriceWithTax, setSalePriceWithTax] = useState<number>(0);
   const [gstRate, setGstRate] = useState<GstTaxRate>(18);
   const [currentStock, setCurrentStock] = useState<number>(10);
   const [minStockAlert, setMinStockAlert] = useState<number>(5);
   const [isService, setIsService] = useState(false);
+
+  const handleSellingPriceChange = (val: number) => {
+    setSellingPrice(val);
+    const withTax = calculateRateWithTax(val, gstRate);
+    setSalePriceWithTax(withTax);
+  };
+
+  const handleSalePriceWithTaxChange = (val: number) => {
+    setSalePriceWithTax(val);
+    const base = calculateBaseRateFromRateWithTax(val, gstRate);
+    setSellingPrice(base);
+  };
+
+  const handleGstRateChange = (newGst: GstTaxRate) => {
+    setGstRate(newGst);
+    if (salePriceIncludesTax) {
+      const base = calculateBaseRateFromRateWithTax(salePriceWithTax, newGst);
+      setSellingPrice(base);
+    } else {
+      const withTax = calculateRateWithTax(sellingPrice, newGst);
+      setSalePriceWithTax(withTax);
+    }
+  };
 
   // Batch fields
   const [batchNo, setBatchNo] = useState('');
@@ -257,6 +288,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
     setUnit('PCS');
     setPurchasePrice(0);
     setSellingPrice(0);
+    setSalePriceIncludesTax(false);
+    setSalePriceWithTax(0);
     setGstRate(18);
     setCurrentStock(10);
     setMinStockAlert(stockSettings.defaultThreshold || 5);
@@ -276,7 +309,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
     setHsnCode(p.hsnCode);
     setUnit(p.unit);
     setPurchasePrice(p.purchasePrice);
-    setSellingPrice(p.sellingPrice);
+    
+    const rates = getProductSaleRates(p);
+    setSalePriceIncludesTax(rates.isTaxInclusive);
+    setSellingPrice(rates.baseRate);
+    setSalePriceWithTax(rates.rateWithTax);
+
     setGstRate(p.gstRate);
     setCurrentStock(p.currentStock);
     setMinStockAlert(p.minStockAlert);
@@ -291,12 +329,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
       return;
     }
 
+    const finalSellingPrice = salePriceIncludesTax ? salePriceWithTax : sellingPrice;
+    const mrp = salePriceIncludesTax ? salePriceWithTax : (sellingPrice * (1 + gstRate / 100));
+
     const batches = batchNo ? [{
       batchNumber: batchNo,
       mfgDate: new Date().toISOString().split('T')[0],
       expiryDate: expiryDate || '2029-12-31',
       stock: currentStock,
-      mrp: sellingPrice * 1.15
+      mrp: mrp
     }] : undefined;
 
     if (editingProduct) {
@@ -309,7 +350,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
         hsnCode,
         unit,
         purchasePrice,
-        sellingPrice,
+        sellingPrice: finalSellingPrice,
+        salePriceIncludesTax,
         gstRate,
         currentStock,
         minStockAlert,
@@ -326,7 +368,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
         hsnCode,
         unit,
         purchasePrice,
-        sellingPrice,
+        sellingPrice: finalSellingPrice,
+        salePriceIncludesTax,
         gstRate,
         currentStock,
         minStockAlert,
@@ -343,6 +386,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
     if (!adjustingProduct) return;
     adjustStock(adjustingProduct.id, newStockQty, adjustReason);
     setAdjustingProduct(null);
+  };
+
+  const handleDeleteProduct = async (prod: Product) => {
+    const confirmed = await confirmDelete({
+      title: 'Delete Product',
+      itemName: prod.name,
+      itemType: `SKU: ${prod.sku || 'N/A'} • ${prod.category || 'General'}`,
+      message: `Are you sure you want to permanently delete "${prod.name}" from your catalog? Current stock of ${prod.currentStock} ${prod.unit} will be removed from inventory.`,
+      confirmText: 'Delete Product',
+      variant: 'danger'
+    });
+    if (confirmed) {
+      deleteProduct(prod.id);
+      showToast('success', 'Product Deleted', `"${prod.name}" has been removed from inventory.`);
+    }
   };
 
   // Handler for adding a scanned item to invoice
@@ -701,18 +759,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
             const isLow = isProductLowStock(prod, stockSettings);
             const isExpanded = !!expandedProductIds[prod.id];
             
+            const saleRates = getProductSaleRates(prod);
             const effectiveTaxRate = (prod.gstRate || 0) + (prod.cessRate || 0);
             const purchaseTaxAmount = (prod.purchasePrice || 0) * (effectiveTaxRate / 100);
             const purchasePriceWithTax = (prod.purchasePrice || 0) * (1 + effectiveTaxRate / 100);
             const marginOnTaxIncl = purchasePriceWithTax > 0 
-              ? (((prod.sellingPrice - purchasePriceWithTax) / purchasePriceWithTax) * 100).toFixed(0)
+              ? (((saleRates.rateWithTax - purchasePriceWithTax) / purchasePriceWithTax) * 100).toFixed(0)
               : 0;
             const marginPercent = prod.purchasePrice > 0 
-              ? (((prod.sellingPrice - prod.purchasePrice) / prod.purchasePrice) * 100).toFixed(0)
+              ? (((saleRates.baseRate - prod.purchasePrice) / prod.purchasePrice) * 100).toFixed(0)
               : 0;
 
-            const baseTaxableSelling = prod.sellingPrice / (1 + prod.gstRate / 100);
-            const unitTaxAmount = prod.sellingPrice - baseTaxableSelling;
+            const baseTaxableSelling = saleRates.baseRate;
+            const unitTaxAmount = saleRates.taxAmount;
 
             return (
               <div key={prod.id} className="p-3.5 space-y-3 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
@@ -733,9 +792,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">Sale Rate</span>
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-sans">Sale Rate</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                        saleRates.isTaxInclusive 
+                          ? 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300' 
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}>
+                        {saleRates.isTaxInclusive ? 'Incl. Tax' : 'Excl. Tax'}
+                      </span>
+                    </div>
                     <div className="font-bold text-sm text-slate-900 dark:text-white font-mono">
-                      {formatCurrency(prod.sellingPrice, business.currencySymbol)}
+                      {formatCurrency(saleRates.rateWithTax, business.currencySymbol)}
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                      Base: {formatCurrency(saleRates.baseRate, business.currencySymbol)}
                     </div>
                     <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
                       {prod.gstRate}% GST
@@ -809,18 +880,25 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                     )}
 
                     <div className="bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200/70 dark:border-slate-750 text-right">
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">
-                        Sale Rate
-                      </span>
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-sans font-medium">
+                          Sale Rate
+                        </span>
+                        <span className="text-[8.5px] font-bold text-indigo-600 dark:text-indigo-400">
+                          {saleRates.isTaxInclusive ? '(Incl. Tax)' : '(Base)'}
+                        </span>
+                      </div>
                       <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400">
-                        {formatCurrency(prod.sellingPrice, business.currencySymbol)}
+                        {formatCurrency(saleRates.rateWithTax, business.currencySymbol)}
                       </div>
                       {can('inventory', 'viewPurchaseCost') && purchasePriceWithTax > 0 ? (
                         <div className="text-[9px] text-emerald-600 dark:text-emerald-400 font-sans font-semibold mt-0.5">
                           +{marginOnTaxIncl}% margin
                         </div>
                       ) : (
-                        <div className="text-[9px] text-slate-400 font-sans mt-0.5">Selling Price</div>
+                        <div className="text-[9px] text-slate-400 font-sans mt-0.5">
+                          Base: {formatCurrency(saleRates.baseRate, business.currencySymbol)}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -864,9 +942,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
                         <div>
-                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Selling Price (MRP)</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">
-                            {formatCurrency(prod.sellingPrice, business.currencySymbol)}
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">
+                            Sale Rate (Incl. Tax)
+                          </span>
+                          <span className="font-bold text-indigo-700 dark:text-indigo-300">
+                            {formatCurrency(saleRates.rateWithTax, business.currencySymbol)}
                           </span>
                         </div>
                         <div>
@@ -878,26 +958,26 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                         <div>
                           <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Taxable Base / Unit</span>
                           <span className="text-slate-700 dark:text-slate-300">
-                            {formatCurrency(baseTaxableSelling, business.currencySymbol)}
+                            {formatCurrency(saleRates.baseRate, business.currencySymbol)}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-500 dark:text-slate-400 block text-[10px]">GST Tax / Unit</span>
                           <span className="font-semibold text-amber-700 dark:text-amber-300">
-                            {formatCurrency(unitTaxAmount, business.currencySymbol)}
+                            {formatCurrency(saleRates.taxAmount, business.currencySymbol)}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Intra-State Split</span>
                           <span className="text-slate-600 dark:text-slate-400 text-[10px]">
-                            CGST ({prod.gstRate / 2}%): {formatCurrency(unitTaxAmount / 2, business.currencySymbol)}<br />
-                            SGST ({prod.gstRate / 2}%): {formatCurrency(unitTaxAmount / 2, business.currencySymbol)}
+                            CGST ({prod.gstRate / 2}%): {formatCurrency(saleRates.taxAmount / 2, business.currencySymbol)}<br />
+                            SGST ({prod.gstRate / 2}%): {formatCurrency(saleRates.taxAmount / 2, business.currencySymbol)}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Inter-State IGST</span>
                           <span className="text-slate-600 dark:text-slate-400 text-[10px]">
-                            IGST ({prod.gstRate}%): {formatCurrency(unitTaxAmount, business.currencySymbol)}
+                            IGST ({prod.gstRate}%): {formatCurrency(saleRates.taxAmount, business.currencySymbol)}
                           </span>
                         </div>
                       </div>
@@ -936,15 +1016,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-sans">Sale Rate</span>
+                            <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-sans">Sale Rate (Incl. Tax)</span>
                             <span className="font-bold text-indigo-700 dark:text-indigo-300">
-                              {formatCurrency(prod.sellingPrice, business.currencySymbol)}
+                              {formatCurrency(saleRates.rateWithTax, business.currencySymbol)}
                             </span>
                           </div>
                           <div>
                             <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-sans">Gross Profit / Unit</span>
                             <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                              {formatCurrency(prod.sellingPrice - purchasePriceWithTax, business.currencySymbol)}
+                              {formatCurrency(saleRates.rateWithTax - purchasePriceWithTax, business.currencySymbol)}
                             </span>
                           </div>
                           <div>
@@ -956,7 +1036,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                           <div>
                             <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-sans">Stock Valuation (Sale Rate)</span>
                             <span className="font-bold text-slate-900 dark:text-white">
-                              {formatCurrency(prod.currentStock * prod.sellingPrice, business.currencySymbol)}
+                              {formatCurrency(prod.currentStock * saleRates.rateWithTax, business.currencySymbol)}
                             </span>
                           </div>
                         </div>
@@ -1030,7 +1110,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                   {can('inventory', 'deleteProduct') && (
                     <button
                       type="button"
-                      onClick={() => deleteProduct(prod.id)}
+                      onClick={() => handleDeleteProduct(prod)}
                       className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full border border-slate-200/70 dark:border-slate-700 transition-all active:scale-95 cursor-pointer shrink-0"
                       title="Delete Product"
                     >
@@ -1128,7 +1208,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                   <div className="flex items-center justify-end gap-1.5">
                     <div className="text-right">
                       <span>Sale Rate (₹)</span>
-                      <span className="block text-[9px] font-normal text-slate-400 dark:text-slate-500">Selling Price</span>
+                      <span className="block text-[9px] font-normal text-slate-400 dark:text-slate-500">Incl. / Base</span>
                     </div>
                     <span className={`p-0.5 rounded transition-all ${sortField === 'sellingPrice' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/60' : 'text-slate-400 opacity-0 group-hover/th:opacity-100'}`}>
                       {sortField === 'sellingPrice' ? (
@@ -1189,18 +1269,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                 const isLow = isProductLowStock(prod, stockSettings);
                 const isExpanded = !!expandedProductIds[prod.id];
                 
+                const saleRates = getProductSaleRates(prod);
                 const effectiveTaxRate = (prod.gstRate || 0) + (prod.cessRate || 0);
                 const purchaseTaxAmount = (prod.purchasePrice || 0) * (effectiveTaxRate / 100);
                 const purchasePriceWithTax = (prod.purchasePrice || 0) * (1 + effectiveTaxRate / 100);
                 const marginOnTaxIncl = purchasePriceWithTax > 0 
-                  ? (((prod.sellingPrice - purchasePriceWithTax) / purchasePriceWithTax) * 100).toFixed(0)
+                  ? (((saleRates.rateWithTax - purchasePriceWithTax) / purchasePriceWithTax) * 100).toFixed(0)
                   : 0;
                 const marginPercent = prod.purchasePrice > 0 
-                  ? (((prod.sellingPrice - prod.purchasePrice) / prod.purchasePrice) * 100).toFixed(0)
+                  ? (((saleRates.baseRate - prod.purchasePrice) / prod.purchasePrice) * 100).toFixed(0)
                   : 0;
 
-                const baseTaxableSelling = prod.sellingPrice / (1 + prod.gstRate / 100);
-                const unitTaxAmount = prod.sellingPrice - baseTaxableSelling;
+                const baseTaxableSelling = saleRates.baseRate;
+                const unitTaxAmount = saleRates.taxAmount;
 
                 return (
                   <React.Fragment key={prod.id}>
@@ -1254,19 +1335,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                         </td>
                       )}
                       <td className="py-3 px-4 text-right font-mono">
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          {formatCurrency(prod.sellingPrice, business.currencySymbol)}
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {formatCurrency(saleRates.rateWithTax, business.currencySymbol)}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1 py-0.2 rounded ${
+                            saleRates.isTaxInclusive 
+                              ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800' 
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          }`}>
+                            {saleRates.isTaxInclusive ? 'Incl.' : 'Base'}
+                          </span>
                         </div>
-                        {can('inventory', 'viewPurchaseCost') && prod.purchasePrice > 0 ? (
-                          <div 
-                            className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold font-sans"
-                            title={`Margin: ${marginOnTaxIncl}% over tax-inclusive purchase cost (${marginPercent}% over base cost)`}
-                          >
-                            +{marginOnTaxIncl}% margin
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-slate-400 font-sans">Sale Rate</div>
-                        )}
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-end gap-1 font-sans">
+                          <span className="text-slate-400">Base:</span>
+                          <span className="font-mono text-slate-600 dark:text-slate-300">
+                            {formatCurrency(saleRates.baseRate, business.currencySymbol)}
+                          </span>
+                          {can('inventory', 'viewPurchaseCost') && purchasePriceWithTax > 0 && (
+                            <span 
+                              className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold font-sans ml-1"
+                              title={`Margin: ${marginOnTaxIncl}% over tax-inclusive purchase cost (${marginPercent}% over base cost)`}
+                            >
+                              +{marginOnTaxIncl}%
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className="inline-block px-2 py-0.5 text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
@@ -1341,7 +1435,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                           )}
                           {can('inventory', 'deleteProduct') && (
                             <button
-                              onClick={() => deleteProduct(prod.id)}
+                              onClick={() => handleDeleteProduct(prod)}
                               title="Delete Product"
                               className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer"
                             >
@@ -1376,13 +1470,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-slate-500 font-sans">Taxable Base / Unit:</span>
-                                  <span>{formatCurrency(baseTaxableSelling, business.currencySymbol)}</span>
+                                  <span>{formatCurrency(saleRates.baseRate, business.currencySymbol)}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-slate-500 font-sans">GST Amount / Unit:</span>
-                                  <span className="font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(unitTaxAmount, business.currencySymbol)}</span>
+                                  <span className="font-semibold text-amber-700 dark:text-amber-300">{formatCurrency(saleRates.taxAmount, business.currencySymbol)}</span>
                                 </div>
-                                <div className="flex justify-between text-[10px] text-slate-500 border-t border-slate-200/60 dark:border-slate-700/60 pt-1">
+                                <div className="flex justify-between font-bold text-indigo-900 dark:text-indigo-200 border-t border-slate-200/60 dark:border-slate-700/60 pt-1">
+                                  <span className="font-sans">Final Sale Rate (Incl. Tax):</span>
+                                  <span>{formatCurrency(saleRates.rateWithTax, business.currencySymbol)}</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] text-slate-500">
                                   <span className="font-sans">Intra-State Tax:</span>
                                   <span>CGST {prod.gstRate/2}% + SGST {prod.gstRate/2}%</span>
                                 </div>
@@ -1420,13 +1518,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                                     <span>{formatCurrency(purchasePriceWithTax, business.currencySymbol)}</span>
                                   </div>
                                   <div className="flex justify-between font-bold text-slate-900 dark:text-white">
-                                    <span className="font-sans">Sale Rate (Selling Price):</span>
-                                    <span>{formatCurrency(prod.sellingPrice, business.currencySymbol)}</span>
+                                    <span className="font-sans">Sale Rate (Incl. Tax):</span>
+                                    <span>{formatCurrency(saleRates.rateWithTax, business.currencySymbol)}</span>
                                   </div>
                                   <div className="flex justify-between">
                                     <span className="text-slate-500 font-sans">Gross Profit / Unit (vs Landed Cost):</span>
                                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                                      {formatCurrency(prod.sellingPrice - purchasePriceWithTax, business.currencySymbol)}
+                                      {formatCurrency(saleRates.rateWithTax - purchasePriceWithTax, business.currencySymbol)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between">
@@ -1435,7 +1533,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                                   </div>
                                   <div className="flex justify-between font-bold text-slate-900 dark:text-white pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
                                     <span className="font-sans">Stock Value (Sale Rate):</span>
-                                    <span>{formatCurrency(prod.currentStock * prod.sellingPrice, business.currencySymbol)}</span>
+                                    <span>{formatCurrency(prod.currentStock * saleRates.rateWithTax, business.currencySymbol)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1679,7 +1777,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">GST Tax Rate (%)</label>
                   <select
                     value={gstRate}
-                    onChange={(e) => setGstRate(parseInt(e.target.value) as GstTaxRate)}
+                    onChange={(e) => handleGstRateChange(parseInt(e.target.value) as GstTaxRate)}
                     className="w-full px-3 py-2 font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none"
                   >
                     <option value="0">0% (Nil / Exempt)</option>
@@ -1720,36 +1818,137 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                   )}
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300">Sale Rate / Selling Price (₹) *</label>
-                    <span className="text-[10px] text-slate-400 font-sans">Rate to customer</span>
+                {/* Sale Rate Configuration: Exclusive vs Tax Included Mode */}
+                <div className="col-span-1 md:col-span-2 p-3.5 bg-slate-50/80 dark:bg-slate-800/40 rounded-2xl border border-indigo-200/70 dark:border-indigo-900/60 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/70 dark:border-slate-700/70">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Receipt className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        Sale Pricing & Tax Entry Mode
+                      </span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
+                        Choose whether your primary sale price input includes or excludes GST
+                      </p>
+                    </div>
+
+                    <div className="inline-flex rounded-xl p-1 bg-slate-200/80 dark:bg-slate-800 text-xs font-semibold self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSalePriceIncludesTax(false);
+                          if (salePriceWithTax > 0 && sellingPrice === 0) {
+                            setSellingPrice(calculateBaseRateFromRateWithTax(salePriceWithTax, gstRate));
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer text-[11px] ${
+                          !salePriceIncludesTax
+                            ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-2xs font-bold'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        Base (Excl. Tax)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSalePriceIncludesTax(true);
+                          if (sellingPrice > 0 && salePriceWithTax === 0) {
+                            setSalePriceWithTax(calculateRateWithTax(sellingPrice, gstRate));
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer text-[11px] ${
+                          salePriceIncludesTax
+                            ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-2xs font-bold'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        With Tax (Incl. GST)
+                      </button>
+                    </div>
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 font-mono font-bold text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none"
-                    required
-                    placeholder="0.00"
-                  />
-                  {sellingPrice > 0 && (
-                    <div className="mt-1.5 p-2 bg-slate-100 dark:bg-slate-800/80 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-mono">
-                      <div className="flex justify-between items-center text-slate-800 dark:text-slate-200">
-                        <span className="font-sans font-semibold text-[10px]">Sale Rate:</span>
-                        <span className="font-bold text-xs text-indigo-700 dark:text-indigo-300">
-                          {formatCurrency(sellingPrice, business.currencySymbol)}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Sale Rate (Incl. Tax) Input */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`block text-xs font-bold ${salePriceIncludesTax ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                          Sale Rate (Incl. Tax) {salePriceIncludesTax && '*'}
+                        </label>
+                        <span className={`text-[10px] font-sans px-1.5 py-0.2 rounded ${salePriceIncludesTax ? 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold' : 'text-slate-400'}`}>
+                          {salePriceIncludesTax ? 'Primary' : 'Gross / Retail'}
                         </span>
                       </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={salePriceWithTax || ''}
+                          onChange={(e) => handleSalePriceWithTaxChange(parseFloat(e.target.value) || 0)}
+                          className={`w-full px-3 py-2 font-mono font-bold rounded-xl focus:outline-none border transition-all ${
+                            salePriceIncludesTax
+                              ? 'bg-white dark:bg-slate-900 border-indigo-400 dark:border-indigo-600 text-indigo-950 dark:text-white shadow-2xs ring-1 ring-indigo-300/50'
+                              : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
+                          }`}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1 font-sans">
+                        Final bill rate charged to customer including GST
+                      </p>
+                    </div>
+
+                    {/* Base Rate (Excl. Tax) Input */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`block text-xs font-bold ${!salePriceIncludesTax ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                          Base Rate (Excl. Tax) {!salePriceIncludesTax && '*'}
+                        </label>
+                        <span className={`text-[10px] font-sans px-1.5 py-0.2 rounded ${!salePriceIncludesTax ? 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold' : 'text-slate-400'}`}>
+                          {!salePriceIncludesTax ? 'Primary' : 'Taxable Base'}
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={sellingPrice || ''}
+                        onChange={(e) => handleSellingPriceChange(parseFloat(e.target.value) || 0)}
+                        className={`w-full px-3 py-2 font-mono font-bold rounded-xl focus:outline-none border transition-all ${
+                          !salePriceIncludesTax
+                            ? 'bg-white dark:bg-slate-900 border-indigo-400 dark:border-indigo-600 text-indigo-950 dark:text-white shadow-2xs ring-1 ring-indigo-300/50'
+                            : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
+                        }`}
+                        placeholder="0.00"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1 font-sans">
+                        Taxable base rate used for GST calculation & accounts
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Pricing & Margin Summary Card */}
+                  {(salePriceWithTax > 0 || sellingPrice > 0) && (
+                    <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-indigo-100 dark:border-slate-750 text-xs font-mono space-y-1.5">
+                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                        <span className="font-sans font-medium text-[11px]">Taxable Base Rate:</span>
+                        <span className="font-bold">{formatCurrency(sellingPrice, business.currencySymbol)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-amber-600 dark:text-amber-400">
+                        <span className="font-sans font-medium text-[11px]">GST Tax ({gstRate}%):</span>
+                        <span className="font-bold">+{formatCurrency(salePriceWithTax - sellingPrice, business.currencySymbol)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-indigo-950 dark:text-indigo-200 font-bold border-t border-slate-100 dark:border-slate-800 pt-1.5 text-sm">
+                        <span className="font-sans text-xs">Sale Rate (Incl. Tax):</span>
+                        <span>{formatCurrency(salePriceWithTax, business.currencySymbol)}</span>
+                      </div>
                       {purchasePrice > 0 && (
-                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-sans mt-0.5 font-medium flex justify-between">
-                          <span>Margin over Tax-Incl Cost:</span>
+                        <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-sans pt-1 border-t border-slate-100 dark:border-slate-800 font-medium flex justify-between">
+                          <span>Margin over Landed Cost:</span>
                           <span className="font-bold font-mono">
-                            {formatCurrency(sellingPrice - (purchasePrice * (1 + gstRate / 100)), business.currencySymbol)}
+                            {formatCurrency(salePriceWithTax - (purchasePrice * (1 + gstRate / 100)), business.currencySymbol)}
                             {' '}
-                            ({(((sellingPrice - (purchasePrice * (1 + gstRate / 100))) / (purchasePrice * (1 + gstRate / 100))) * 100).toFixed(0)}%)
+                            ({(((salePriceWithTax - (purchasePrice * (1 + gstRate / 100))) / (purchasePrice * (1 + gstRate / 100))) * 100).toFixed(0)}%)
                           </span>
                         </div>
                       )}

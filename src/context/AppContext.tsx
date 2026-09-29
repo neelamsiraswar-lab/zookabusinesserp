@@ -81,6 +81,7 @@ import { isQuotaExceededError, getFirestoreUpgradeUrl } from '../services/fireba
 import { applyThemeCssVariables } from '../utils/themeColors';
 import { DEFAULT_PLATFORM_CONFIG, normalizePlatformConfig } from '../utils/platformDefaults';
 import { safeStorageSet, safeStorageGet, hasCollectionChanged, mergeEntities } from '../utils/storageHelpers';
+import { ConfirmDialog, ConfirmDialogOptions } from '../components/common/ConfirmDialog';
 
 export type ActiveTab = 
   | 'dashboard'
@@ -272,6 +273,7 @@ interface AppContextType {
   toasts: ToastMessage[];
   showToast: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string, duration?: number) => void;
   removeToast: (id: string) => void;
+  confirmDelete: (options: ConfirmDialogOptions) => Promise<boolean>;
   resetAllData: () => void;
   exportDatabaseJSON: () => void;
   importDatabaseJSON: (jsonData: string) => boolean;
@@ -2017,6 +2019,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Universal Delete / Action Confirmation Dialog
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<(ConfirmDialogOptions & { isOpen: boolean; resolve: (val: boolean) => void }) | null>(null);
+
+  const confirmDelete = (options: ConfirmDialogOptions): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setConfirmDialogConfig({
+        ...options,
+        isOpen: true,
+        resolve: (confirmed: boolean) => {
+          setConfirmDialogConfig(null);
+          if (confirmed && options.onConfirm) {
+            try {
+              options.onConfirm();
+            } catch (err) {
+              console.error('Error executing confirmed action:', err);
+            }
+          } else if (!confirmed && options.onCancel) {
+            options.onCancel();
+          }
+          resolve(confirmed);
+        }
+      });
+    });
   };
 
   // Platform Branding & Broadcast Announcements (Super Admin)
@@ -6362,6 +6389,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toasts,
         showToast,
         removeToast,
+        confirmDelete,
         resetAllData,
         exportDatabaseJSON,
         importDatabaseJSON,
@@ -6456,6 +6484,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         config={biometricConfig}
         currencySymbol={business.currencySymbol}
       />
+      {confirmDialogConfig && (
+        <ConfirmDialog
+          isOpen={confirmDialogConfig.isOpen}
+          onClose={() => {
+            confirmDialogConfig.resolve(false);
+            setConfirmDialogConfig(null);
+          }}
+          onConfirm={() => {
+            confirmDialogConfig.resolve(true);
+            setConfirmDialogConfig(null);
+          }}
+          onCancel={() => {
+            confirmDialogConfig.resolve(false);
+            setConfirmDialogConfig(null);
+          }}
+          title={confirmDialogConfig.title}
+          message={confirmDialogConfig.message}
+          itemName={confirmDialogConfig.itemName}
+          itemType={confirmDialogConfig.itemType}
+          confirmText={confirmDialogConfig.confirmText}
+          cancelText={confirmDialogConfig.cancelText}
+          variant={confirmDialogConfig.variant || 'danger'}
+        />
+      )}
     </AppContext.Provider>
   );
 };

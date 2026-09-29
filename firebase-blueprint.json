@@ -120,6 +120,7 @@
         "unit": { "type": "string" },
         "purchasePrice": { "type": "number" },
         "sellingPrice": { "type": "number" },
+        "salePriceIncludesTax": { "type": "boolean" },
         "gstRate": { "type": "number" },
         "currentStock": { "type": "number" },
         "minStockAlert": { "type": "number" },

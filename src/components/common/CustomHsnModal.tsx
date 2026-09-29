@@ -41,7 +41,8 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
     updateCustomHsnCode, 
     deleteCustomHsnCode, 
     bulkImportCustomHsnCodes,
-    showToast 
+    showToast,
+    confirmDelete
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
@@ -132,8 +133,16 @@ export const CustomHsnModal: React.FC<CustomHsnModalProps> = ({
     setActiveTab('LIST');
   };
 
-  const handleDelete = (item: CustomHsnCode) => {
-    if (window.confirm(`Are you sure you want to delete custom HSN/SAC code ${item.code}?`)) {
+  const handleDelete = async (item: CustomHsnCode) => {
+    const confirmed = await confirmDelete({
+      title: 'Delete HSN/SAC Code',
+      itemName: `${item.type}: ${item.code}`,
+      itemType: `Custom Directory • ${item.gstRate}% GST`,
+      message: `Are you sure you want to delete custom ${item.type} code "${item.code}"?`,
+      confirmText: 'Delete Code',
+      variant: 'danger'
+    });
+    if (confirmed) {
       deleteCustomHsnCode(item.id);
       showToast('info', 'Code Deleted', `Removed ${item.code} from custom directory.`);
     }

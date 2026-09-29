@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Product, GstTaxRate } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
+import { useApp } from '../../context/AppContext';
 import { 
   Upload, 
   FileText, 
@@ -29,6 +30,7 @@ interface ParsedProductRow {
   unit: string;
   purchasePrice: number;
   sellingPrice: number;
+  salePriceIncludesTax?: boolean;
   gstRate: GstTaxRate;
   currentStock: number;
   minStockAlert: number;
@@ -51,6 +53,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
   onImport,
   currencySymbol = '₹'
 }) => {
+  const { confirmDelete } = useApp();
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [parsedRows, setParsedRows] = useState<ParsedProductRow[]>([]);
@@ -77,6 +80,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
       'Unit',
       'Purchase Price',
       'Selling Price',
+      'Sale Price Includes Tax (TRUE/FALSE)',
       'GST Rate (%)',
       'Current Stock',
       'Min Stock Alert',
@@ -94,6 +98,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         'PCS',
         '42000',
         '54990',
+        'TRUE',
         '18',
         '15',
         '3',
@@ -109,6 +114,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         'PCS',
         '6500',
         '8999',
+        'FALSE',
         '18',
         '24',
         '5',
@@ -124,6 +130,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         'SET',
         '0',
         '25000',
+        'FALSE',
         '18',
         '0',
         '0',
@@ -139,6 +146,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         'PCS',
         '8500',
         '11999',
+        'TRUE',
         '18',
         '18',
         '4',
@@ -154,6 +162,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         'REAM',
         '260',
         '350',
+        'FALSE',
         '12',
         '100',
         '20',
@@ -276,6 +285,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         const unitIdx = findIndex(['unit', 'uom', 'unitofmeasurement', 'pkg']);
         const purchasePriceIdx = findIndex(['purchaseprice', 'purchase', 'cost', 'costprice', 'buyrate', 'rate']);
         const sellingPriceIdx = findIndex(['sellingprice', 'selling', 'price', 'mrp', 'saleprice', 'sellrate']);
+        const salePriceIncludesTaxIdx = findIndex(['salepriceincludestax', 'salerateincludestax', 'saletaxincluded', 'taxincluded', 'includetax', 'includestax', 'inclusive', 'taxinclusive', 'mrpincluded']);
         const gstRateIdx = findIndex(['gstrate', 'gst', 'taxrate', 'tax', 'taxpercent']);
         const stockIdx = findIndex(['currentstock', 'stock', 'openingstock', 'qty', 'quantity', 'balance']);
         const minAlertIdx = findIndex(['minstockalert', 'minstock', 'lowstock', 'reorder', 'alert']);
@@ -332,6 +342,10 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
             ? parseFloat(row[sellingPriceIdx].replace(/[^0-9.]/g, '')) || 0 
             : rawPurPrice * 1.25;
 
+          const rawSalePriceIncludesTax = salePriceIncludesTaxIdx !== -1 && row[salePriceIncludesTaxIdx]
+            ? ['true', 'yes', '1', 'incl', 'inclusive', 'y'].includes(row[salePriceIncludesTaxIdx].toLowerCase().trim())
+            : false;
+
           // 8. GST Rate
           let rawGst = gstRateIdx !== -1 && row[gstRateIdx] 
             ? parseInt(row[gstRateIdx].replace(/[^0-9]/g, ''), 10) 
@@ -370,6 +384,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
             unit: rawUnit,
             purchasePrice: rawPurPrice,
             sellingPrice: rawSellPrice,
+            salePriceIncludesTax: rawSalePriceIncludesTax,
             gstRate: rawGst as GstTaxRate,
             currentStock: rawStock,
             minStockAlert: rawMinAlert,
@@ -395,8 +410,18 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
   // -------------------------------------------------------------
   // ROW MANAGEMENT & FILTERING
   // -------------------------------------------------------------
-  const handleDeleteRow = (index: number) => {
-    setParsedRows(prev => prev.filter(r => r.index !== index));
+  const handleDeleteRow = async (row: ParsedProductRow) => {
+    const confirmed = await confirmDelete({
+      title: 'Remove Product Row',
+      itemName: row.name || `Row #${row.index}`,
+      itemType: 'CSV Upload Row',
+      message: `Are you sure you want to remove "${row.name || 'this item'}" from the import preview?`,
+      confirmText: 'Remove Row',
+      variant: 'warning'
+    });
+    if (confirmed) {
+      setParsedRows(prev => prev.filter(r => r.index !== row.index));
+    }
   };
 
   const validRowsCount = parsedRows.filter(r => r.status !== 'ERROR').length;
@@ -440,6 +465,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
         unit: r.unit,
         purchasePrice: r.purchasePrice,
         sellingPrice: r.sellingPrice,
+        salePriceIncludesTax: r.salePriceIncludesTax ?? false,
         gstRate: r.gstRate,
         currentStock: r.currentStock,
         minStockAlert: r.minStockAlert,
@@ -792,7 +818,23 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                           </div>
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                          {formatCurrency(row.sellingPrice, currencySymbol)}
+                          <div className="flex items-center justify-end gap-1">
+                            <span>{formatCurrency(row.sellingPrice, currencySymbol)}</span>
+                            <span className={`text-[9px] font-sans px-1 py-0.2 rounded font-semibold ${
+                              row.salePriceIncludesTax 
+                                ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800' 
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                            }`}>
+                              {row.salePriceIncludesTax ? 'Incl.' : 'Base'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {row.salePriceIncludesTax ? (
+                              <span>Base: {formatCurrency(row.sellingPrice / (1 + (row.gstRate || 0) / 100), currencySymbol)}</span>
+                            ) : (
+                              <span>Incl: {formatCurrency(row.sellingPrice * (1 + (row.gstRate || 0) / 100), currencySymbol)}</span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
@@ -805,7 +847,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
-                            onClick={() => handleDeleteRow(row.index)}
+                            onClick={() => handleDeleteRow(row)}
                             className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded cursor-pointer transition-colors"
                             title="Exclude this item from import"
                           >

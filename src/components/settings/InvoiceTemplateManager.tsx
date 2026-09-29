@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 export const InvoiceTemplateManager: React.FC = () => {
-  const { business, updateBusiness, invoices, showToast } = useApp();
+  const { business, updateBusiness, invoices, showToast, confirmDelete } = useApp();
 
   const customTemplates = business.customTemplates || [];
   const allTemplates = getAllTemplates(customTemplates);
@@ -204,9 +204,18 @@ export const InvoiceTemplateManager: React.FC = () => {
     showToast('success', 'Custom Template Saved', `"${editingTemplate.name}" has been saved and applied as default template.`);
   };
 
-  const handleDeleteCustomTemplate = (templateId: string, e: React.MouseEvent) => {
+  const handleDeleteCustomTemplate = async (templateId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this custom template?')) {
+    const tpl = customTemplates.find(c => c.id !== templateId);
+    const confirmed = await confirmDelete({
+      title: 'Delete Custom Template',
+      itemName: tpl?.name || 'Custom Template',
+      itemType: 'Invoice Template',
+      message: 'Are you sure you want to delete this custom template? This action cannot be undone.',
+      confirmText: 'Delete Template',
+      variant: 'danger'
+    });
+    if (confirmed) {
       const updatedList = customTemplates.filter(c => c.id !== templateId);
       const newDefault = activeTemplateId === templateId ? 'OFFICIAL_GST' : activeTemplateId;
       

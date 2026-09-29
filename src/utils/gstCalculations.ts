@@ -123,6 +123,70 @@ export const calculateBaseRateFromInclusive = (
   return Number(baseRate.toFixed(2));
 };
 
+/**
+ * Calculate per-unit sale rate inclusive of tax (GST + Cess) from base rate
+ */
+export const calculateRateWithTax = (
+  baseRate: number,
+  gstRate: number = 0,
+  cessRate: number = 0
+): number => {
+  const taxFactor = 1 + ((gstRate + cessRate) / 100);
+  return Number((baseRate * taxFactor).toFixed(2));
+};
+
+/**
+ * Back-calculate per-unit base rate (exclusive of tax) from tax-included unit rate
+ */
+export const calculateBaseRateFromRateWithTax = (
+  rateWithTax: number,
+  gstRate: number = 0,
+  cessRate: number = 0
+): number => {
+  const taxFactor = 1 + ((gstRate + cessRate) / 100);
+  return Number((rateWithTax / taxFactor).toFixed(2));
+};
+
+/**
+ * Helper to inspect a product's configured sale rates (both with tax and without tax)
+ */
+export const getProductSaleRates = (product: {
+  sellingPrice: number;
+  gstRate: number;
+  cessRate?: number;
+  salePriceIncludesTax?: boolean;
+}): {
+  isTaxInclusive: boolean;
+  rateWithTax: number;
+  baseRate: number;
+  taxAmount: number;
+} => {
+  const taxFactor = 1 + ((product.gstRate || 0) + (product.cessRate || 0)) / 100;
+  const isTaxIncl = !!product.salePriceIncludesTax;
+  
+  if (isTaxIncl) {
+    const rateWithTax = Number(product.sellingPrice.toFixed(2));
+    const baseRate = Number((product.sellingPrice / taxFactor).toFixed(2));
+    const taxAmount = Number((rateWithTax - baseRate).toFixed(2));
+    return {
+      isTaxInclusive: true,
+      rateWithTax,
+      baseRate,
+      taxAmount
+    };
+  } else {
+    const baseRate = Number(product.sellingPrice.toFixed(2));
+    const rateWithTax = Number((product.sellingPrice * taxFactor).toFixed(2));
+    const taxAmount = Number((rateWithTax - baseRate).toFixed(2));
+    return {
+      isTaxInclusive: false,
+      rateWithTax,
+      baseRate,
+      taxAmount
+    };
+  }
+};
+
 export const calculateItemGst = (
   rate: number,
   quantity: number,
@@ -155,10 +219,13 @@ export const calculateItemGst = (
   const cessAmount = cessRate > 0 ? (taxableAmount * cessRate) / 100 : 0;
   const totalTax = cgstAmount + sgstAmount + igstAmount + cessAmount;
   const totalAmount = taxableAmount + totalTax;
+  const taxFactor = 1 + ((gstRate + cessRate) / 100);
+  const taxIncludedRate = Number((rate * taxFactor).toFixed(2));
 
   return {
     quantity,
     rate,
+    taxIncludedRate,
     discountPercent,
     discountAmount: Number(discountAmount.toFixed(2)),
     taxableAmount: Number(taxableAmount.toFixed(2)),

@@ -56,7 +56,8 @@ export const PurchasesView: React.FC = () => {
     recordPurchasePayment, 
     createExpense, 
     deleteExpense, 
-    showToast 
+    showToast,
+    confirmDelete
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'BILLS' | 'EXPENSES'>('BILLS');
@@ -685,11 +686,53 @@ export const PurchasesView: React.FC = () => {
     });
   };
 
-  // Allow removing any item row freely without blocking constraint
-  const handleRemoveItemRow = (index: number) => {
+  // Allow removing any item row with confirmation if populated
+  const handleRemoveItemRow = async (index: number) => {
+    const item = pItems[index];
+    if (item && (item.name || item.rate > 0 || (item.taxIncludedRate && item.taxIncludedRate > 0))) {
+      const confirmed = await confirmDelete({
+        title: 'Remove Item Row',
+        itemName: item.name || `Row #${index + 1}`,
+        itemType: 'Purchase Bill Line Item',
+        message: `Are you sure you want to remove "${item.name || 'this item'}" from this purchase bill?`,
+        confirmText: 'Remove Item',
+        variant: 'warning'
+      });
+      if (!confirmed) return;
+    }
     setPItems(prev => prev.filter((_, i) => i !== index));
     if (activeSuggestIndex === index) {
       setActiveSuggestIndex(null);
+    }
+  };
+
+  const handleDeletePurchaseBill = async (bill: PurchaseBill) => {
+    const confirmed = await confirmDelete({
+      title: 'Delete Purchase Bill',
+      itemName: `Bill #${bill.billNumber || bill.vendorInvoiceNumber} • ${bill.vendorName}`,
+      itemType: 'Purchase Bill',
+      message: `Are you sure you want to delete purchase bill #${bill.billNumber}? Stock added from this bill will be rolled back from inventory and supplier balance will be updated.`,
+      confirmText: 'Delete Bill',
+      variant: 'danger'
+    });
+    if (confirmed) {
+      deletePurchaseBill(bill.id);
+      showToast('success', 'Purchase Bill Deleted', `Bill #${bill.billNumber} has been removed.`);
+    }
+  };
+
+  const handleDeleteExpense = async (exp: Expense) => {
+    const confirmed = await confirmDelete({
+      title: 'Delete Expense Record',
+      itemName: `${exp.category} • ${exp.payee}`,
+      itemType: `Expense • ${formatCurrency(exp.amount, business.currencySymbol)}`,
+      message: `Are you sure you want to delete this expense of ${formatCurrency(exp.amount, business.currencySymbol)}?`,
+      confirmText: 'Delete Expense',
+      variant: 'danger'
+    });
+    if (confirmed) {
+      deleteExpense(exp.id);
+      showToast('success', 'Expense Deleted', 'Expense record has been deleted.');
     }
   };
 
@@ -1110,7 +1153,7 @@ export const PurchasesView: React.FC = () => {
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => deletePurchaseBill(bill.id)}
+                            onClick={() => handleDeletePurchaseBill(bill)}
                             className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                             title="Delete Purchase Bill & Rollback Stock"
                           >
@@ -1179,8 +1222,9 @@ export const PurchasesView: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <button
-                        onClick={() => deleteExpense(exp.id)}
+                        onClick={() => handleDeleteExpense(exp)}
                         className="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                        title="Delete Expense"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
