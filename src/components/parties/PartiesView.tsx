@@ -43,8 +43,7 @@ export const PartiesView: React.FC = () => {
     deleteParty, 
     syncBillingParties,
     setSelectedInvoiceIdForPrint,
-    showToast,
-    confirmDelete
+    showToast 
   } = useApp();
 
   // Run a one-time check on mount to ensure all billing customers and vendors are synchronized
@@ -248,21 +247,6 @@ export const PartiesView: React.FC = () => {
       `Dear ${party.name},\nThis is a gentle payment reminder from ${business.tradeName || business.name}.\nOutstanding balance: ${formatCurrency(party.currentBalance, business.currencySymbol)}.\nPlease transfer via UPI (${business.upiId}) or Bank A/C (${business.accountNumber}, IFSC: ${business.ifscCode}).\nThank you!`
     );
     window.open(`https://wa.me/${party.phone.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
-  };
-
-  const handleDeleteParty = async (party: Party) => {
-    const confirmed = await confirmDelete({
-      title: 'Delete Contact / Party',
-      itemName: party.name,
-      itemType: party.type === 'CUSTOMER' ? 'Customer' : party.type === 'VENDOR' ? 'Supplier' : 'Dual Role Party',
-      message: `Are you sure you want to permanently delete "${party.name}"? This party's account and ledger linkages will be removed.`,
-      confirmText: 'Delete Contact',
-      variant: 'danger'
-    });
-    if (confirmed) {
-      deleteParty(party.id);
-      showToast('success', 'Contact Deleted', `"${party.name}" has been removed.`);
-    }
   };
 
   return (
@@ -515,7 +499,7 @@ export const PartiesView: React.FC = () => {
                         </button>
 
                         <button
-                          onClick={() => handleDeleteParty(party)}
+                          onClick={() => deleteParty(party.id)}
                           title="Delete Contact"
                           className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                         >

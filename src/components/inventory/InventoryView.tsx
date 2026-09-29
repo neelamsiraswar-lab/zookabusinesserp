@@ -81,8 +81,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
     adjustStock, 
     setActiveTab, 
     showToast,
-    can,
-    confirmDelete
+    can 
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -386,21 +385,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
     if (!adjustingProduct) return;
     adjustStock(adjustingProduct.id, newStockQty, adjustReason);
     setAdjustingProduct(null);
-  };
-
-  const handleDeleteProduct = async (prod: Product) => {
-    const confirmed = await confirmDelete({
-      title: 'Delete Product',
-      itemName: prod.name,
-      itemType: `SKU: ${prod.sku || 'N/A'} • ${prod.category || 'General'}`,
-      message: `Are you sure you want to permanently delete "${prod.name}" from your catalog? Current stock of ${prod.currentStock} ${prod.unit} will be removed from inventory.`,
-      confirmText: 'Delete Product',
-      variant: 'danger'
-    });
-    if (confirmed) {
-      deleteProduct(prod.id);
-      showToast('success', 'Product Deleted', `"${prod.name}" has been removed from inventory.`);
-    }
   };
 
   // Handler for adding a scanned item to invoice
@@ -1110,7 +1094,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                   {can('inventory', 'deleteProduct') && (
                     <button
                       type="button"
-                      onClick={() => handleDeleteProduct(prod)}
+                      onClick={() => deleteProduct(prod.id)}
                       className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full border border-slate-200/70 dark:border-slate-700 transition-all active:scale-95 cursor-pointer shrink-0"
                       title="Delete Product"
                     >
@@ -1435,7 +1419,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onOpenNewInvoiceWi
                           )}
                           {can('inventory', 'deleteProduct') && (
                             <button
-                              onClick={() => handleDeleteProduct(prod)}
+                              onClick={() => deleteProduct(prod.id)}
                               title="Delete Product"
                               className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors cursor-pointer"
                             >

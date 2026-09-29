@@ -469,16 +469,8 @@ export const LetterheadManagerView: React.FC<LetterheadManagerViewProps> = (prop
                               {/* Delete */}
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  const confirmed = await appCtx.confirmDelete({
-                                    title: 'Delete Document',
-                                    itemName: doc.title,
-                                    itemType: `Letterhead Document • ${doc.category}`,
-                                    message: `Are you sure you want to permanently delete "${doc.title}"?`,
-                                    confirmText: 'Delete Document',
-                                    variant: 'danger'
-                                  });
-                                  if (confirmed) {
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete "${doc.title}"?`)) {
                                     onDeleteDocument(doc.id);
                                     showToast({
                                       type: 'info',
@@ -488,7 +480,7 @@ export const LetterheadManagerView: React.FC<LetterheadManagerViewProps> = (prop
                                   }
                                 }}
                                 title="Delete Document"
-                                className="p-1.5 rounded-lg bg-slate-800 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors border border-slate-700 cursor-pointer"
+                                className="p-1.5 rounded-lg bg-slate-800 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors border border-slate-700"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -612,16 +604,8 @@ export const LetterheadManagerView: React.FC<LetterheadManagerViewProps> = (prop
                     {templates.length > 1 && (
                       <button
                         type="button"
-                        onClick={async () => {
-                          const confirmed = await appCtx.confirmDelete({
-                            title: 'Delete Template',
-                            itemName: tpl.name,
-                            itemType: 'Letterhead Template',
-                            message: `Are you sure you want to delete letterhead template "${tpl.name}"?`,
-                            confirmText: 'Delete Template',
-                            variant: 'danger'
-                          });
-                          if (confirmed) {
+                        onClick={() => {
+                          if (confirm(`Delete letterhead template "${tpl.name}"?`)) {
                             onDeleteTemplate(tpl.id);
                             showToast({
                               type: 'info',
@@ -630,7 +614,7 @@ export const LetterheadManagerView: React.FC<LetterheadManagerViewProps> = (prop
                             });
                           }
                         }}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
                         title="Delete Template"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

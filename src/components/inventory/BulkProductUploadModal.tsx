@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Product, GstTaxRate } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
-import { useApp } from '../../context/AppContext';
 import { 
   Upload, 
   FileText, 
@@ -53,7 +52,6 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
   onImport,
   currencySymbol = '₹'
 }) => {
-  const { confirmDelete } = useApp();
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [parsedRows, setParsedRows] = useState<ParsedProductRow[]>([]);
@@ -410,18 +408,8 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
   // -------------------------------------------------------------
   // ROW MANAGEMENT & FILTERING
   // -------------------------------------------------------------
-  const handleDeleteRow = async (row: ParsedProductRow) => {
-    const confirmed = await confirmDelete({
-      title: 'Remove Product Row',
-      itemName: row.name || `Row #${row.index}`,
-      itemType: 'CSV Upload Row',
-      message: `Are you sure you want to remove "${row.name || 'this item'}" from the import preview?`,
-      confirmText: 'Remove Row',
-      variant: 'warning'
-    });
-    if (confirmed) {
-      setParsedRows(prev => prev.filter(r => r.index !== row.index));
-    }
+  const handleDeleteRow = (index: number) => {
+    setParsedRows(prev => prev.filter(r => r.index !== index));
   };
 
   const validRowsCount = parsedRows.filter(r => r.status !== 'ERROR').length;
@@ -847,7 +835,7 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
-                            onClick={() => handleDeleteRow(row)}
+                            onClick={() => handleDeleteRow(row.index)}
                             className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded cursor-pointer transition-colors"
                             title="Exclude this item from import"
                           >

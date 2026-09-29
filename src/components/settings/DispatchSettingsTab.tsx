@@ -15,7 +15,6 @@ import {
   Layers
 } from 'lucide-react';
 import { BusinessProfile } from '../../types';
-import { useApp } from '../../context/AppContext';
 import { 
   DispatchSettings, 
   DispatchTemplate, 
@@ -35,7 +34,6 @@ export const DispatchSettingsTab: React.FC<DispatchSettingsTabProps> = ({
   setFormData,
   showToast
 }) => {
-  const { confirmDelete } = useApp();
   const currentSettings: DispatchSettings = normalizeDispatchSettings(formData.dispatchSettings);
 
   const [activeTemplateId, setActiveTemplateId] = useState<string>(
@@ -85,22 +83,11 @@ export const DispatchSettingsTab: React.FC<DispatchSettingsTabProps> = ({
     showToast('success', 'Template Created', 'New dispatch message template added.');
   };
 
-  const handleDeleteTemplate = async (id: string) => {
+  const handleDeleteTemplate = (id: string) => {
     if (currentSettings.templates.length <= 1) {
       showToast('error', 'Cannot Delete', 'At least one dispatch message template is required.');
       return;
     }
-
-    const targetTemplate = currentSettings.templates.find(t => t.id === id);
-    const confirmed = await confirmDelete({
-      title: 'Delete Dispatch Template',
-      itemName: targetTemplate?.name || 'Template',
-      itemType: 'Dispatch Template',
-      message: `Are you sure you want to delete dispatch message template "${targetTemplate?.name}"?`,
-      confirmText: 'Delete Template',
-      variant: 'danger'
-    });
-    if (!confirmed) return;
 
     updateDispatchSettings(prev => {
       const filtered = prev.templates.filter(t => t.id !== id);

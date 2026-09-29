@@ -55,8 +55,7 @@ export const SnapshotRestoreSettingsTab: React.FC = () => {
     clearAllVaultSnapshots,
     exportVaultSnapshotById,
     exportCurrentDatabaseSnapshot,
-    showToast,
-    confirmDelete
+    showToast
   } = useApp();
 
   const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
@@ -194,21 +193,6 @@ export const SnapshotRestoreSettingsTab: React.FC = () => {
       showToast('error', 'Restore Failed', e?.message || 'Failed to apply restore.');
     } finally {
       setIsRestoring(false);
-    }
-  };
-
-  const handleDeleteSnapshot = async (snap: SystemSnapshotMetadata) => {
-    const confirmed = await confirmDelete({
-      title: 'Delete Backup Snapshot',
-      itemName: snap.label,
-      itemType: `Snapshot • ${snap.invoicesCount} Invoices`,
-      message: `Are you sure you want to permanently delete this snapshot (${snap.label}) from the vault?`,
-      confirmText: 'Delete Snapshot',
-      variant: 'danger'
-    });
-    if (confirmed) {
-      deleteVaultSnapshot(snap.id);
-      showToast('info', 'Snapshot Removed', 'Snapshot removed from vault.');
     }
   };
 
@@ -684,7 +668,7 @@ export const SnapshotRestoreSettingsTab: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteSnapshot(snap)}
+                    onClick={() => deleteVaultSnapshot(snap.id)}
                     title="Delete snapshot from vault"
                     className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                   >

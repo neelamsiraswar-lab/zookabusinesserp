@@ -71,26 +71,10 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
     setSelectedInvoiceIdForPrint, 
     recordInvoicePayment,
     deleteInvoice,
-    confirmDelete,
     showToast,
     setActiveTab,
     currentCompanyId
   } = useApp();
-
-  const handleDeleteInvoice = async (inv: Invoice) => {
-    const confirmed = await confirmDelete({
-      title: 'Delete Invoice',
-      itemType: 'Sales Invoice',
-      itemName: `Invoice #${inv.invoiceNumber} • ${inv.customerName}`,
-      message: `Are you sure you want to permanently delete Invoice #${inv.invoiceNumber}? Stock deducted for this sale will be replenished, and any linked account entries will be reversed.`,
-      confirmText: 'Delete Invoice',
-      variant: 'danger'
-    });
-    if (confirmed) {
-      deleteInvoice(inv.id);
-      showToast('success', 'Invoice Deleted', `Invoice #${inv.invoiceNumber} has been deleted.`);
-    }
-  };
 
   const [activeDraft, setActiveDraft] = useState(() => getInvoiceDraft(currentCompanyId));
   const [shareModalInvoice, setShareModalInvoice] = useState<Invoice | null>(null);
@@ -535,11 +519,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
               setStatementPartyId(partyId || parties[0]?.id || null);
               setIsStatementOpen(true);
             }}
-            onDeleteInvoice={(id) => {
-              const target = invoices.find(i => i.id === id);
-              if (target) handleDeleteInvoice(target);
-              else deleteInvoice(id);
-            }}
+            onDeleteInvoice={deleteInvoice}
             currencySymbol={business.currencySymbol}
           />
         ) : (
@@ -846,7 +826,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
 
                   <button
                     type="button"
-                    onClick={() => handleDeleteInvoice(inv)}
+                    onClick={() => deleteInvoice(inv.id)}
                     className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-xl transition-colors cursor-pointer shrink-0"
                     title="Delete Invoice"
                   >
@@ -1200,7 +1180,7 @@ export const InvoiceListView: React.FC<InvoiceListViewProps> = ({ onOpenNewInvoi
                           </button>
 
                           <button
-                            onClick={() => handleDeleteInvoice(inv)}
+                            onClick={() => deleteInvoice(inv.id)}
                             title="Delete Invoice"
                             className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-lg transition-colors cursor-pointer"
                           >

@@ -3,7 +3,6 @@ import { DesktopModal } from '../common/DesktopModal';
 import { Party } from '../../types';
 import { formatCurrency, validateGstin } from '../../utils/formatters';
 import { INDIAN_STATES } from '../../utils/constants';
-import { useApp } from '../../context/AppContext';
 import { 
   Upload, 
   FileText, 
@@ -57,7 +56,6 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
   onImport,
   currencySymbol = '₹'
 }) => {
-  const { confirmDelete } = useApp();
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [parsedRows, setParsedRows] = useState<ParsedPartyRow[]>([]);
@@ -466,18 +464,8 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
   // -------------------------------------------------------------
   // ROW MANAGEMENT & FILTERING
   // -------------------------------------------------------------
-  const handleDeleteRow = async (row: ParsedPartyRow) => {
-    const confirmed = await confirmDelete({
-      title: 'Remove Party Row',
-      itemName: row.name || `Row #${row.index}`,
-      itemType: 'CSV Upload Row',
-      message: `Are you sure you want to remove "${row.name || 'this party'}" from the import preview?`,
-      confirmText: 'Remove Row',
-      variant: 'warning'
-    });
-    if (confirmed) {
-      setParsedRows(prev => prev.filter(r => r.index !== row.index));
-    }
+  const handleDeleteRow = (index: number) => {
+    setParsedRows(prev => prev.filter(r => r.index !== index));
   };
 
   const validRowsCount = parsedRows.filter(r => r.status !== 'ERROR').length;
@@ -969,7 +957,7 @@ export const BulkPartyUploadModal: React.FC<BulkPartyUploadModalProps> = ({
                         <td className="py-2.5 px-3 text-center">
                           <button
                             type="button"
-                            onClick={() => handleDeleteRow(row)}
+                            onClick={() => handleDeleteRow(row.index)}
                             className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition-colors"
                             title="Exclude from import"
                           >
