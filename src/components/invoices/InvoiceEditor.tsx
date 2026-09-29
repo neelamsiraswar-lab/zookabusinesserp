@@ -96,6 +96,7 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     updateInvoice, 
     getNextSequentialInvoiceNumber, 
     setSelectedInvoiceIdForPrint, 
+    confirmDelete,
     showToast,
     currentCompanyId
   } = useApp();
@@ -938,7 +939,19 @@ export const InvoiceEditor: React.FC<InvoiceEditorProps> = ({ onClose, initialDa
     });
   };
 
-  const handleRemoveItem = (index: number) => {
+  const handleRemoveItem = async (index: number) => {
+    const item = items[index];
+    if (item && (item.name?.trim() || item.rate > 0)) {
+      const confirmed = await confirmDelete({
+        title: 'Remove Line Item',
+        itemName: item.name || 'Unnamed Item',
+        itemType: 'Invoice Item',
+        message: `Are you sure you want to remove "${item.name || 'this item'}" from the invoice?`,
+        confirmText: 'Remove Item',
+        variant: 'danger'
+      });
+      if (!confirmed) return;
+    }
     setItems(prev => prev.filter((_, i) => i !== index));
     if (activeSuggestIndex === index) {
       setActiveSuggestIndex(null);

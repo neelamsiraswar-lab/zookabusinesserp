@@ -56,7 +56,7 @@ export const FooterSettingsTab: React.FC<FooterSettingsTabProps> = ({
   companyId,
   companyName,
 }) => {
-  const { business, currentCompany, companies, updateBusiness, editBusinessProfile, showToast } = useApp();
+  const { business, currentCompany, companies, updateBusiness, editBusinessProfile, showToast, confirmDelete } = useApp();
 
   const baseConfig = normalizeFooterConfig(
     initialConfig || business.footerConfig || currentCompany?.footerConfig
@@ -157,7 +157,18 @@ export const FooterSettingsTab: React.FC<FooterSettingsTabProps> = ({
     showToast('success', 'Badge Added', `Added "${newBadge.label}" to trust badges.`);
   };
 
-  const handleRemoveBadge = (id: string) => {
+  const handleRemoveBadge = async (id: string) => {
+    const badge = (config.badges || []).find(b => b.id === id);
+    const confirmed = await confirmDelete({
+      title: 'Remove Trust Badge',
+      itemName: badge?.label || 'Trust Badge',
+      itemType: 'Footer Trust Badge',
+      message: `Are you sure you want to remove the "${badge?.label || 'badge'}" from your platform footer?`,
+      confirmText: 'Remove Badge',
+      variant: 'warning'
+    });
+    if (!confirmed) return;
+
     setConfig(prev => ({
       ...prev,
       badges: (prev.badges || []).filter(b => b.id !== id)

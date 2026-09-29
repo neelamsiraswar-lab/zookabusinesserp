@@ -49,7 +49,8 @@ export const BiometricSettingsTab: React.FC = () => {
     currentUser, 
     can, 
     showToast,
-    logSecurityEvent 
+    logSecurityEvent,
+    confirmDelete
   } = useApp();
 
   const isCurrentUserAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN' || can('settings', 'manageUsersAndRoles');
@@ -156,8 +157,18 @@ export const BiometricSettingsTab: React.FC = () => {
     showToast('success', 'Passkey Enrolled', 'Device passkey enrolled. Sensitive ledger actions are now protected.');
   };
 
-  const handleRemoveBiometric = () => {
+  const handleRemoveBiometric = async () => {
     if (!isCurrentUserAdmin) return;
+    const confirmed = await confirmDelete({
+      title: 'Remove Passkey Credential',
+      itemName: config.credential?.deviceLabel || 'Biometric Passkey',
+      itemType: 'Device Credential',
+      message: 'Are you sure you want to remove this registered biometric passkey credential? Financial transactions will revert to Security PIN fallback.',
+      confirmText: 'Remove Passkey',
+      variant: 'warning'
+    });
+    if (!confirmed) return;
+
     const updatedConfig: BiometricSecurityConfig = {
       ...config,
       registered: false,

@@ -85,7 +85,8 @@ export const SettingsView: React.FC = () => {
     resequenceAllInvoicesFromStartingNumber,
     realignAndFixVoucherSequences,
     showToast,
-    setActiveTab: setGlobalActiveTab
+    setActiveTab: setGlobalActiveTab,
+    confirmDelete
   } = useApp();
 
   const palette = getThemePalette(business?.themeColor || currentCompany?.themeColor || 'indigo');
@@ -230,7 +231,17 @@ export const SettingsView: React.FC = () => {
     showToast('success', 'Preset Added', `Added "${newWarrantyPreset.trim()}" to warranty presets.`);
   };
 
-  const handleRemoveWarrantyPreset = (preset: string) => {
+  const handleRemoveWarrantyPreset = async (preset: string) => {
+    const confirmed = await confirmDelete({
+      title: 'Remove Warranty Option',
+      itemName: preset,
+      itemType: 'Item Line Setting',
+      message: `Are you sure you want to remove "${preset}" from your warranty preset list?`,
+      confirmText: 'Remove Preset',
+      variant: 'warning'
+    });
+    if (!confirmed) return;
+
     const existing = currentItemSettings.warrantyOptions || [];
     const updated = existing.filter(p => p !== preset);
     handleItemLineSettingChange('warrantyOptions', updated);
@@ -277,7 +288,17 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = async () => {
+    const confirmed = await confirmDelete({
+      title: 'Remove Company Logo',
+      itemName: 'Brand Logo Image',
+      itemType: 'Company Branding',
+      message: 'Are you sure you want to remove your company logo? It will no longer appear on invoices, delivery challans, and headers.',
+      confirmText: 'Remove Logo',
+      variant: 'warning'
+    });
+    if (!confirmed) return;
+
     setFormData(prev => ({
       ...prev,
       logoUrl: ''
@@ -322,7 +343,17 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleRemoveSignature = () => {
+  const handleRemoveSignature = async () => {
+    const confirmed = await confirmDelete({
+      title: 'Remove Signature',
+      itemName: signatureFileName || 'Authorized Signature',
+      itemType: 'Company Authorization',
+      message: 'Are you sure you want to remove your authorized signature image? Invoices will no longer include this signature.',
+      confirmText: 'Remove Signature',
+      variant: 'warning'
+    });
+    if (!confirmed) return;
+
     setFormData(prev => ({
       ...prev,
       signatureUrl: undefined

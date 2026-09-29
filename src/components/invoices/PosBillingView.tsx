@@ -82,7 +82,8 @@ export const PosBillingView: React.FC = () => {
     createParty, 
     getNextSequentialInvoiceNumber,
     setSelectedInvoiceIdForPrint, 
-    showToast 
+    showToast,
+    confirmDelete
   } = useApp();
 
   const posSettings: PosSettings = {
@@ -302,8 +303,18 @@ export const PosBillingView: React.FC = () => {
     });
   };
 
-  const handleRemoveFromCart = (itemId: string) => {
-    setCart(prev => prev.filter(i => i.id !== itemId && i.productId !== itemId));
+  const handleRemoveFromCart = async (item: CartItem) => {
+    const confirmed = await confirmDelete({
+      title: 'Remove from Cart',
+      itemName: item.name,
+      itemType: `Quantity: ${item.quantity} ${item.unit || 'units'}`,
+      message: `Are you sure you want to remove "${item.name}" from the POS checkout cart?`,
+      confirmText: 'Remove Item',
+      variant: 'warning'
+    });
+    if (confirmed) {
+      setCart(prev => prev.filter(i => i.id !== item.id && i.productId !== item.id));
+    }
   };
 
   // Open Edit Item Sale Price Modal
@@ -1333,7 +1344,7 @@ export const PosBillingView: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleRemoveFromCart(item.id)}
+                          onClick={() => handleRemoveFromCart(item)}
                           className="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors ml-0.5 cursor-pointer"
                           title="Remove item"
                         >

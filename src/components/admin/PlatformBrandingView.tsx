@@ -29,7 +29,7 @@ import { LOGO_ICON_OPTIONS, LOGO_GRADIENT_PRESETS, DEFAULT_PLATFORM_CONFIG } fro
 import { PlatformConfig } from '../../types';
 
 export const PlatformBrandingView: React.FC = () => {
-  const { platformConfig, updatePlatformConfig, resetPlatformConfig } = useApp();
+  const { platformConfig, updatePlatformConfig, resetPlatformConfig, showToast, confirmDelete } = useApp();
 
   // Local editable form state
   const [appName, setAppName] = useState(platformConfig?.appName || DEFAULT_PLATFORM_CONFIG.appName);
@@ -117,7 +117,15 @@ export const PlatformBrandingView: React.FC = () => {
   };
 
   const handleReset = async () => {
-    if (window.confirm('Reset platform identity and logo back to factory defaults (Zooka Business)?')) {
+    const confirmed = await confirmDelete({
+      title: 'Reset Platform Identity',
+      itemName: 'Platform Branding & Logo',
+      itemType: 'Platform Configuration',
+      message: 'Are you sure you want to reset all platform identity, logo, and brand name back to factory defaults (Zooka Business)?',
+      confirmText: 'Reset Defaults',
+      variant: 'warning'
+    });
+    if (confirmed) {
       await resetPlatformConfig();
       setAppName(DEFAULT_PLATFORM_CONFIG.appName);
       setAppTagline(DEFAULT_PLATFORM_CONFIG.appTagline);
@@ -126,6 +134,7 @@ export const PlatformBrandingView: React.FC = () => {
       setAppLogoUrl('');
       setAppLogoGradient(DEFAULT_PLATFORM_CONFIG.appLogoGradient);
       setBrandBadgeText(DEFAULT_PLATFORM_CONFIG.brandBadgeText);
+      showToast('info', 'Reset Complete', 'Platform branding has been reset to factory defaults.');
     }
   };
 
