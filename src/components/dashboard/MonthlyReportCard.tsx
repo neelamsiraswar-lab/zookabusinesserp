@@ -58,25 +58,38 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
     return `${yyyy}-${mm}`;
   };
 
+  const getNextMonthString = () => {
+    const d = new Date();
+    let y = d.getFullYear();
+    let m = d.getMonth() + 2;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    return `${y}-${String(m).padStart(2, '0')}`;
+  };
+
   const [selectedMonth, setSelectedMonth] = useState<string>(() => getCurrentMonthString());
   const [activeTabSubView, setActiveTabSubView] = useState<'kpi' | 'daily_chart' | 'top_performers' | 'breakdowns'>('kpi');
   const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
 
   // Parse Year and Month number
-  const { year, monthNum, monthName, daysInMonth, monthLabel, isCurrentMonth } = useMemo(() => {
+  const { year, monthNum, monthName, daysInMonth, monthLabel, isCurrentMonth, isNextMonth } = useMemo(() => {
     const parts = selectedMonth.split('-');
     const y = parseInt(parts[0], 10) || new Date().getFullYear();
     const m = parseInt(parts[1], 10) || (new Date().getMonth() + 1);
     const mName = MONTH_NAMES[m - 1] || 'Month';
     const days = new Date(y, m, 0).getDate();
     const isCur = selectedMonth === getCurrentMonthString();
+    const isNxt = selectedMonth === getNextMonthString();
     return {
       year: y,
       monthNum: m,
       monthName: mName,
       daysInMonth: days,
       monthLabel: `${mName} ${y}`,
-      isCurrentMonth: isCur
+      isCurrentMonth: isCur,
+      isNextMonth: isNxt
     };
   }, [selectedMonth]);
 
@@ -425,6 +438,17 @@ export const MonthlyReportCard: React.FC<MonthlyReportCardProps> = () => {
               className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/40 transition-all cursor-pointer"
             >
               Jump to This Month
+            </button>
+          )}
+
+          {!isNextMonth && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(getNextMonthString())}
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-emerald-200/80 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-all cursor-pointer"
+              title="Jump to Next Month"
+            >
+              Next Month
             </button>
           )}
 

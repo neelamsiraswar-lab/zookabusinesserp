@@ -20,6 +20,7 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Package,
   Eye,
   Filter,
@@ -49,6 +50,83 @@ import { ModalWrapper } from '../common/Portal';
 type GstTabType = 'gstr1' | 'gstr3b' | 'sale_register' | 'purchase_register' | 'hsn_finder';
 type FilterMode = 'month' | 'date_range';
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+export const formatYearMonth = (d: Date): string => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}`;
+};
+
+export const getMonthRange = (ym: string): { start: string; end: string } => {
+  const [yStr, mStr] = ym.split('-');
+  const y = parseInt(yStr, 10) || new Date().getFullYear();
+  const m = parseInt(mStr, 10) || (new Date().getMonth() + 1);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { start, end };
+};
+
+export const shiftYearMonth = (ym: string, delta: number): string => {
+  const now = new Date();
+  if (!ym || ym === 'ALL' || ym.startsWith('Q') || ym.startsWith('FY_')) {
+    const shifted = new Date(now.getFullYear(), now.getMonth() + delta, 1);
+    return formatYearMonth(shifted);
+  }
+  const [yStr, mStr] = ym.split('-');
+  let y = parseInt(yStr, 10);
+  let m = parseInt(mStr, 10);
+  if (!y || !m) {
+    y = now.getFullYear();
+    m = now.getMonth() + 1;
+  }
+  let newMonth = m + delta;
+  let newYear = y;
+  while (newMonth < 1) {
+    newMonth += 12;
+    newYear -= 1;
+  }
+  while (newMonth > 12) {
+    newMonth -= 12;
+    newYear += 1;
+  }
+  return `${newYear}-${String(newMonth).padStart(2, '0')}`;
+};
+
+export const getMonthLabel = (ym: string): string => {
+  if (!ym || !ym.includes('-')) return ym;
+  const [yStr, mStr] = ym.split('-');
+  const y = parseInt(yStr, 10);
+  const m = parseInt(mStr, 10);
+  if (!y || !m || m < 1 || m > 12) return ym;
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+};
+
+export const getFilingPeriodCode = (ym: string): string => {
+  if (ym && ym.includes('-')) {
+    const [y, m] = ym.split('-');
+    return `${m}${y}`;
+  }
+  const now = new Date();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return `${m}${now.getFullYear()}`;
+};
+
+export const normalizeDate = (dStr: string): string => {
+  if (!dStr) return '';
+  let clean = dStr.trim();
+  if (clean.includes('T')) clean = clean.split('T')[0];
+  if (/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(clean)) {
+    const parts = clean.split(/[/-]/);
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  return clean;
+};
+
 export const GstReturnsView: React.FC = () => {
   const { 
     business, 
@@ -64,7 +142,6 @@ export const GstReturnsView: React.FC = () => {
   } = useApp();
   
   const [returnType, setReturnType] = useState<GstTabType>('sale_register');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('August 2026');
   const [hsnSearchQuery, setHsnSearchQuery] = useState('');
 
   // HSN & SAC Tariff Directory State
@@ -90,13 +167,32 @@ export const GstReturnsView: React.FC = () => {
   // Copied feedback
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+  // Reference for native calendar month picker input
+  const monthInputRef = React.useRef<HTMLInputElement>(null);
+
   // -------------------------------------------------------------
+  // DYNAMIC MONTH & DATE CALCULATIONS
+  // -------------------------------------------------------------
+  const now = useMemo(() => new Date(), []);
+  const currentYearMonth = useMemo(() => formatYearMonth(now), [now]);
+  const nextYearMonth = useMemo(() => {
+    let m = now.getMonth() + 2;
+    let y = now.getFullYear();
+    if (m > 12) { m -= 12; y += 1; }
+    return `${y}-${String(m).padStart(2, '0')}`;
+  }, [now]);
+  const lastYearMonth = useMemo(() => {
+    let m = now.getMonth();
+    let y = now.getFullYear();
+    if (m < 1) { m += 12; y -= 1; }
+    return `${y}-${String(m).padStart(2, '0')}`;
+  }, [now]);
+
   // SALES & PURCHASE REGISTER FILTERS (Month & Date Filters)
-  // -------------------------------------------------------------
   const [filterMode, setFilterMode] = useState<FilterMode>('month');
-  const [selectedMonth, setSelectedMonth] = useState<string>('2026-08'); // YYYY-MM or 'ALL' or 'Q2_2026' or 'FY_2026_27'
-  const [startDate, setStartDate] = useState<string>('2026-08-01');
-  const [endDate, setEndDate] = useState<string>('2026-08-31');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => formatYearMonth(new Date()));
+  const [startDate, setStartDate] = useState<string>(() => getMonthRange(formatYearMonth(new Date())).start);
+  const [endDate, setEndDate] = useState<string>(() => getMonthRange(formatYearMonth(new Date())).end);
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Specific register filters
@@ -121,30 +217,244 @@ export const GstReturnsView: React.FC = () => {
     }));
   };
 
+  // Grouped and sorted list of months for organized dropdown
+  const monthSelectGroups = useMemo(() => {
+    const today = new Date();
+    const curYm = formatYearMonth(today);
+    const nxtDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const nxtYm = formatYearMonth(nxtDate);
+    const lstDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lstYm = formatYearMonth(lstDate);
+
+    // 1. Quick Month Shortcuts
+    const quickGroup = {
+      label: '⭐ Quick Month Shortcuts',
+      options: [
+        { value: curYm, label: `${getMonthLabel(curYm)} (Current Month)` },
+        { value: nxtYm, label: `${getMonthLabel(nxtYm)} (Next Month)` },
+        { value: lstYm, label: `${getMonthLabel(lstYm)} (Last Month)` },
+      ]
+    };
+
+    // 2. Months with actual activity / data
+    const activityMap = new Map<string, { invCount: number; billCount: number }>();
+    invoices.forEach(inv => {
+      if (inv.invoiceDate) {
+        const norm = normalizeDate(inv.invoiceDate);
+        if (norm.length >= 7) {
+          const ym = norm.slice(0, 7);
+          const entry = activityMap.get(ym) || { invCount: 0, billCount: 0 };
+          entry.invCount++;
+          activityMap.set(ym, entry);
+        }
+      }
+    });
+    purchaseBills.forEach(bill => {
+      if (bill.billDate) {
+        const norm = normalizeDate(bill.billDate);
+        if (norm.length >= 7) {
+          const ym = norm.slice(0, 7);
+          const entry = activityMap.get(ym) || { invCount: 0, billCount: 0 };
+          entry.billCount++;
+          activityMap.set(ym, entry);
+        }
+      }
+    });
+
+    const activeMonths = Array.from(activityMap.keys()).sort((a, b) => b.localeCompare(a));
+    const activeGroup = {
+      label: '📁 Months with Recorded Data',
+      options: activeMonths.map(ym => {
+        const d = activityMap.get(ym)!;
+        let tag = '';
+        if (ym === curYm) tag = ' [Current]';
+        else if (ym === nxtYm) tag = ' [Next]';
+        else if (ym === lstYm) tag = ' [Last]';
+        return {
+          value: ym,
+          label: `${getMonthLabel(ym)}${tag} (${d.invCount} inv, ${d.billCount} bills)`
+        };
+      })
+    };
+
+    // 3. Upcoming Filing Periods (Next 6 months)
+    const upcomingOptions = [];
+    for (let i = 1; i <= 6; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const ym = formatYearMonth(d);
+      const suffix = i === 1 ? ' (Next Month)' : ` (+${i} mos)`;
+      upcomingOptions.push({
+        value: ym,
+        label: `${getMonthLabel(ym)}${suffix}`
+      });
+    }
+    const upcomingGroup = {
+      label: '⏩ Upcoming Filing Periods',
+      options: upcomingOptions
+    };
+
+    // 4. Past Filing Periods (Past 18 months)
+    const pastOptions = [];
+    for (let i = 1; i <= 18; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const ym = formatYearMonth(d);
+      const suffix = i === 1 ? ' (Last Month)' : '';
+      pastOptions.push({
+        value: ym,
+        label: `${getMonthLabel(ym)}${suffix}`
+      });
+    }
+    const pastGroup = {
+      label: '⏪ Past Filing Months',
+      options: pastOptions
+    };
+
+    // 5. Statutory Quarters (Correct Indian Financial Year: Apr-Mar)
+    const cYear = today.getFullYear();
+    const isAfterMarch = today.getMonth() >= 3;
+    const currentFyYear = isAfterMarch ? cYear : cYear - 1;
+
+    const quartersGroup = {
+      label: '📊 Quarterly Returns (QRMP)',
+      options: [
+        { value: `Q1_${currentFyYear}`, label: `Q1: Apr - Jun ${currentFyYear}` },
+        { value: `Q2_${currentFyYear}`, label: `Q2: Jul - Sep ${currentFyYear}` },
+        { value: `Q3_${currentFyYear}`, label: `Q3: Oct - Dec ${currentFyYear}` },
+        { value: `Q4_${currentFyYear}`, label: `Q4: Jan - Mar ${currentFyYear + 1}` },
+        { value: `Q1_${currentFyYear - 1}`, label: `Q1: Apr - Jun ${currentFyYear - 1}` },
+        { value: `Q2_${currentFyYear - 1}`, label: `Q2: Jul - Sep ${currentFyYear - 1}` },
+        { value: `Q3_${currentFyYear - 1}`, label: `Q3: Oct - Dec ${currentFyYear - 1}` },
+        { value: `Q4_${currentFyYear - 1}`, label: `Q4: Jan - Mar ${currentFyYear}` },
+      ]
+    };
+
+    // 6. Annual Financial Years
+    const fyGroup = {
+      label: '🏛️ Financial Years (Annual GSTR-9)',
+      options: [
+        { value: `FY_${currentFyYear}_${String(currentFyYear + 1).slice(-2)}`, label: `Financial Year ${currentFyYear}-${String(currentFyYear + 1).slice(-2)} (Full Year)` },
+        { value: `FY_${currentFyYear - 1}_${String(currentFyYear).slice(-2)}`, label: `Financial Year ${currentFyYear - 1}-${String(currentFyYear).slice(-2)} (Previous FY)` },
+      ]
+    };
+
+    // 7. All Records
+    const allGroup = {
+      label: '🌐 Full History',
+      options: [
+        { value: 'ALL', label: 'All Records (No Period Filter)' }
+      ]
+    };
+
+    return [
+      quickGroup,
+      ...(activeGroup.options.length > 0 ? [activeGroup] : []),
+      upcomingGroup,
+      pastGroup,
+      quartersGroup,
+      fyGroup,
+      allGroup
+    ];
+  }, [invoices, purchaseBills]);
+
+  // Flat options list for easy lookup
+  const monthSelectOptions = useMemo(() => {
+    const flat = monthSelectGroups.flatMap(g => g.options);
+    // Ensure selectedMonth is always present in options if custom
+    if (selectedMonth && !flat.some(o => o.value === selectedMonth)) {
+      flat.unshift({
+        value: selectedMonth,
+        label: getMonthLabel(selectedMonth) || selectedMonth
+      });
+    }
+    return flat;
+  }, [monthSelectGroups, selectedMonth]);
+
+  // Handle selecting a month or quarter/FY from dropdown or calendar
+  const handleMonthSelect = (val: string) => {
+    setSelectedMonth(val);
+    if (val === 'ALL') {
+      setStartDate('');
+      setEndDate('');
+    } else if (val.startsWith('Q')) {
+      const parts = val.split('_');
+      const qNum = parseInt(parts[0].replace('Q', ''), 10);
+      const fyYear = parseInt(parts[1], 10);
+      let startM = '04', endM = '06', endD = '30', y1 = fyYear, y2 = fyYear;
+      if (qNum === 1) { startM = '04'; endM = '06'; endD = '30'; y1 = fyYear; y2 = fyYear; }
+      else if (qNum === 2) { startM = '07'; endM = '09'; endD = '30'; y1 = fyYear; y2 = fyYear; }
+      else if (qNum === 3) { startM = '10'; endM = '12'; endD = '31'; y1 = fyYear; y2 = fyYear; }
+      else if (qNum === 4) { startM = '01'; endM = '03'; endD = '31'; y1 = fyYear + 1; y2 = fyYear + 1; }
+      setStartDate(`${y1}-${startM}-01`);
+      setEndDate(`${y2}-${endM}-${endD}`);
+    } else if (val.startsWith('FY_')) {
+      const parts = val.split('_');
+      const startY = parseInt(parts[1], 10);
+      const endY = startY + 1;
+      setStartDate(`${startY}-04-01`);
+      setEndDate(`${endY}-03-31`);
+    } else {
+      const { start, end } = getMonthRange(val);
+      setStartDate(start);
+      setEndDate(end);
+    }
+  };
+
+  // Step month forwards or backwards
+  const handleStepMonth = (delta: number) => {
+    setFilterMode('month');
+    const nextYm = shiftYearMonth(selectedMonth, delta);
+    handleMonthSelect(nextYm);
+  };
+
   // Quick Date Range helper
-  const handleQuickPreset = (preset: 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_QUARTER' | 'THIS_FY' | 'ALL_TIME') => {
+  const handleQuickPreset = (preset: 'THIS_MONTH' | 'NEXT_MONTH' | 'LAST_MONTH' | 'THIS_QUARTER' | 'THIS_FY' | 'ALL_TIME') => {
+    const today = new Date();
     if (preset === 'THIS_MONTH') {
-      setFilterMode('month');
-      setSelectedMonth('2026-08');
-      setStartDate('2026-08-01');
-      setEndDate('2026-08-31');
+      const curYm = formatYearMonth(today);
+      const { start, end } = getMonthRange(curYm);
+      setSelectedMonth(curYm);
+      setStartDate(start);
+      setEndDate(end);
+    } else if (preset === 'NEXT_MONTH') {
+      const nextDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const nextYm = formatYearMonth(nextDate);
+      const { start, end } = getMonthRange(nextYm);
+      setSelectedMonth(nextYm);
+      setStartDate(start);
+      setEndDate(end);
     } else if (preset === 'LAST_MONTH') {
-      setFilterMode('month');
-      setSelectedMonth('2026-07');
-      setStartDate('2026-07-01');
-      setEndDate('2026-07-31');
+      const lastDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastYm = formatYearMonth(lastDate);
+      const { start, end } = getMonthRange(lastYm);
+      setSelectedMonth(lastYm);
+      setStartDate(start);
+      setEndDate(end);
     } else if (preset === 'THIS_QUARTER') {
-      setFilterMode('month');
-      setSelectedMonth('Q2_2026');
-      setStartDate('2026-07-01');
-      setEndDate('2026-09-30');
+      const m = today.getMonth();
+      const cYear = today.getFullYear();
+      let qNum = 1;
+      let fyYear = m >= 3 ? cYear : cYear - 1;
+      let startM = '04', endM = '06', endD = '30', y1 = fyYear, y2 = fyYear;
+      if (m >= 3 && m <= 5) {
+        qNum = 1; startM = '04'; endM = '06'; endD = '30'; y1 = fyYear; y2 = fyYear;
+      } else if (m >= 6 && m <= 8) {
+        qNum = 2; startM = '07'; endM = '09'; endD = '30'; y1 = fyYear; y2 = fyYear;
+      } else if (m >= 9 && m <= 11) {
+        qNum = 3; startM = '10'; endM = '12'; endD = '31'; y1 = fyYear; y2 = fyYear;
+      } else {
+        qNum = 4; startM = '01'; endM = '03'; endD = '31'; y1 = fyYear + 1; y2 = fyYear + 1;
+      }
+      setSelectedMonth(`Q${qNum}_${fyYear}`);
+      setStartDate(`${y1}-${startM}-01`);
+      setEndDate(`${y2}-${endM}-${endD}`);
     } else if (preset === 'THIS_FY') {
-      setFilterMode('month');
-      setSelectedMonth('FY_2026_27');
-      setStartDate('2026-04-01');
-      setEndDate('2027-03-31');
+      const m = today.getMonth();
+      const fyStartYear = m >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+      const fyEndYear = fyStartYear + 1;
+      setSelectedMonth(`FY_${fyStartYear}_${String(fyEndYear).slice(-2)}`);
+      setStartDate(`${fyStartYear}-04-01`);
+      setEndDate(`${fyEndYear}-03-31`);
     } else if (preset === 'ALL_TIME') {
-      setFilterMode('month');
       setSelectedMonth('ALL');
       setStartDate('');
       setEndDate('');
@@ -153,20 +463,91 @@ export const GstReturnsView: React.FC = () => {
 
   // Helper date checker
   const isDateInRange = (dateStr: string): boolean => {
-    if (!dateStr) return true;
+    if (!dateStr) return false;
+    const clean = normalizeDate(dateStr);
+    if (!clean) return false;
+
     if (filterMode === 'month') {
       if (selectedMonth === 'ALL') return true;
-      if (selectedMonth === 'Q1_2026') return dateStr >= '2026-04-01' && dateStr <= '2026-06-30';
-      if (selectedMonth === 'Q2_2026') return dateStr >= '2026-07-01' && dateStr <= '2026-09-30';
-      if (selectedMonth === 'FY_2026_27') return dateStr >= '2026-04-01' && dateStr <= '2027-03-31';
-      return dateStr.startsWith(selectedMonth);
+      if (selectedMonth.startsWith('Q')) {
+        const parts = selectedMonth.split('_');
+        const qNum = parseInt(parts[0].replace('Q', ''), 10);
+        const fyYear = parseInt(parts[1], 10);
+        let startM = '04', endM = '06', endD = '30', y1 = fyYear, y2 = fyYear;
+        if (qNum === 1) { startM = '04'; endM = '06'; endD = '30'; y1 = fyYear; y2 = fyYear; }
+        else if (qNum === 2) { startM = '07'; endM = '09'; endD = '30'; y1 = fyYear; y2 = fyYear; }
+        else if (qNum === 3) { startM = '10'; endM = '12'; endD = '31'; y1 = fyYear; y2 = fyYear; }
+        else if (qNum === 4) { startM = '01'; endM = '03'; endD = '31'; y1 = fyYear + 1; y2 = fyYear + 1; }
+        const s = `${y1}-${startM}-01`;
+        const e = `${y2}-${endM}-${endD}`;
+        return clean >= s && clean <= e;
+      }
+      if (selectedMonth.startsWith('FY_')) {
+        const parts = selectedMonth.split('_');
+        const startY = parseInt(parts[1], 10);
+        const endY = startY + 1;
+        return clean >= `${startY}-04-01` && clean <= `${endY}-03-31`;
+      }
+      return clean.startsWith(selectedMonth);
     } else {
       // Date Range mode
-      if (startDate && dateStr < startDate) return false;
-      if (endDate && dateStr > endDate) return false;
+      if (startDate && clean < startDate) return false;
+      if (endDate && clean > endDate) return false;
       return true;
     }
   };
+
+  // Active period display labels & FP code for GST Returns
+  const selectedPeriodLabel = useMemo(() => {
+    if (filterMode === 'date_range') {
+      return `${startDate || 'Start'} to ${endDate || 'End'}`;
+    }
+    if (selectedMonth === 'ALL') return 'All Records (All Time)';
+    if (selectedMonth.startsWith('Q')) {
+      const parts = selectedMonth.split('_');
+      return `${parts[0]} (${parts[1]})`;
+    }
+    if (selectedMonth.startsWith('FY_')) {
+      return selectedMonth.replace('FY_', 'FY ').replace('_', '-');
+    }
+    return getMonthLabel(selectedMonth);
+  }, [filterMode, selectedMonth, startDate, endDate]);
+
+  const currentFp = useMemo(() => {
+    return getFilingPeriodCode(selectedMonth);
+  }, [selectedMonth]);
+
+  const isThisMonthActive = (filterMode === 'month' && selectedMonth === currentYearMonth) ||
+    (filterMode === 'date_range' && startDate === getMonthRange(currentYearMonth).start && endDate === getMonthRange(currentYearMonth).end);
+
+  const isNextMonthActive = (filterMode === 'month' && selectedMonth === nextYearMonth) ||
+    (filterMode === 'date_range' && startDate === getMonthRange(nextYearMonth).start && endDate === getMonthRange(nextYearMonth).end);
+
+  const isLastMonthActive = (filterMode === 'month' && selectedMonth === lastYearMonth) ||
+    (filterMode === 'date_range' && startDate === getMonthRange(lastYearMonth).start && endDate === getMonthRange(lastYearMonth).end);
+
+  // Month with most activity for friendly suggestions
+  const topActiveMonth = useMemo(() => {
+    const counts = new Map<string, number>();
+    invoices.forEach(inv => {
+      if (inv.invoiceDate) {
+        const norm = normalizeDate(inv.invoiceDate);
+        if (norm.length >= 7) {
+          const ym = norm.slice(0, 7);
+          counts.set(ym, (counts.get(ym) || 0) + 1);
+        }
+      }
+    });
+    let maxMonth = '';
+    let maxCount = 0;
+    counts.forEach((cnt, ym) => {
+      if (cnt > maxCount) {
+        maxCount = cnt;
+        maxMonth = ym;
+      }
+    });
+    return maxMonth ? { ym: maxMonth, count: maxCount } : null;
+  }, [invoices]);
 
   // -------------------------------------------------------------
   // FILTERED SALES REGISTER DATA
@@ -430,61 +811,82 @@ export const GstReturnsView: React.FC = () => {
   // -------------------------------------------------------------
   // GSTR-1 CALCULATIONS (Standard Statutory View)
   // -------------------------------------------------------------
-  const activeInvoices = invoices.filter(i => i.status !== 'CANCELLED');
-  const b2bInvoices = activeInvoices.filter(i => Boolean(i.customerGstin && i.customerGstin.trim().length === 15));
-  const b2csInvoices = activeInvoices.filter(i => !i.customerGstin && !(i.isInterState && i.grandTotal > 250000));
+  const activeInvoices = useMemo(() => {
+    return invoices.filter(i => i.status !== 'CANCELLED' && isDateInRange(i.invoiceDate));
+  }, [invoices, filterMode, selectedMonth, startDate, endDate]);
+
+  const b2bInvoices = useMemo(() => {
+    return activeInvoices.filter(i => Boolean(i.customerGstin && i.customerGstin.trim().length === 15));
+  }, [activeInvoices]);
+
+  const b2csInvoices = useMemo(() => {
+    return activeInvoices.filter(i => !i.customerGstin && !(i.isInterState && i.grandTotal > 250000));
+  }, [activeInvoices]);
   
   // HSN Summary aggregation
-  const hsnSummaryMap: { [hsn: string]: { hsn: string; desc: string; uqc: string; qty: number; taxable: number; cgst: number; sgst: number; igst: number; cess: number; total: number } } = {};
-  activeInvoices.forEach(inv => {
-    inv.items.forEach(item => {
-      const code = item.hsnCode || '9999';
-      if (!hsnSummaryMap[code]) {
-        hsnSummaryMap[code] = {
-          hsn: code,
-          desc: item.name,
-          uqc: item.unit || 'NOS',
-          qty: 0,
-          taxable: 0,
-          cgst: 0,
-          sgst: 0,
-          igst: 0,
-          cess: 0,
-          total: 0
-        };
-      }
-      hsnSummaryMap[code].qty += item.quantity;
-      hsnSummaryMap[code].taxable += item.taxableAmount;
-      hsnSummaryMap[code].cgst += item.cgstAmount;
-      hsnSummaryMap[code].sgst += item.sgstAmount;
-      hsnSummaryMap[code].igst += item.igstAmount;
-      hsnSummaryMap[code].cess += item.cessAmount || 0;
-      hsnSummaryMap[code].total += item.totalAmount;
+  const hsnSummaryList = useMemo(() => {
+    const hsnSummaryMap: { [hsn: string]: { hsn: string; desc: string; uqc: string; qty: number; taxable: number; cgst: number; sgst: number; igst: number; cess: number; total: number } } = {};
+    activeInvoices.forEach(inv => {
+      inv.items.forEach(item => {
+        const code = item.hsnCode || '9999';
+        if (!hsnSummaryMap[code]) {
+          hsnSummaryMap[code] = {
+            hsn: code,
+            desc: item.name,
+            uqc: item.unit || 'NOS',
+            qty: 0,
+            taxable: 0,
+            cgst: 0,
+            sgst: 0,
+            igst: 0,
+            cess: 0,
+            total: 0
+          };
+        }
+        hsnSummaryMap[code].qty += item.quantity;
+        hsnSummaryMap[code].taxable += item.taxableAmount;
+        hsnSummaryMap[code].cgst += item.cgstAmount;
+        hsnSummaryMap[code].sgst += item.sgstAmount;
+        hsnSummaryMap[code].igst += item.igstAmount;
+        hsnSummaryMap[code].cess += item.cessAmount || 0;
+        hsnSummaryMap[code].total += item.totalAmount;
+      });
     });
-  });
-  const hsnSummaryList = Object.values(hsnSummaryMap);
+    return Object.values(hsnSummaryMap);
+  }, [activeInvoices]);
 
-  const b2bTaxable = b2bInvoices.reduce((s, i) => s + i.subTotalTaxable, 0);
-  const b2csTaxable = b2csInvoices.reduce((s, i) => s + i.subTotalTaxable, 0);
-  const b2csCgst = b2csInvoices.reduce((s, i) => s + i.totalCgst, 0);
-  const b2csSgst = b2csInvoices.reduce((s, i) => s + i.totalSgst, 0);
+  const b2bTaxable = useMemo(() => b2bInvoices.reduce((s, i) => s + i.subTotalTaxable, 0), [b2bInvoices]);
+  const b2csTaxable = useMemo(() => b2csInvoices.reduce((s, i) => s + i.subTotalTaxable, 0), [b2csInvoices]);
+  const b2csCgst = useMemo(() => b2csInvoices.reduce((s, i) => s + i.totalCgst, 0), [b2csInvoices]);
+  const b2csSgst = useMemo(() => b2csInvoices.reduce((s, i) => s + i.totalSgst, 0), [b2csInvoices]);
 
-  const totalOutwardTaxable = activeInvoices.reduce((s, i) => s + i.subTotalTaxable, 0);
-  const totalOutwardCgst = activeInvoices.reduce((s, i) => s + i.totalCgst, 0);
-  const totalOutwardSgst = activeInvoices.reduce((s, i) => s + i.totalSgst, 0);
-  const totalOutwardIgst = activeInvoices.reduce((s, i) => s + i.totalIgst, 0);
-  const totalOutwardTax = activeInvoices.reduce((s, i) => s + i.totalTax, 0);
+  const totalOutwardTaxable = useMemo(() => activeInvoices.reduce((s, i) => s + i.subTotalTaxable, 0), [activeInvoices]);
+  const totalOutwardCgst = useMemo(() => activeInvoices.reduce((s, i) => s + i.totalCgst, 0), [activeInvoices]);
+  const totalOutwardSgst = useMemo(() => activeInvoices.reduce((s, i) => s + i.totalSgst, 0), [activeInvoices]);
+  const totalOutwardIgst = useMemo(() => activeInvoices.reduce((s, i) => s + i.totalIgst, 0), [activeInvoices]);
+  const totalOutwardTax = useMemo(() => activeInvoices.reduce((s, i) => s + i.totalTax, 0), [activeInvoices]);
 
   // -------------------------------------------------------------
   // GSTR-3B CALCULATIONS (Eligible ITC from Purchases)
   // -------------------------------------------------------------
-  const eligiblePurchases = purchaseBills.filter(b => b.itcEligibility !== 'INELIGIBLE_17_5');
-  const totalItcCgst = eligiblePurchases.reduce((s, b) => s + b.totalCgst, 0);
-  const totalItcSgst = eligiblePurchases.reduce((s, b) => s + b.totalSgst, 0);
-  const totalItcIgst = eligiblePurchases.reduce((s, b) => s + b.totalIgst, 0);
-  const totalItcAvailable = eligiblePurchases.reduce((s, b) => s + b.totalTax, 0);
-  const blockedPurchases = purchaseBills.filter(b => b.itcEligibility === 'INELIGIBLE_17_5');
-  const totalBlockedItc = blockedPurchases.reduce((s, b) => s + b.totalTax, 0);
+  const periodPurchases = useMemo(() => {
+    return purchaseBills.filter(b => isDateInRange(b.billDate));
+  }, [purchaseBills, filterMode, selectedMonth, startDate, endDate]);
+
+  const eligiblePurchases = useMemo(() => {
+    return periodPurchases.filter(b => b.itcEligibility !== 'INELIGIBLE_17_5');
+  }, [periodPurchases]);
+
+  const totalItcCgst = useMemo(() => eligiblePurchases.reduce((s, b) => s + b.totalCgst, 0), [eligiblePurchases]);
+  const totalItcSgst = useMemo(() => eligiblePurchases.reduce((s, b) => s + b.totalSgst, 0), [eligiblePurchases]);
+  const totalItcIgst = useMemo(() => eligiblePurchases.reduce((s, b) => s + b.totalIgst, 0), [eligiblePurchases]);
+  const totalItcAvailable = useMemo(() => eligiblePurchases.reduce((s, b) => s + b.totalTax, 0), [eligiblePurchases]);
+  
+  const blockedPurchases = useMemo(() => {
+    return periodPurchases.filter(b => b.itcEligibility === 'INELIGIBLE_17_5');
+  }, [periodPurchases]);
+
+  const totalBlockedItc = useMemo(() => blockedPurchases.reduce((s, b) => s + b.totalTax, 0), [blockedPurchases]);
 
   const netCgstPayable = Math.max(0, totalOutwardCgst - totalItcCgst);
   const netSgstPayable = Math.max(0, totalOutwardSgst - totalItcSgst);
@@ -495,7 +897,7 @@ export const GstReturnsView: React.FC = () => {
   const handleDownloadGstr1Json = () => {
     const gstr1Data = {
       gstin: business.gstin,
-      fp: '082026',
+      fp: currentFp,
       cur_gt: totalOutwardTaxable,
       b2b: b2bInvoices.map(inv => ({
         ctin: inv.customerGstin,
@@ -562,10 +964,10 @@ export const GstReturnsView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `GSTR1_${business.gstin}_082026.json`;
+    a.download = `GSTR1_${business.gstin || 'Return'}_${currentFp}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('success', 'GSTR-1 JSON Exported', 'Valid JSON file generated for GST Offline Utility.');
+    showToast('success', 'GSTR-1 JSON Exported', `Valid JSON generated for Return Period ${currentFp}.`);
   };
 
   // -------------------------------------------------------------
@@ -664,7 +1066,7 @@ export const GstReturnsView: React.FC = () => {
 
   useEffect(() => {
     setGstr1B2bPage(1);
-  }, [selectedPeriod]);
+  }, [selectedMonth, filterMode, startDate, endDate]);
 
   const totalGstr1B2bPages = Math.max(1, Math.ceil(b2bInvoices.length / gstr1B2bPageSize));
   const safeGstr1B2bPage = Math.min(Math.max(1, gstr1B2bPage), totalGstr1B2bPages);
@@ -683,7 +1085,7 @@ export const GstReturnsView: React.FC = () => {
 
   useEffect(() => {
     setGstr1HsnPage(1);
-  }, [selectedPeriod]);
+  }, [selectedMonth, filterMode, startDate, endDate]);
 
   const totalGstr1HsnPages = Math.max(1, Math.ceil(hsnSummaryList.length / gstr1HsnPageSize));
   const safeGstr1HsnPage = Math.min(Math.max(1, gstr1HsnPage), totalGstr1HsnPages);
@@ -1025,7 +1427,7 @@ export const GstReturnsView: React.FC = () => {
       {/* ------------------------------------------------------------------ */}
       {/* FILTER CONTROL BAR (Used by Sale Register & Purchase Register)    */}
       {/* ------------------------------------------------------------------ */}
-      {(returnType === 'sale_register' || returnType === 'purchase_register') && (
+      {(returnType === 'sale_register' || returnType === 'purchase_register' || returnType === 'gstr1' || returnType === 'gstr3b') && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-3">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Filter Mode Toggle & Controls */}
@@ -1055,29 +1457,85 @@ export const GstReturnsView: React.FC = () => {
                 </button>
               </div>
 
-              {/* Month Dropdown Selector */}
+              {/* Month Dropdown Selector with Next/Prev Steppers & Native Calendar Picker */}
               {filterMode === 'month' ? (
-                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs">
-                  <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  <span className="text-slate-500 dark:text-slate-400 font-semibold">Month:</span>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="font-bold text-slate-800 dark:text-white bg-transparent outline-none cursor-pointer"
+                <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 text-xs shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => handleStepMonth(-1)}
+                    className="p-1.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                    title="Previous Month"
+                    aria-label="Previous Month"
                   >
-                    <option value="2026-08">August 2026 (Current)</option>
-                    <option value="2026-07">July 2026</option>
-                    <option value="2026-06">June 2026</option>
-                    <option value="2026-05">May 2026</option>
-                    <option value="2026-04">April 2026</option>
-                    <option value="2026-03">March 2026</option>
-                    <option value="2026-02">February 2026</option>
-                    <option value="2026-01">January 2026</option>
-                    <option value="Q2_2026">Q2 (Jul - Sep 2026)</option>
-                    <option value="Q1_2026">Q1 (Apr - Jun 2026)</option>
-                    <option value="FY_2026_27">Full Financial Year (2026-27)</option>
-                    <option value="ALL">All Records (No Month Filter)</option>
-                  </select>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-1 px-1">
+                    {/* Clickable Calendar Icon to open native date/month picker */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          if (monthInputRef.current) {
+                            if ('showPicker' in monthInputRef.current) {
+                              (monthInputRef.current as any).showPicker();
+                            } else {
+                              monthInputRef.current.focus();
+                            }
+                          }
+                        } catch (e) {
+                          monthInputRef.current?.focus();
+                        }
+                      }}
+                      className="p-1 hover:bg-indigo-50 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 rounded-md transition-colors cursor-pointer"
+                      title="Open Calendar Month Picker"
+                      aria-label="Open Calendar Month Picker"
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </button>
+
+                    {/* Native Month Calendar Input */}
+                    <input
+                      ref={monthInputRef}
+                      type="month"
+                      value={/^\d{4}-\d{2}$/.test(selectedMonth) ? selectedMonth : currentYearMonth}
+                      onChange={(e) => {
+                        if (e.target.value) handleMonthSelect(e.target.value);
+                      }}
+                      className="text-xs font-bold text-slate-800 dark:text-slate-100 bg-transparent outline-none cursor-pointer border-none p-0 w-24 sm:w-28"
+                      title="Pick Month via Calendar"
+                    />
+
+                    {/* Grouped Dropdown for Quick Shortcuts, Active Months, Quarters & FYs */}
+                    <div className="border-l border-slate-200 dark:border-slate-700 pl-1.5">
+                      <select
+                        value={selectedMonth}
+                        onChange={(e) => handleMonthSelect(e.target.value)}
+                        className="font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none cursor-pointer text-xs max-w-[170px] sm:max-w-[210px]"
+                        title="Select Filing Period or Filter"
+                      >
+                        {monthSelectGroups.map(grp => (
+                          <optgroup key={grp.label} label={grp.label} className="dark:bg-slate-850 dark:text-slate-300 font-bold">
+                            {grp.options.map(opt => (
+                              <option key={opt.value} value={opt.value} className="dark:bg-slate-850 dark:text-white font-normal">
+                                {opt.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleStepMonth(1)}
+                    className="p-1.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                    title="Next Month"
+                    aria-label="Next Month"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               ) : (
                 /* Date Range Pickers */
@@ -1104,58 +1562,92 @@ export const GstReturnsView: React.FC = () => {
               )}
 
               {/* Quick Presets */}
-              <div className="hidden sm:flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => handleQuickPreset('THIS_MONTH')}
-                  className="px-2 py-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer"
-                >
-                  This Month
-                </button>
+              <div className="flex flex-wrap items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleQuickPreset('LAST_MONTH')}
-                  className="px-2 py-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer"
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors cursor-pointer ${
+                    isLastMonthActive 
+                      ? 'bg-indigo-600 text-white font-bold shadow-xs' 
+                      : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                  title="Last Month"
                 >
                   Last Month
                 </button>
                 <button
                   type="button"
+                  onClick={() => handleQuickPreset('THIS_MONTH')}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors cursor-pointer ${
+                    isThisMonthActive 
+                      ? 'bg-indigo-600 text-white font-bold shadow-xs ring-2 ring-indigo-500/20' 
+                      : 'bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-semibold'
+                  }`}
+                  title="Current Month"
+                >
+                  This Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickPreset('NEXT_MONTH')}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors cursor-pointer ${
+                    isNextMonthActive 
+                      ? 'bg-emerald-600 text-white font-bold shadow-xs ring-2 ring-emerald-500/20' 
+                      : 'bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 font-semibold'
+                  }`}
+                  title="Next Month"
+                >
+                  Next Month
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleQuickPreset('THIS_QUARTER')}
-                  className="px-2 py-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer"
+                  className="px-2.5 py-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer"
+                  title="Current Financial Quarter"
                 >
                   This Quarter
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleQuickPreset('ALL_TIME')}
-                  className="px-2 py-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer"
+                  onClick={() => handleQuickPreset('THIS_FY')}
+                  className="px-2.5 py-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer"
+                  title="Current Financial Year"
                 >
-                  All
+                  This FY
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickPreset('ALL_TIME')}
+                  className="px-2.5 py-1 text-[11px] font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer"
+                  title="All Records"
+                >
+                  All Records
                 </button>
               </div>
             </div>
 
-            {/* Right: Search & Sub-Filter */}
+            {/* Right: Search & Sub-Filter or Filing Period Indicator */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder={returnType === 'sale_register' ? 'Search buyer, GSTIN, invoice #...' : 'Search vendor, bill #, GSTIN...'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-7 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+              {(returnType === 'sale_register' || returnType === 'purchase_register') && (
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder={returnType === 'sale_register' ? 'Search buyer, GSTIN, invoice #...' : 'Search vendor, bill #, GSTIN...'}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-7 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Sales Category Filter */}
               {returnType === 'sale_register' && (
@@ -1187,6 +1679,24 @@ export const GstReturnsView: React.FC = () => {
                   <option value="INTER_STATE">Inter-State Purchases (IGST)</option>
                   <option value="INTRA_STATE">Intra-State Purchases (CGST+SGST)</option>
                 </select>
+              )}
+
+              {/* GSTR-1 & GSTR-3B Return Period Summary Tag */}
+              {(returnType === 'gstr1' || returnType === 'gstr3b') && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-indigo-50/80 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/60 rounded-xl px-3 py-1.5 text-xs">
+                    <CheckCircle className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span className="text-slate-600 dark:text-slate-300 font-medium">Return Period:</span>
+                    <span className="font-bold text-indigo-700 dark:text-indigo-300 font-mono">
+                      {selectedPeriodLabel}
+                    </span>
+                    {currentFp && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 font-semibold">
+                        FP {currentFp}
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1472,12 +1982,38 @@ export const GstReturnsView: React.FC = () => {
                   ) : (
                     <tr>
                       <td colSpan={16} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Calculator className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                          <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">No Sales Invoices Found</p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500">
-                            Try choosing a different month or expanding the date filter range above.
-                          </p>
+                        <div className="flex flex-col items-center justify-center gap-3 max-w-md mx-auto">
+                          <div className="p-3 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl text-indigo-600 dark:text-indigo-400">
+                            <Calendar className="w-8 h-8" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                              No Invoices for {selectedPeriodLabel}
+                            </p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                              {invoices.length > 0 
+                                ? `You have ${invoices.length} total sales invoices recorded in other periods.` 
+                                : 'No sales invoices have been recorded yet.'}
+                            </p>
+                          </div>
+                          {topActiveMonth && topActiveMonth.ym !== selectedMonth && (
+                            <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleMonthSelect(topActiveMonth.ym)}
+                                className="px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-all cursor-pointer"
+                              >
+                                View {getMonthLabel(topActiveMonth.ym)} ({topActiveMonth.count} Invoices)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickPreset('ALL_TIME')}
+                                className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
+                              >
+                                View All Invoices
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1823,12 +2359,31 @@ export const GstReturnsView: React.FC = () => {
                   ) : (
                     <tr>
                       <td colSpan={17} className="py-12 text-center text-slate-400 dark:text-slate-500">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Truck className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                          <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">No Purchase Bills Found</p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500">
-                            Try choosing a different month or date range in the filter above.
-                          </p>
+                        <div className="flex flex-col items-center justify-center gap-3 max-w-md mx-auto">
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 rounded-2xl text-emerald-600 dark:text-emerald-400">
+                            <Calendar className="w-8 h-8" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                              No Purchase Bills for {selectedPeriodLabel}
+                            </p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                              {purchaseBills.length > 0 
+                                ? `You have ${purchaseBills.length} total inward bills recorded in other periods.` 
+                                : 'No inward purchase bills have been recorded yet.'}
+                            </p>
+                          </div>
+                          {purchaseBills.length > 0 && (
+                            <div className="flex items-center gap-2 flex-wrap justify-center pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleQuickPreset('ALL_TIME')}
+                                className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl border border-emerald-200 dark:border-emerald-800 transition-all cursor-pointer"
+                              >
+                                View All Purchase Bills ({purchaseBills.length})
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
