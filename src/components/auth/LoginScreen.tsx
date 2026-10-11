@@ -362,51 +362,45 @@ export const LoginScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Top Master Governance Header */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      {/* Top Master Governance Header - Compact Minimalist Bar */}
+      <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
+        <div className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-6 h-12 sm:h-14 flex items-center justify-between gap-3">
           {/* Brand & Portal Title */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative group shrink-0">
               <AppLogo 
                 config={platformConfig} 
-                size="md" 
-                className="ring-1 ring-slate-800 rounded-xl transition-transform group-hover:scale-105" 
+                size="sm" 
+                className="ring-1 ring-slate-800 rounded-lg transition-transform group-hover:scale-105" 
               />
-              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center" title="Platform Governance Enabled">
-                <Crown className="w-2 h-2" />
+              <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center" title="Platform Governance Enabled">
+                <Crown className="w-1.5 h-1.5" />
               </div>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
                   {platformConfig?.appName || 'Zooka Business'}
                 </span>
-                {platformConfig?.brandBadgeText && (
-                  <span className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0">
-                    {platformConfig.brandBadgeText}
-                  </span>
-                )}
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800/90 text-slate-300 border border-slate-700/80 flex items-center gap-1.5 shrink-0">
-                  <Crown className="w-2.5 h-2.5 text-amber-400" />
-                  <span>{loginStep === 'super_admin_credentials' ? 'Super Admin Gateway' : 'Workspace Portal'}</span>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-slate-900 text-slate-300 border border-slate-800 flex items-center gap-1 shrink-0">
+                  <Crown className="w-2 h-2 text-amber-400" />
+                  <span>{loginStep === 'super_admin_credentials' ? 'Super Admin' : 'Workspace'}</span>
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium truncate max-w-[240px] sm:max-w-md">
+              <p className="text-[10px] text-slate-400 font-medium truncate hidden sm:block max-w-[200px] md:max-w-xs">
                 {platformConfig?.appTagline || 'Smart Business, GST & E-Invoicing Suite'}
               </p>
             </div>
           </div>
 
           {/* Quick Stats & Controls */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Firestore Cloud Sync Badge */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
-              <Server className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-slate-400">Database:</span>
-              <span className={`flex items-center gap-1.5 font-medium ${cloudSyncStatus === 'online' ? 'text-emerald-400' : 'text-amber-400'}`}>
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px]">
+              <Server className="w-3 h-3 text-indigo-400" />
+              <span className={`flex items-center gap-1 font-medium ${cloudSyncStatus === 'online' ? 'text-emerald-400' : 'text-amber-400'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${cloudSyncStatus === 'online' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                {cloudSyncStatus === 'online' ? 'Connected' : 'Local'}
+                {cloudSyncStatus === 'online' ? 'Sync' : 'Local'}
               </span>
             </div>
 
@@ -415,10 +409,10 @@ export const LoginScreen: React.FC = () => {
               type="button"
               onClick={() => triggerCloudSync()}
               disabled={isCloudSyncing}
-              className="hidden md:flex p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors border border-slate-800 cursor-pointer disabled:opacity-50"
+              className="hidden lg:flex p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors border border-slate-800 cursor-pointer disabled:opacity-50"
               title="Sync cloud database"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin text-indigo-400' : ''}`} />
+              <RefreshCw className={`w-3 h-3 ${isCloudSyncing ? 'animate-spin text-indigo-400' : ''}`} />
             </button>
 
             {/* Back to Step 1 Company Login */}
@@ -426,10 +420,10 @@ export const LoginScreen: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSwitchCompanyBack}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors border border-slate-800 text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors border border-slate-800 text-[11px] font-medium flex items-center gap-1.5 cursor-pointer"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Switch Company</span>
+                <ArrowLeft className="w-3 h-3" />
+                <span>Switch Company</span>
               </button>
             )}
 
@@ -438,53 +432,53 @@ export const LoginScreen: React.FC = () => {
               <button
                 type="button"
                 onClick={handleGoToSuperAdminLogin}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer transition-colors text-xs font-medium text-slate-300 hover:text-white"
+                className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer transition-colors text-[11px] font-medium text-slate-300 hover:text-white"
                 title="Access Super Admin Master Control"
               >
-                <Crown className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">Super Admin</span>
+                <Crown className="w-3 h-3 text-amber-400" />
+                <span>Super Admin</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setLoginStep('company_login')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer transition-colors text-xs font-medium text-slate-300 hover:text-white"
+                className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 cursor-pointer transition-colors text-[11px] font-medium text-slate-300 hover:text-white"
                 title="Return to Business Workspace Login"
               >
-                <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden sm:inline">Business Login</span>
+                <Building2 className="w-3 h-3 text-slate-400" />
+                <span>Business Login</span>
               </button>
             )}
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="relative z-10 w-full max-w-6xl mx-auto px-4 py-8 sm:py-12 flex-1 flex flex-col justify-center">
+      {/* Main Content Area - Optimized viewport fit across desktop, tablet, and mobile */}
+      <main className="relative z-10 w-full max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-5 md:py-6 flex-1 flex flex-col justify-center">
         
         {/* ======================================================================= */}
         {/* STEP 1: COMPANY LOGIN GATE (INPUT COMPANY NAME + PASSWORD/PIN)          */}
         {/* ======================================================================= */}
         {loginStep === 'company_login' && (
-          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200 max-w-lg mx-auto w-full">
+          <div className="space-y-3 sm:space-y-4 animate-in fade-in zoom-in-95 duration-200 max-w-md mx-auto w-full">
             
-            {/* Header / Intro */}
-            <div className="text-center space-y-2 max-w-md mx-auto">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 text-xs font-medium">
-                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+            {/* Header / Intro - Compact typography */}
+            <div className="text-center space-y-1 max-w-sm mx-auto">
+              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-medium">
+                <Building2 className="w-3 h-3 text-slate-400" />
                 <span>Step 1 of 2: Company Verification</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight">
                 {platformConfig?.appName ? `${platformConfig.appName} Workspace Login` : 'Business Workspace Login'}
               </h2>
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                Enter your registered Company Name (or GSTIN) and PIN/Password to access your company workspace.
+              <p className="text-[11px] sm:text-xs text-slate-400 leading-snug">
+                Enter your registered Company Name (or GSTIN) & PIN/Password.
               </p>
             </div>
 
-            {/* Company Login Card */}
-            <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm space-y-6 relative">
-              <form onSubmit={handleVerifyCompany} className="space-y-5">
+            {/* Company Login Card - Compact padding and neat spacing */}
+            <div className="bg-slate-900/95 border border-slate-800/90 rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl backdrop-blur-sm space-y-4 relative">
+              <form onSubmit={handleVerifyCompany} className="space-y-3.5">
                 
                 {/* 1. Minimalist Workspace / Company Field */}
                 <div>
@@ -600,7 +594,7 @@ export const LoginScreen: React.FC = () => {
                   </div>
 
                   {/* Clean Segmented Control */}
-                  <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs mb-3">
+                  <div className="grid grid-cols-2 p-0.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] mb-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -608,13 +602,13 @@ export const LoginScreen: React.FC = () => {
                         setCompanySecret('');
                         setCompanyError(null);
                       }}
-                      className={`py-1.5 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`py-1 px-2.5 rounded-md font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         companyAuthMode === 'password'
                           ? 'bg-slate-800 text-white shadow-xs'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      <KeyRound className="w-3.5 h-3.5" />
+                      <KeyRound className="w-3 h-3" />
                       <span>Password</span>
                     </button>
                     <button
@@ -624,13 +618,13 @@ export const LoginScreen: React.FC = () => {
                         setCompanySecret('');
                         setCompanyError(null);
                       }}
-                      className={`py-1.5 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`py-1 px-2.5 rounded-md font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         companyAuthMode === 'pin'
                           ? 'bg-slate-800 text-white shadow-xs'
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      <Fingerprint className="w-3.5 h-3.5" />
+                      <Fingerprint className="w-3 h-3" />
                       <span>4-Digit PIN</span>
                     </button>
                   </div>
@@ -645,8 +639,8 @@ export const LoginScreen: React.FC = () => {
                       }}
                       placeholder={companyAuthMode === 'password' ? 'Enter company password...' : '••••'}
                       maxLength={companyAuthMode === 'pin' ? 6 : 50}
-                      className={`w-full px-3.5 py-2.5 sm:py-3 pr-12 text-sm bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
-                        companyAuthMode === 'pin' ? 'font-mono tracking-widest text-center text-base sm:text-lg' : 'font-mono'
+                      className={`w-full px-3 py-2 pr-10 text-xs sm:text-sm bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
+                        companyAuthMode === 'pin' ? 'font-mono tracking-widest text-center text-sm sm:text-base' : 'font-mono'
                       } ${
                         companyError ? 'border-rose-500/80 ring-1 ring-rose-500/30' : 'border-slate-800 hover:border-slate-700'
                       }`}
@@ -654,16 +648,16 @@ export const LoginScreen: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowCompanySecret(!showCompanySecret)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 cursor-pointer"
                       title={showCompanySecret ? 'Hide secret' : 'Show secret'}
                     >
-                      {showCompanySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showCompanySecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
 
                   {companyError && (
-                    <div className="flex items-start gap-2 text-xs text-rose-400 mt-2.5 font-medium animate-in fade-in p-2.5 rounded-xl bg-rose-950/30 border border-rose-800/40">
-                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                    <div className="flex items-start gap-1.5 text-[11px] text-rose-400 mt-2 font-medium animate-in fade-in p-2 rounded-lg bg-rose-950/30 border border-rose-800/40">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400 mt-0.5" />
                       <span>{companyError}</span>
                     </div>
                   )}
@@ -673,48 +667,48 @@ export const LoginScreen: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isVerifyingCompany}
-                  className="w-full py-3 px-4 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                  className="w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   {isVerifyingCompany ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>Verifying Company Credentials...</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span>Verifying Credentials...</span>
                     </span>
                   ) : (
                     <>
-                      <Building2 className="w-4 h-4" />
-                      <span>Verify & Access Company Workspace</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>Access Workspace</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}
                 </button>
               </form>
 
               {/* Bottom Super Admin Link */}
-              <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="pt-3 border-t border-slate-800/90 flex items-center justify-between gap-2 text-[11px]">
                 <button
                   type="button"
                   onClick={handleGoToSuperAdminLogin}
-                  className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white font-medium transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-slate-400 hover:text-white font-medium transition-colors cursor-pointer"
                 >
-                  <Crown className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Super Admin Gateway</span>
+                  <Crown className="w-3 h-3 text-amber-400" />
+                  <span>Super Admin</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsCreateCompanyOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white font-medium transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-slate-400 hover:text-white font-medium transition-colors cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Register New Business</span>
+                  <Plus className="w-3 h-3 text-indigo-400" />
+                  <span>New Business</span>
                 </button>
               </div>
             </div>
 
             {/* Privacy & Compliance Note */}
-            <div className="text-center text-[11px] text-slate-500">
-              <span>Isolated Multi-Company Ledger Encryption • Strict Role-Based Access Control</span>
+            <div className="text-center text-[10px] text-slate-500">
+              <span>Encrypted Multi-Company Ledgers • RBAC Security</span>
             </div>
           </div>
         )}
@@ -723,66 +717,61 @@ export const LoginScreen: React.FC = () => {
         {/* STEP 2: USER LOGIN (AFTER COMPANY IS VERIFIED)                          */}
         {/* ======================================================================= */}
         {loginStep === 'login_credentials' && (
-          <div className="animate-in fade-in zoom-in-95 duration-200 space-y-5">
+          <div className="animate-in fade-in zoom-in-95 duration-200 space-y-3 sm:space-y-4 max-w-4xl mx-auto w-full">
             
-            {/* Active Verified Company Banner */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-sm">
-              <div className="flex items-center gap-3.5">
-                <div className={`w-11 h-11 rounded-xl ${getThemeBg(currentCompany.themeColor)} text-white flex items-center justify-center font-bold text-sm shrink-0`}>
-                  <Building2 className="w-5 h-5" />
+            {/* Active Verified Company Banner - Streamlined */}
+            <div className="bg-slate-900/95 border border-slate-800 rounded-xl p-2.5 sm:p-3.5 flex items-center justify-between gap-3 backdrop-blur-sm">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg ${getThemeBg(currentCompany.themeColor)} text-white flex items-center justify-center font-bold text-xs shrink-0`}>
+                  <Building2 className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-bold text-white leading-tight">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h2 className="text-xs sm:text-sm font-bold text-white leading-tight truncate">
                       {currentCompany.tradeName || currentCompany.name}
                     </h2>
-                    <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      <span>Company Verified</span>
+                    <span className="text-[9px] font-semibold bg-emerald-500/10 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/20 flex items-center gap-1 shrink-0">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                      <span>Verified</span>
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                    <span className="font-mono text-slate-300">{currentCompany.gstin}</span>
-                    <span>•</span>
-                    <span>{currentCompany.city}, {currentCompany.state}</span>
-                    <span>•</span>
-                    <span>FY {currentCompany.financialYear || '2026-2027'}</span>
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 font-mono mt-0.5 truncate">
+                    <span className="text-slate-300">{currentCompany.gstin}</span>
+                    {currentCompany.city && (
+                      <>
+                        <span className="font-sans">•</span>
+                        <span className="font-sans">{currentCompany.city}, {currentCompany.state}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSwitchCompanyBack}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 border border-slate-700"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Switch Company</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSwitchCompanyBack}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 border border-slate-700"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                <span>Switch</span>
+              </button>
             </div>
 
-            {/* Login & Role Selection Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Login & Role Selection Grid - Compact Split on Desktop & Tablet */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-start">
               
               {/* Left Column: Role Selector in Selected Company */}
-              <div className="lg:col-span-7 space-y-3">
-                <div className="space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 text-xs font-medium">
+              <div className="md:col-span-7 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Step 2 of 2: Select User Role</span>
+                    <span className="text-xs font-semibold text-white">Select Account ({sortedActiveUsers.length})</span>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                    Choose Your User Account
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Select a designated persona configured for this business entity and enter credentials.
-                  </p>
+                  <span className="text-[10px] text-slate-400">Choose persona to log in</span>
                 </div>
 
-                {/* Role Account Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Role Account Cards - Max 4 visible or scrollable with max height to avoid page overflow */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[38vh] sm:max-h-[46vh] overflow-y-auto pr-1">
                   {sortedActiveUsers.map(user => {
                     const isSelected = user.id === selectedUserId;
                     const uRoleMeta = ROLE_DEFINITIONS[user.role] || ROLE_DEFINITIONS.ADMIN;
@@ -793,49 +782,43 @@ export const LoginScreen: React.FC = () => {
                         key={user.id}
                         type="button"
                         onClick={() => handleSelectUser(user)}
-                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative group flex flex-col justify-between ${
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative group flex flex-col justify-between ${
                           isSelected
-                            ? 'bg-slate-900 border-indigo-500/90 ring-1 ring-indigo-500/30 shadow-md'
-                            : 'bg-slate-900/50 border-slate-800 hover:bg-slate-900 hover:border-slate-700'
+                            ? 'bg-slate-800/95 border-indigo-500 ring-1 ring-indigo-500/30 shadow-sm'
+                            : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-850 hover:border-slate-700'
                         }`}
                       >
                         <div>
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`w-8 h-8 rounded-lg ${user.avatarBg} text-white font-semibold text-xs flex items-center justify-center shrink-0`}>
+                          <div className="flex items-center justify-between gap-1.5 mb-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-7 h-7 rounded-lg ${user.avatarBg} text-white font-semibold text-[11px] flex items-center justify-center shrink-0`}>
                                 {isSuper ? <Crown className="w-3.5 h-3.5 text-amber-300" /> : user.avatarText}
                               </div>
                               <div className="min-w-0">
                                 <div className="text-xs font-semibold text-white truncate group-hover:text-indigo-300 transition-colors">
                                   {user.name}
                                 </div>
-                                <div className="text-[11px] text-slate-400 truncate">
+                                <div className="text-[10px] text-slate-400 truncate">
                                   {user.roleTitle || uRoleMeta.name}
                                 </div>
                               </div>
                             </div>
 
-                            <span className={`text-[9px] font-semibold uppercase px-2 py-0.5 rounded-md border shrink-0 ${uRoleMeta.badgeBg} ${uRoleMeta.badgeText}`}>
+                            <span className={`text-[8px] font-semibold uppercase px-1.5 py-0.2 rounded border shrink-0 ${uRoleMeta.badgeBg} ${uRoleMeta.badgeText}`}>
                               {user.role}
                             </span>
                           </div>
-
-                          <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                            {uRoleMeta.description}
-                          </p>
                         </div>
 
-                        <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
-                          <span className="flex items-center gap-1 text-slate-400 font-medium">
-                            <Lock className="w-2.5 h-2.5 text-slate-400" />
-                            <span>Password / PIN</span>
+                        <div className="mt-1.5 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[9px] text-slate-400">
+                          <span className="flex items-center gap-1 text-slate-400">
+                            <Lock className="w-2.5 h-2.5" />
+                            <span>Auth required</span>
                           </span>
-                          <span className="text-indigo-400 font-medium">Select & Login</span>
+                          <span className={isSelected ? 'text-indigo-400 font-semibold' : 'text-slate-500'}>
+                            {isSelected ? 'Selected' : 'Select'}
+                          </span>
                         </div>
-
-                        {isSelected && (
-                          <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                        )}
                       </button>
                     );
                   })}
@@ -843,32 +826,32 @@ export const LoginScreen: React.FC = () => {
               </div>
 
               {/* Right Column: Password / PIN Login Form */}
-              <div className="lg:col-span-5">
-                <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-sm space-y-4">
+              <div className="md:col-span-5">
+                <div className="bg-slate-900/95 border border-slate-800/90 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 md:p-5 shadow-xl backdrop-blur-sm space-y-3">
                   
                   {/* Selected User Header */}
-                  <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-                    <div className={`w-10 h-10 rounded-xl ${targetUser?.avatarBg} text-white font-bold text-xs flex items-center justify-center shrink-0`}>
-                      {targetUser?.role === 'SUPER_ADMIN' ? <Crown className="w-4 h-4 text-amber-300" /> : targetUser?.avatarText}
+                  <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-800">
+                    <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg ${targetUser?.avatarBg} text-white font-bold text-xs flex items-center justify-center shrink-0`}>
+                      {targetUser?.role === 'SUPER_ADMIN' ? <Crown className="w-3.5 h-3.5 text-amber-300" /> : targetUser?.avatarText}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-white text-sm truncate">{targetUser?.name}</h3>
-                        <span className={`text-[9px] font-semibold uppercase px-2 py-0.5 rounded-md border ${roleMeta.badgeBg} ${roleMeta.badgeText}`}>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-semibold text-white text-xs sm:text-sm truncate">{targetUser?.name}</h3>
+                        <span className={`text-[8px] font-semibold uppercase px-1.5 py-0.2 rounded border ${roleMeta.badgeBg} ${roleMeta.badgeText}`}>
                           {targetUser?.role}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                        {targetUser?.department} • {currentCompany.tradeName || currentCompany.name}
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                        {targetUser?.department || 'Workspace Member'}
                       </p>
                     </div>
                   </div>
 
                   {/* Login Form */}
-                  <form onSubmit={handleUserLogin} className="space-y-4">
+                  <form onSubmit={handleUserLogin} className="space-y-3">
                     
                     {/* Clean Segmented Control (Password vs PIN) */}
-                    <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                    <div className="grid grid-cols-2 p-0.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px]">
                       <button
                         type="button"
                         onClick={() => {
@@ -876,13 +859,13 @@ export const LoginScreen: React.FC = () => {
                           setPasswordInput('');
                           setErrorMessage(null);
                         }}
-                        className={`py-1.5 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`py-1 px-2.5 rounded-md font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                           authMode === 'password'
                             ? 'bg-slate-800 text-white shadow-xs'
                             : 'text-slate-400 hover:text-slate-200'
                         }`}
                       >
-                        <KeyRound className="w-3.5 h-3.5" />
+                        <KeyRound className="w-3 h-3" />
                         <span>Password</span>
                       </button>
                       <button
@@ -892,25 +875,25 @@ export const LoginScreen: React.FC = () => {
                           setPasswordInput('');
                           setErrorMessage(null);
                         }}
-                        className={`py-1.5 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        className={`py-1 px-2.5 rounded-md font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                           authMode === 'pin'
                             ? 'bg-slate-800 text-white shadow-xs'
                             : 'text-slate-400 hover:text-slate-200'
                         }`}
                       >
-                        <Fingerprint className="w-3.5 h-3.5" />
+                        <Fingerprint className="w-3 h-3" />
                         <span>4-Digit PIN</span>
                       </button>
                     </div>
 
                     {/* Password / PIN Input Field */}
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-semibold text-slate-200">
-                          {authMode === 'password' ? 'Account Password' : '4-Digit Counter PIN'}
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-medium text-slate-300">
+                          {authMode === 'password' ? 'Password' : 'PIN'}
                         </label>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          {authMode === 'password' ? 'Confidential' : 'Numeric PIN'}
+                        <span className="text-[10px] text-slate-500">
+                          {authMode === 'password' ? 'Confidential' : 'Numeric'}
                         </span>
                       </div>
 
@@ -926,8 +909,8 @@ export const LoginScreen: React.FC = () => {
                           placeholder={authMode === 'password' ? 'Enter password...' : '••••'}
                           maxLength={authMode === 'pin' ? 6 : 50}
                           autoFocus
-                          className={`w-full px-3.5 py-2.5 pr-11 text-xs bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
-                            authMode === 'pin' ? 'font-mono tracking-widest text-center text-base sm:text-lg' : 'font-mono'
+                          className={`w-full px-3 py-2 pr-10 text-xs bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
+                            authMode === 'pin' ? 'font-mono tracking-widest text-center text-sm' : 'font-mono'
                           } ${
                             errorMessage ? 'border-rose-500/80 ring-1 ring-rose-500/30' : 'border-slate-800 hover:border-slate-700'
                           }`}
@@ -935,16 +918,16 @@ export const LoginScreen: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 cursor-pointer"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 cursor-pointer"
                           title={showPassword ? 'Hide password' : 'Show password'}
                         >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                       </div>
 
                       {errorMessage && (
-                        <div className="flex items-center gap-1.5 text-xs text-rose-400 mt-2 font-medium animate-in fade-in">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-[11px] text-rose-400 mt-1.5 font-medium animate-in fade-in">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
                           <span>{errorMessage}</span>
                         </div>
                       )}
@@ -954,16 +937,16 @@ export const LoginScreen: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full py-2.5 px-4 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                      className="w-full py-2 px-3 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
                     >
                       {isLoading ? (
-                        <span className="flex items-center gap-2">
-                          <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                           <span>Authenticating...</span>
                         </span>
                       ) : (
                         <>
-                          <span>Login to {currentCompany.tradeName || currentCompany.name}</span>
+                          <span>Login as {targetUser?.name.split(' ')[0]}</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </>
                       )}
@@ -971,14 +954,12 @@ export const LoginScreen: React.FC = () => {
                   </form>
 
                   {/* Security Policy Footnote */}
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                    <span className="flex items-center gap-1 text-slate-500">
-                      <Lock className="w-3 h-3 text-slate-500" />
-                      <span>Encrypted Session</span>
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 text-slate-500" />
+                      <span>Encrypted</span>
                     </span>
-                    <span className="text-slate-400 font-medium">
-                      Ind AS & GST Compliant
-                    </span>
+                    <span>GST & Ind AS Compliant</span>
                   </div>
                 </div>
               </div>
@@ -991,50 +972,50 @@ export const LoginScreen: React.FC = () => {
         {/* STEP 3: SUPER ADMIN PASSWORD / PIN LOGIN (UNOBTRUSIVE GOVERNANCE)       */}
         {/* ======================================================================= */}
         {loginStep === 'super_admin_credentials' && (
-          <div className="animate-in fade-in zoom-in-95 duration-200 max-w-lg mx-auto w-full space-y-6">
+          <div className="animate-in fade-in zoom-in-95 duration-200 max-w-md mx-auto w-full space-y-3 sm:space-y-4">
             {/* Header Navigation */}
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => setLoginStep('company_login')}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back to Workspace Login</span>
+                <ArrowLeft className="w-3 h-3" />
+                <span>Back to Workspace</span>
               </button>
 
-              <span className="text-[10px] font-semibold uppercase bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700 flex items-center gap-1.5">
-                <Crown className="w-3 h-3 text-amber-400" />
+              <span className="text-[9px] font-semibold uppercase bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700 flex items-center gap-1">
+                <Crown className="w-2.5 h-2.5 text-amber-400" />
                 <span>Master Console</span>
               </span>
             </div>
 
             {/* Super Admin Login Card - Unified Minimalist Slate Design */}
-            <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm space-y-6 relative">
+            <div className="bg-slate-900/95 border border-slate-800/90 rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl backdrop-blur-sm space-y-4 relative">
               
               {/* Profile Card Header */}
-              <div className="flex items-center gap-3.5 pb-5 border-b border-slate-800">
-                <div className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center shrink-0">
-                  <Crown className="w-5 h-5" />
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+                <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center shrink-0">
+                  <Crown className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-white text-base tracking-tight truncate">{superAdminUser?.name || DEFAULT_SUPER_ADMIN.name}</h3>
-                    <span className="text-[9px] font-semibold uppercase px-2 py-0.5 rounded-md border bg-slate-800 text-slate-300 border-slate-700">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-bold text-white text-xs sm:text-sm tracking-tight truncate">{superAdminUser?.name || DEFAULT_SUPER_ADMIN.name}</h3>
+                    <span className="text-[8px] font-semibold uppercase px-1.5 py-0.2 rounded border bg-slate-800 text-slate-300 border-slate-700">
                       SUPER ADMIN
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 truncate mt-0.5">
-                    {superAdminUser?.roleTitle || 'Platform Governance & Workspace Administration'}
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    {superAdminUser?.roleTitle || 'Platform Governance & Master Administration'}
                   </p>
                 </div>
               </div>
 
               {/* Login Form */}
-              <form onSubmit={handleUserLogin} className="space-y-5">
+              <form onSubmit={handleUserLogin} className="space-y-3.5">
                 
                 {/* Clean Segmented Control (Password vs PIN) */}
-                <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                <div className="grid grid-cols-2 p-0.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px]">
                   <button
                     type="button"
                     onClick={() => {
@@ -1042,13 +1023,13 @@ export const LoginScreen: React.FC = () => {
                       setPasswordInput('');
                       setErrorMessage(null);
                     }}
-                    className={`py-2 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    className={`py-1 px-2.5 rounded-md font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       authMode === 'password'
                         ? 'bg-slate-800 text-white shadow-xs'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <KeyRound className="w-3.5 h-3.5" />
+                    <KeyRound className="w-3 h-3" />
                     <span>Master Password</span>
                   </button>
                   <button
@@ -1058,24 +1039,24 @@ export const LoginScreen: React.FC = () => {
                       setPasswordInput('');
                       setErrorMessage(null);
                     }}
-                    className={`py-2 px-3 rounded-lg font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    className={`py-1 px-2.5 rounded-md font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       authMode === 'pin'
                         ? 'bg-slate-800 text-white shadow-xs'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    <Fingerprint className="w-3.5 h-3.5" />
-                    <span>4-Digit Master PIN</span>
+                    <Fingerprint className="w-3 h-3" />
+                    <span>4-Digit PIN</span>
                   </button>
                 </div>
 
                 {/* Password / PIN Input Field */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-slate-200">
-                      {authMode === 'password' ? 'Super Admin Master Password' : '4-Digit Master PIN'}
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-medium text-slate-300">
+                      {authMode === 'password' ? 'Super Admin Password' : '4-Digit PIN'}
                     </label>
-                    <span className="text-[11px] text-slate-500 font-medium">
+                    <span className="text-[10px] text-slate-500">
                       Master Key
                     </span>
                   </div>
@@ -1092,8 +1073,8 @@ export const LoginScreen: React.FC = () => {
                       placeholder={authMode === 'password' ? 'Enter master password...' : '••••'}
                       maxLength={authMode === 'pin' ? 6 : 50}
                       autoFocus
-                      className={`w-full px-3.5 py-2.5 sm:py-3 pr-12 text-sm bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
-                        authMode === 'pin' ? 'font-mono tracking-widest text-center text-base sm:text-lg' : 'font-mono'
+                      className={`w-full px-3 py-2 pr-10 text-xs sm:text-sm bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
+                        authMode === 'pin' ? 'font-mono tracking-widest text-center text-sm sm:text-base' : 'font-mono'
                       } ${
                         errorMessage ? 'border-rose-500/80 ring-1 ring-rose-500/30' : 'border-slate-800 hover:border-slate-700'
                       }`}
@@ -1101,16 +1082,16 @@ export const LoginScreen: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 cursor-pointer"
                       title={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
 
                   {errorMessage && (
-                    <div className="flex items-center gap-2 text-xs text-rose-400 mt-2.5 font-medium animate-in fade-in p-2.5 rounded-xl bg-rose-950/30 border border-rose-800/40">
-                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <div className="flex items-center gap-1.5 text-[11px] text-rose-400 mt-1.5 font-medium animate-in fade-in p-2 rounded-lg bg-rose-950/30 border border-rose-800/40">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                       <span>{errorMessage}</span>
                     </div>
                   )}
@@ -1120,31 +1101,31 @@ export const LoginScreen: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-3 px-4 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                  className="w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>Verifying Super Admin Credentials...</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span>Verifying Master Credentials...</span>
                     </span>
                   ) : (
                     <>
-                      <Crown className="w-4 h-4 text-amber-400" />
+                      <Crown className="w-3.5 h-3.5 text-amber-400" />
                       <span>Access Governance Console</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}
                 </button>
               </form>
 
               {/* Security Policy Footnote */}
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                <span className="flex items-center gap-1.5 text-slate-500">
-                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+                <span className="flex items-center gap-1 text-slate-500">
+                  <Lock className="w-2.5 h-2.5 text-slate-500" />
                   <span>Master Key Protected</span>
                 </span>
                 <span className="font-medium text-slate-400">
-                  Platform Governance Console
+                  Governance Console
                 </span>
               </div>
             </div>
@@ -1153,11 +1134,11 @@ export const LoginScreen: React.FC = () => {
 
       </main>
 
-      {/* Footer Note */}
-      <footer className="relative z-10 w-full max-w-6xl mx-auto px-6 py-4 text-center text-xs text-slate-400 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <p>© {new Date().getFullYear()} {platformConfig?.appName || 'Zooka Business'} • {platformConfig?.appTagline || 'Enterprise Multi-Business Accounting'} • All rights reserved</p>
-        <p className="flex items-center gap-3">
-          <span>Developed by.Kuldeep Siraswar</span>
+      {/* Footer Note - Compact & Responsive */}
+      <footer className="relative z-10 w-full max-w-6xl mx-auto px-4 py-2 sm:py-3 text-center text-[10px] sm:text-[11px] text-slate-500 border-t border-slate-900/90 flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-2">
+        <p>© {new Date().getFullYear()} {platformConfig?.appName || 'Zooka Business'} • {platformConfig?.appTagline || 'Enterprise Accounting'}</p>
+        <p className="flex items-center gap-2 text-slate-500">
+          <span>Developed by Kuldeep Siraswar</span>
         </p>
       </footer>
 
