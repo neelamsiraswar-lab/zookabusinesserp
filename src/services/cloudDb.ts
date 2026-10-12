@@ -586,6 +586,37 @@ class CloudDbService {
   }
 
   // -------------------------------------------------------------
+  // Direct Company Users Fetcher from Firestore
+  // -------------------------------------------------------------
+  async fetchCompanyUsers(companyId: string): Promise<AppUser[]> {
+    try {
+      if (!companyId) return [];
+      const q = query(collection(db, 'users'), where('companyId', '==', companyId));
+      const snap = await getDocs(q);
+      const res: AppUser[] = [];
+      snap.forEach(d => res.push(d.data() as AppUser));
+      return res;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'users');
+      console.warn(`Error querying users for company ${companyId}:`, err);
+      return [];
+    }
+  }
+
+  async fetchAllCompanyUsers(): Promise<AppUser[]> {
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const res: AppUser[] = [];
+      snap.forEach(d => res.push(d.data() as AppUser));
+      return res;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'users');
+      console.warn('Error querying all users from Firestore:', err);
+      return [];
+    }
+  }
+
+  // -------------------------------------------------------------
   // Real-time Firestore Subscriptions for active Company Data
   // -------------------------------------------------------------
   subscribeToCompanyData(companyId: string, listeners: RealtimeListenersConfig): () => void {

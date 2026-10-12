@@ -4,6 +4,7 @@ import { AppUser, RoleType, Company } from '../../types';
 import { ROLE_DEFINITIONS, DEFAULT_SUPER_ADMIN } from '../../utils/rbacRules';
 import { cleanDefaultUsers } from '../../utils/cleanDefaults';
 import { getThemeBg } from '../../utils/themeColors';
+import { cloudDb } from '../../services/cloudDb';
 import { 
   ShieldCheck, 
   Lock, 
@@ -72,8 +73,6 @@ export const LoginScreen: React.FC = () => {
   const [showCompanySecret, setShowCompanySecret] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
   const [isVerifyingCompany, setIsVerifyingCompany] = useState(false);
-  const [isWorkspaceSelectModalOpen, setIsWorkspaceSelectModalOpen] = useState(false);
-  const [workspaceSearchTerm, setWorkspaceSearchTerm] = useState('');
 
   // Dynamically resolve matched company in real-time as user types GSTIN or company name
   const matchedCompanyPreview = useMemo(() => {
@@ -108,20 +107,6 @@ export const LoginScreen: React.FC = () => {
       return false;
     }) || null;
   }, [companies, companyIdentifier]);
-
-  // Filtered companies for Workspace Picker Dialog / Dropdown
-  const filteredWorkspaceOptions = useMemo(() => {
-    const term = workspaceSearchTerm.trim().toLowerCase();
-    if (!term) return companies;
-    return companies.filter(c => {
-      const name = (c.name || '').toLowerCase();
-      const trade = (c.tradeName || '').toLowerCase();
-      const gstin = (c.gstin || '').toLowerCase();
-      const city = (c.city || '').toLowerCase();
-      const state = (c.state || '').toLowerCase();
-      return name.includes(term) || trade.includes(term) || gstin.includes(term) || city.includes(term) || state.includes(term);
-    });
-  }, [companies, workspaceSearchTerm]);
 
   // Step 2: User Login State
   const [selectedUserId, setSelectedUserId] = useState<string>(() => {
@@ -172,15 +157,8 @@ export const LoginScreen: React.FC = () => {
     : users.find(u => u.id === selectedUserId) || users.find(u => u.role === 'ADMIN' && u.isActive) || sortedActiveUsers[0] || DEFAULT_SUPER_ADMIN;
   const roleMeta = ROLE_DEFINITIONS[targetUser?.role] || ROLE_DEFINITIONS.ADMIN;
 
-  // Select company workspace from browse / picker
-  const handleSelectWorkspaceCompany = (company: Company) => {
-    setCompanyIdentifier(company.tradeName || company.name || company.gstin || '');
-    setCompanyError(null);
-    setIsWorkspaceSelectModalOpen(false);
-  };
-
   // Handle Step 1: Company Verification via Company Name + Password/PIN
-  const handleVerifyCompany = (e: React.FormEvent) => {
+  const handleVerifyCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setCompanyError(null);
 
@@ -199,7 +177,7 @@ export const LoginScreen: React.FC = () => {
 
     setIsVerifyingCompany(true);
 
-    setTimeout(() => {
+    try {
       // Use matchedCompanyPreview if available, or search across registered companies
       const matchedComp = matchedCompanyPreview || companies.find(c => {
         const cName = (c.name || '').toLowerCase();
@@ -228,22 +206,31 @@ export const LoginScreen: React.FC = () => {
         return;
       }
 
-      // Check if credentials match any authorized user or admin in that company partition
+      // Check credentials against Firestore users first, then local partition cache
       let compUsers: AppUser[] = [];
       try {
-        const raw = localStorage.getItem(`zookabusiness_v2_cloud_c_${matchedComp.id}_users`) || localStorage.getItem(`vyaparflow_v2_cloud_c_${matchedComp.id}_users`);
-        if (raw) {
-          compUsers = JSON.parse(raw);
+        const cloudUsers = await cloudDb.fetchCompanyUsers(matchedComp.id);
+        if (cloudUsers && cloudUsers.length > 0) {
+          compUsers = cloudUsers;
         }
       } catch (err) {
-        console.warn('Error reading company users partition:', err);
+        console.warn('Could not fetch cloud users during verification, falling back to cache:', err);
+      }
+
+      if (compUsers.length === 0) {
+        try {
+          const raw = localStorage.getItem(`zookabusiness_v2_cloud_c_${matchedComp.id}_users`) || localStorage.getItem(`vyaparflow_v2_cloud_c_${matchedComp.id}_users`);
+          if (raw) {
+            compUsers = JSON.parse(raw);
+          }
+        } catch (err) {
+          console.warn('Error reading company users partition:', err);
+        }
       }
 
       if (!compUsers || compUsers.length === 0) {
         if (matchedComp.id === currentCompanyId && users.length > 0) {
           compUsers = users;
-        } else {
-          compUsers = cleanDefaultUsers;
         }
       }
 
@@ -261,13 +248,13 @@ export const LoginScreen: React.FC = () => {
         u.isActive && (
           (u.password && u.password === cleanSecret) ||
           (u.pin && u.pin === cleanSecret) ||
-          // Fallback standard default admin check
-          (u.role === 'ADMIN' && (cleanSecret === 'admin' || cleanSecret === '1111'))
+          // Fallback standard default admin check only if default user exists in this company
+          (u.role === 'ADMIN' && (cleanSecret === 'admin' || cleanSecret === '1111') && u.id === 'usr-admin-1')
         )
       );
 
       if (isSuperMatch || matchingUser) {
-        switchCompany(matchedComp.id);
+        await switchCompany(matchedComp.id, matchingUser?.id);
         setIsVerifyingCompany(false);
         setCompanyError(null);
         setCompanySecret('');
@@ -280,7 +267,10 @@ export const LoginScreen: React.FC = () => {
         setIsVerifyingCompany(false);
         setCompanyError(`Invalid password or PIN for "${matchedComp.tradeName || matchedComp.name}". Access denied.`);
       }
-    }, 200);
+    } catch (err: any) {
+      setIsVerifyingCompany(false);
+      setCompanyError(`Authentication error: ${err?.message || 'Could not verify workspace credentials'}`);
+    }
   };
 
   const handleSelectUser = (user: AppUser) => {
@@ -487,19 +477,6 @@ export const LoginScreen: React.FC = () => {
                       <Building2 className="w-3.5 h-3.5 text-slate-400" />
                       <span>Workspace</span>
                     </label>
-                    {companies.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setWorkspaceSearchTerm('');
-                          setIsWorkspaceSelectModalOpen(true);
-                        }}
-                        className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors cursor-pointer flex items-center gap-1 hover:underline"
-                      >
-                        <Search className="w-3 h-3" />
-                        <span>Browse ({companies.length})</span>
-                      </button>
-                    )}
                   </div>
 
                   <div className="relative group">
@@ -514,10 +491,10 @@ export const LoginScreen: React.FC = () => {
                       autoFocus
                       className={`w-full px-3.5 py-2.5 text-sm bg-slate-950 border rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder:text-slate-600 ${
                         matchedCompanyPreview
-                          ? 'border-emerald-500/80 pr-16'
+                          ? 'border-emerald-500/80 pr-10'
                           : companyIdentifier.trim()
-                            ? 'pr-16 border-slate-700'
-                            : 'pr-10 border-slate-850 hover:border-slate-750'
+                            ? 'pr-10 border-slate-700'
+                            : 'border-slate-850 hover:border-slate-750'
                       } ${
                         companyError ? 'border-rose-500/80 ring-1 ring-rose-500/30' : ''
                       }`}
@@ -538,22 +515,10 @@ export const LoginScreen: React.FC = () => {
                           <X className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      {matchedCompanyPreview ? (
+                      {matchedCompanyPreview && (
                         <span className="text-emerald-400 p-0.5" title="Workspace entity verified">
                           <CheckCircle2 className="w-4 h-4" />
                         </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWorkspaceSearchTerm('');
-                            setIsWorkspaceSelectModalOpen(true);
-                          }}
-                          className="p-1 hover:text-slate-200 transition-colors cursor-pointer rounded"
-                          title="Browse available workspaces"
-                        >
-                          <ChevronDown className="w-4 h-4 text-slate-500" />
-                        </button>
                       )}
                     </div>
                   </div>
@@ -1150,147 +1115,6 @@ export const LoginScreen: React.FC = () => {
           setLoginStep('login_credentials');
         }}
       />
-
-      {/* Minimalist Workspace Browser Dialog / Modal */}
-      {isWorkspaceSelectModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150"
-          onClick={() => setIsWorkspaceSelectModalOpen(false)}
-        >
-          <div 
-            className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-800/80 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center text-indigo-400">
-                  <Building2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Select Workspace</h3>
-                  <p className="text-[11px] text-slate-400">Choose from registered business entities</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsWorkspaceSelectModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Search Input Filter */}
-            <div className="p-3 border-b border-slate-800/80 bg-slate-950/40">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={workspaceSearchTerm}
-                  onChange={(e) => setWorkspaceSearchTerm(e.target.value)}
-                  placeholder="Filter workspaces by name, trade name, GSTIN, or city..."
-                  autoFocus
-                  className="w-full pl-9 pr-8 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-slate-600"
-                />
-                {workspaceSearchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => setWorkspaceSearchTerm('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-500 hover:text-slate-300 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Workspaces List */}
-            <div className="p-2 overflow-y-auto space-y-1.5 flex-1 max-h-96">
-              {filteredWorkspaceOptions.length === 0 ? (
-                <div className="py-8 text-center text-slate-500 text-xs">
-                  <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-600 stroke-[1.5]" />
-                  <p>No business workspace found matching &ldquo;{workspaceSearchTerm}&rdquo;</p>
-                </div>
-              ) : (
-                filteredWorkspaceOptions.map(comp => {
-                  const isCurrentActive = comp.id === currentCompanyId;
-                  const isInputSelected = matchedCompanyPreview?.id === comp.id;
-
-                  return (
-                    <button
-                      key={comp.id}
-                      type="button"
-                      onClick={() => handleSelectWorkspaceCompany(comp)}
-                      className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 group ${
-                        isInputSelected
-                          ? 'bg-slate-800/90 border-indigo-500/80 ring-1 ring-indigo-500/20'
-                          : 'bg-slate-950/60 border-slate-800/70 hover:bg-slate-800/50 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-9 h-9 rounded-lg ${getThemeBg(comp.themeColor)} text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs`}>
-                          <Building className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-white group-hover:text-indigo-300 transition-colors truncate">
-                              {comp.tradeName || comp.name}
-                            </span>
-                            {isCurrentActive && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-slate-800 text-slate-400 border border-slate-700 shrink-0">
-                                Current
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono mt-0.5 truncate">
-                            <span className="text-slate-300">{comp.gstin}</span>
-                            {comp.city && (
-                              <>
-                                <span className="text-slate-600 font-sans">•</span>
-                                <span className="text-slate-400 font-sans">{comp.city}, {comp.state}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isInputSelected ? (
-                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                            <Check className="w-3.5 h-3.5" />
-                          </div>
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Modal Footer with Register New Business shortcut */}
-            <div className="px-4 py-3 bg-slate-950/80 border-t border-slate-800/80 flex items-center justify-between text-xs">
-              <span className="text-slate-500 text-[11px]">
-                {filteredWorkspaceOptions.length} of {companies.length} workspaces
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsWorkspaceSelectModalOpen(false);
-                  setIsCreateCompanyOpen(true);
-                }}
-                className="text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Register New Business</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

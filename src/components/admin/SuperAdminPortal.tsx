@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Company, BusinessProfile, SuperAdminAuthData, AppUser } from '../../types';
+import { cloudDb } from '../../services/cloudDb';
 import { 
   Crown, 
   Building2, 
@@ -170,26 +171,71 @@ export const SuperAdminPortal: React.FC = () => {
     };
   }, [companies, currentCompanyId, invoices]);
 
+  // Live remote users fetched from Firestore across all companies
+  const [remoteAllUsers, setRemoteAllUsers] = useState<AppUser[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUsers = async () => {
+      try {
+        const cloudUsers = await cloudDb.fetchAllCompanyUsers();
+        if (isMounted && cloudUsers && cloudUsers.length > 0) {
+          setRemoteAllUsers(cloudUsers);
+        }
+      } catch (e) {
+        console.warn('SuperAdminPortal: Failed to fetch all users from Firestore:', e);
+      }
+    };
+    fetchUsers();
+    return () => { isMounted = false; };
+  }, [companies, users]);
+
   // Aggregate Cross-Tenant Users Roster
   const crossTenantUsers = useMemo(() => {
     const list: Array<{ user: AppUser; company: Company }> = [];
+    const seenUserCompanyKeys = new Set<string>();
+
     companies.forEach(comp => {
+      // 1. Current company active users
       if (comp.id === currentCompanyId && users.length > 0) {
-        users.forEach(u => list.push({ user: u, company: comp }));
-      } else {
-        try {
-          const raw = localStorage.getItem(`zookabusiness_v2_cloud_c_${comp.id}_users`) || localStorage.getItem(`vyaparflow_v2_cloud_c_${comp.id}_users`);
-          if (raw) {
-            const parsed = JSON.parse(raw) as AppUser[];
-            if (Array.isArray(parsed)) {
-              parsed.forEach(u => list.push({ user: u, company: comp }));
-            }
+        users.forEach(u => {
+          const key = `${comp.id}_${u.id}`;
+          if (!seenUserCompanyKeys.has(key)) {
+            seenUserCompanyKeys.add(key);
+            list.push({ user: u, company: comp });
           }
-        } catch (e) {}
+        });
       }
+
+      // 2. Remote Firestore users for this company
+      const compRemoteUsers = remoteAllUsers.filter(u => u.companyId === comp.id);
+      compRemoteUsers.forEach(u => {
+        const key = `${comp.id}_${u.id}`;
+        if (!seenUserCompanyKeys.has(key)) {
+          seenUserCompanyKeys.add(key);
+          list.push({ user: u, company: comp });
+        }
+      });
+
+      // 3. Local partition fallback
+      try {
+        const raw = localStorage.getItem(`zookabusiness_v2_cloud_c_${comp.id}_users`) || localStorage.getItem(`vyaparflow_v2_cloud_c_${comp.id}_users`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as AppUser[];
+          if (Array.isArray(parsed)) {
+            parsed.forEach(u => {
+              const key = `${comp.id}_${u.id}`;
+              if (!seenUserCompanyKeys.has(key)) {
+                seenUserCompanyKeys.add(key);
+                list.push({ user: u, company: comp });
+              }
+            });
+          }
+        }
+      } catch (e) {}
     });
     return list;
-  }, [companies, currentCompanyId, users]);
+  }, [companies, currentCompanyId, users, remoteAllUsers]);
 
   // Filtered Cross-Tenant Users
   const filteredUsers = useMemo(() => {
