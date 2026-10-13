@@ -275,7 +275,8 @@ body {
 
 @media print {
   html, body {
-    width: 210mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -285,8 +286,25 @@ body {
     print-color-adjust: exact !important;
   }
 
+  body:not([data-thermal="true"]) {
+    width: 210mm !important;
+  }
+
+  body[data-thermal="true"] {
+    width: 80mm !important;
+    max-width: 80mm !important;
+  }
+
+  /* Prevent filter / transform clipping during print from Framer Motion and animations */
+  *, *::before, *::after {
+    filter: none !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
   /* Hide entire application navigation, sidebar, toasts, and headers */
-  header, nav, aside, .print\:hidden, .no-print, [role="navigation"] {
+  header, nav, aside, footer, .print\:hidden, .no-print, [role="navigation"] {
     display: none !important;
     visibility: hidden !important;
   }
@@ -323,7 +341,7 @@ body {
     display: none !important;
   }
 
-  /* Reset main wrappers for direct clean A4 printing */
+  /* Reset main wrappers for direct clean A4 & thermal printing */
   #root, main, .main-container {
     padding: 0 !important;
     margin: 0 !important;
@@ -332,17 +350,28 @@ body {
     background: transparent !important;
   }
 
-  /* Keep A4 document crisp without shadow or screen borders */
-  .a4-sheet, .statement-sheet {
+  /* Keep invoice document crisp without shadow or screen borders */
+  #invoice-printable-container,
+  .a4-sheet, 
+  .statement-sheet,
+  .thermal-receipt-sheet {
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: auto !important;
     margin: 0 auto !important;
     padding: 0 !important;
     page-break-after: auto;
+  }
+
+  .a4-sheet, .statement-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+  }
+
+  .thermal-receipt-sheet {
+    width: 100% !important;
+    max-width: 80mm !important;
   }
 
   /* Table & row pagination controls */

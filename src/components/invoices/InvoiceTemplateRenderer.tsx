@@ -22,15 +22,22 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
   fitToOnePage = false,
   isInteractivePreview = false,
 }) => {
-  const activeSignatureUrl = normalizeSignatureUrl(business.signatureUrl);
-  const showSig = template.showSignature && (business.showSignatureOnInvoice !== false);
-  const effectiveUpiId = cleanUpiId(business.upiId) || 'bharattech@okhdfcbank';
+  const safeBusinessName = business?.tradeName || business?.name || 'Company Name';
+  const businessInitials = (safeBusinessName.trim() || 'CO').slice(0, 2).toUpperCase();
+  const safeInvoiceTypeLabel = (invoice?.invoiceType ? String(invoice.invoiceType) : 'TAX_INVOICE').replace(/_/g, ' ');
+
+  const activeSignatureUrl = normalizeSignatureUrl(business?.signatureUrl);
+  const showSig = template.showSignature && (business?.showSignatureOnInvoice !== false);
+  const effectiveUpiId = cleanUpiId(business?.upiId) || 'bharattech@okhdfcbank';
+  const rawDueAmount = invoice?.amountDue !== undefined && Number(invoice.amountDue) > 0 
+    ? Number(invoice.amountDue) 
+    : Number(invoice?.grandTotal || 0);
   const upiPaymentUri = buildUpiPaymentUri({
     upiId: effectiveUpiId,
-    payeeName: business.tradeName || business.name,
-    amount: invoice.amountDue !== undefined && invoice.amountDue > 0 ? invoice.amountDue : invoice.grandTotal,
-    invoiceNumber: invoice.invoiceNumber,
-    note: `Invoice ${invoice.invoiceNumber}`,
+    payeeName: business?.tradeName || business?.name || 'Authorized Merchant',
+    amount: rawDueAmount > 0 ? rawDueAmount : 1,
+    invoiceNumber: invoice?.invoiceNumber || 'INV',
+    note: `Invoice ${invoice?.invoiceNumber || ''}`,
   });
 
   const copyLabel = printCopyType === 'ORIGINAL' 
@@ -77,7 +84,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
 
   // Plain Text Payment Mode (no badge pills, no icons)
   const plainPaymentModeText = (() => {
-    switch (invoice.paymentMethod) {
+    switch (invoice.paymentMethod as string) {
       case 'CASH':
         return 'CASH';
       case 'UPI':
@@ -112,7 +119,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
 
   // Payment Method Info Helper
   const paymentInfo = (() => {
-    switch (invoice.paymentMethod) {
+    switch (invoice.paymentMethod as string) {
       case 'CASH':
         return { 
           label: 'Cash Payment', 
@@ -179,6 +186,11 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
     }
   })();
 
+  // Safe items array to prevent undefined.forEach crashes
+  const safeItems: InvoiceItem[] = Array.isArray(invoice?.items) ? invoice.items : [];
+  const safeRoundOff = typeof invoice?.roundOff === 'number' ? invoice.roundOff : (Number(invoice?.roundOff) || 0);
+  const hasRoundOff = Math.abs(safeRoundOff) >= 0.01;
+
   // Format HSN Summary Table
   const hsnSummaryMap = new Map<string, {
     hsnCode: string;
@@ -190,24 +202,33 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
     totalTax: number;
   }>();
 
-  invoice.items.forEach(item => {
-    const key = `${item.hsnCode}_${item.gstRate}`;
+  safeItems.forEach(item => {
+    if (!item) return;
+    const gstRate = Number(item.gstRate) || 0;
+    const hsnCode = item.hsnCode || 'N/A';
+    const key = `${hsnCode}_${gstRate}`;
+    const taxableAmount = Number(item.taxableAmount) || 0;
+    const cgstAmount = Number(item.cgstAmount) || 0;
+    const sgstAmount = Number(item.sgstAmount) || 0;
+    const igstAmount = Number(item.igstAmount) || 0;
+    const totalTax = (item as any).totalTax !== undefined ? Number((item as any).totalTax) : (cgstAmount + sgstAmount + igstAmount);
+
     const existing = hsnSummaryMap.get(key);
     if (existing) {
-      existing.taxableAmount += item.taxableAmount;
-      existing.cgstAmount += item.cgstAmount;
-      existing.sgstAmount += item.sgstAmount;
-      existing.igstAmount += item.igstAmount;
-      existing.totalTax += (item.cgstAmount + item.sgstAmount + item.igstAmount);
+      existing.taxableAmount += taxableAmount;
+      existing.cgstAmount += cgstAmount;
+      existing.sgstAmount += sgstAmount;
+      existing.igstAmount += igstAmount;
+      existing.totalTax += totalTax;
     } else {
       hsnSummaryMap.set(key, {
-        hsnCode: item.hsnCode || 'N/A',
-        taxableAmount: item.taxableAmount,
-        gstRate: item.gstRate,
-        cgstAmount: item.cgstAmount,
-        sgstAmount: item.sgstAmount,
-        igstAmount: item.igstAmount,
-        totalTax: (item.cgstAmount + item.sgstAmount + item.igstAmount),
+        hsnCode,
+        taxableAmount,
+        gstRate,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        totalTax,
       });
     }
   });
@@ -232,7 +253,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                 />
               ) : (
                 <div className={`w-10 h-10 ${getLogoShapeClasses(effectiveLogoShape)} border-2 border-slate-800 bg-white flex items-center justify-center font-black text-xs`}>
-                  {(business.tradeName || business.name).slice(0, 2).toUpperCase()}
+                  {businessInitials}
                 </div>
               )}
             </div>
@@ -263,7 +284,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
             <span>Qty x Rate</span>
             <span>Amt (₹)</span>
           </div>
-          {invoice.items.map((item, idx) => (
+          {safeItems.map((item, idx) => (
             <div key={item.id || idx} className="py-1.5 border-b border-dotted border-slate-200 last:border-0">
               <div className="flex justify-between text-[10px]">
                 <div className="truncate max-w-[130px] font-semibold" style={{ color: headingTextColor }}>{item.name}</div>
@@ -315,10 +336,10 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               </div>
             </>
           )}
-          {invoice.roundOff !== 0 && (
+          {hasRoundOff && (
             <div className="flex justify-between text-[10px]" style={{ color: mutedTextColor }}>
               <span>Round Off:</span>
-              <span>{invoice.roundOff > 0 ? `+${invoice.roundOff.toFixed(2)}` : invoice.roundOff.toFixed(2)}</span>
+              <span>{safeRoundOff > 0 ? `+${safeRoundOff.toFixed(2)}` : safeRoundOff.toFixed(2)}</span>
             </div>
           )}
           <div 
@@ -368,8 +389,8 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
   // (As shown in TM Electricals & Hardware Invoices)
   // ==========================================
   if (template.headerStyle === 'TRADE_CLASSIC' || template.id === 'TRADE_CLASSIC_TM') {
-    const totalQuantity = invoice.items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0);
-    const dominantUnit = invoice.items[0]?.unit || 'Pcs.';
+    const totalQuantity = safeItems.reduce((acc, item) => acc + (Number(item?.quantity) || 0), 0);
+    const dominantUnit = safeItems[0]?.unit || 'Pcs.';
     const copyTypeText = printCopyType === 'ORIGINAL' 
       ? 'Original Copy' 
       : printCopyType === 'DUPLICATE' 
@@ -378,8 +399,9 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
 
     // Tax Breakdown by GST Rate
     const taxRateBreakdown = Array.from(
-      invoice.items.reduce((acc, item) => {
-        const rate = item.gstRate || 0;
+      safeItems.reduce((acc, item) => {
+        if (!item) return acc;
+        const rate = Number(item.gstRate) || 0;
         const existing = acc.get(rate) || {
           rate,
           taxable: 0,
@@ -388,21 +410,31 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
           igst: 0,
           totalTax: 0,
         };
-        existing.taxable += item.taxableAmount;
-        existing.cgst += item.cgstAmount;
-        existing.sgst += item.sgstAmount;
-        existing.igst += item.igstAmount;
-        existing.totalTax += (item.cgstAmount + item.sgstAmount + item.igstAmount);
+        const taxable = Number(item.taxableAmount) || 0;
+        const cgst = Number(item.cgstAmount) || 0;
+        const sgst = Number(item.sgstAmount) || 0;
+        const igst = Number(item.igstAmount) || 0;
+        existing.taxable += taxable;
+        existing.cgst += cgst;
+        existing.sgst += sgst;
+        existing.igst += igst;
+        existing.totalTax += (cgst + sgst + igst);
         acc.set(rate, existing);
         return acc;
       }, new Map<number, { rate: number; taxable: number; cgst: number; sgst: number; igst: number; totalTax: number }>())
     ).map(([_, val]) => val);
 
-    const invoiceDateTimeStr = `${formatDate(invoice.invoiceDate)} ( ${
-      invoice.createdAt
-        ? new Date(invoice.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : '12:21 PM'
-    } )`;
+    let safeTimeString = '12:00 PM';
+    try {
+      if (invoice?.createdAt) {
+        const d = new Date(invoice.createdAt);
+        if (!isNaN(d.getTime())) {
+          safeTimeString = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+      }
+    } catch {}
+
+    const invoiceDateTimeStr = `${formatDate(invoice.invoiceDate)} ( ${safeTimeString} )`;
 
     return (
       <div 
@@ -550,7 +582,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                 </tr>
               </thead>
               <tbody>
-                {invoice.items.map((item, idx) => (
+                {safeItems.map((item, idx) => (
                   <tr key={item.id || idx} className="align-top">
                     <td className="border-r border-black py-1.5 px-1 text-center font-mono">{idx + 1}.</td>
                     <td className="border-r border-black py-1.5 px-2 space-y-0.5">
@@ -578,38 +610,38 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                     </td>
                     <td className="border-r border-black py-1.5 px-1 text-center font-mono">{item.hsnCode || ''}</td>
                     <td className="border-r border-black py-1.5 px-1 text-center font-medium">
-                      {Number(item.quantity).toFixed(2)} {item.unit || 'Pcs.'}
+                      {(Number(item.quantity) || 0).toFixed(2)} {item.unit || 'Pcs.'}
                     </td>
                     <td className="border-r border-black py-1.5 px-1.5 text-right font-mono font-medium">
                       <div>{formatCurrency(item.rate, '')}</div>
                       {(item.isTaxInclusive || (item.taxIncludedRate && item.taxIncludedRate !== item.rate)) && (
                         <div className="text-[8px] font-sans text-slate-500">
-                          (Incl: {formatCurrency(item.taxIncludedRate || (item.rate * (1 + item.gstRate / 100)), '')})
+                          (Incl: {formatCurrency(item.taxIncludedRate || (Number(item.rate || 0) * (1 + Number(item.gstRate || 0) / 100)), '')})
                         </div>
                       )}
                     </td>
                     {!invoice.isInterState ? (
                       <>
                         <td className="border-r border-black py-1.5 px-1 text-center font-mono text-[10px]">
-                          {(item.gstRate / 2).toFixed(2)} %
+                          {(Number(item.gstRate || 0) / 2).toFixed(2)} %
                         </td>
                         <td className="border-r border-black py-1.5 px-1 text-right font-mono">
-                          {formatCurrency(item.cgstAmount, '')}
+                          {formatCurrency(item.cgstAmount || 0, '')}
                         </td>
                         <td className="border-r border-black py-1.5 px-1 text-center font-mono text-[10px]">
-                          {(item.gstRate / 2).toFixed(2)} %
+                          {(Number(item.gstRate || 0) / 2).toFixed(2)} %
                         </td>
                         <td className="border-r border-black py-1.5 px-1 text-right font-mono">
-                          {formatCurrency(item.sgstAmount, '')}
+                          {formatCurrency(item.sgstAmount || 0, '')}
                         </td>
                       </>
                     ) : (
                       <>
                         <td className="border-r border-black py-1.5 px-1 text-center font-mono text-[10px]">
-                          {item.gstRate.toFixed(2)} %
+                          {Number(item.gstRate || 0).toFixed(2)} %
                         </td>
                         <td className="border-r border-black py-1.5 px-1.5 text-right font-mono">
-                          {formatCurrency(item.igstAmount, '')}
+                          {formatCurrency(item.igstAmount || 0, '')}
                         </td>
                       </>
                     )}
@@ -620,7 +652,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                 ))}
 
                 {/* Vertical Column Padding to Maintain Tall Column Lines */}
-                {Array.from({ length: Math.max(0, 4 - invoice.items.length) }).map((_, emptyIdx) => (
+                {Array.from({ length: Math.max(0, 4 - safeItems.length) }).map((_, emptyIdx) => (
                   <tr key={`empty-${emptyIdx}`} className="h-6">
                     <td className="border-r border-black"></td>
                     <td className="border-r border-black"></td>
@@ -653,7 +685,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               Grand Total
             </div>
             <div className="col-span-2 py-1 px-1 text-center font-mono">
-              {totalQuantity.toFixed(2)} {dominantUnit}
+              {(Number(totalQuantity) || 0).toFixed(2)} {dominantUnit}
             </div>
             <div className="col-span-3"></div>
             <div className="col-span-3 border-l border-black py-1 px-3 flex justify-between items-center font-mono text-xs">
@@ -787,7 +819,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                       />
                     ) : (
                       <div className={`w-14 h-14 ${getLogoShapeClasses(effectiveLogoShape)} bg-white/20 backdrop-blur-xs border-2 border-white/40 flex items-center justify-center text-white font-black text-xl tracking-tight shadow-sm`}>
-                        {(business.tradeName || business.name).slice(0, 2).toUpperCase()}
+                        {businessInitials}
                       </div>
                     )}
                   </div>
@@ -817,7 +849,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
 
               <div className="text-right shrink-0 bg-white/10 p-3 rounded-lg backdrop-blur-xs border border-white/20 min-w-[170px]">
                 <div className="text-[10px] font-extrabold uppercase tracking-widest text-white/80">
-                  {invoice.invoiceType.replace(/_/g, ' ')}
+                  {safeInvoiceTypeLabel}
                 </div>
                 <div className={`${fitToOnePage ? 'text-base' : 'text-lg'} font-black font-mono mt-0.5 text-white`}>
                   {invoice.invoiceNumber}
@@ -846,7 +878,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                       className={`w-14 h-14 ${getLogoShapeClasses(effectiveLogoShape)} border-2 flex items-center justify-center font-black text-xl tracking-tight shadow-2xs`}
                       style={{ borderColor: themeHex, color: themeHex, backgroundColor: `${themeHex}10` }}
                     >
-                      {(business.tradeName || business.name).slice(0, 2).toUpperCase()}
+                      {businessInitials}
                     </div>
                   )}
                 </div>
@@ -882,7 +914,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                 className="text-[10px] font-black uppercase tracking-widest"
                 style={{ color: accentTextColor }}
               >
-                {invoice.invoiceType.replace(/_/g, ' ')}
+                {safeInvoiceTypeLabel}
               </div>
               <div className={`${fitToOnePage ? 'text-lg' : 'text-xl'} font-black font-mono mt-0.5`} style={{ color: headingTextColor }}>
                 {invoice.invoiceNumber}
@@ -908,7 +940,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                   />
                 ) : (
                   <div className={`w-14 h-14 ${getLogoShapeClasses(effectiveLogoShape)} border-2 border-black bg-white flex items-center justify-center text-black font-black text-xl tracking-tight shadow-xs`}>
-                    {(business.tradeName || business.name).slice(0, 2).toUpperCase()}
+                    {businessInitials}
                   </div>
                 )}
               </div>
@@ -973,7 +1005,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                       />
                     ) : (
                       <div className={`w-13 h-13 ${getLogoShapeClasses(effectiveLogoShape)} border-2 border-slate-400 bg-slate-100 flex items-center justify-center text-slate-800 font-black text-lg tracking-tight shadow-2xs`}>
-                        {(business.tradeName || business.name).slice(0, 2).toUpperCase()}
+                        {businessInitials}
                       </div>
                     )}
                   </div>
@@ -1001,7 +1033,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               <div className="text-right shrink-0">
                 <div className="inline-block px-2.5 py-1 rounded border border-slate-300 bg-white shadow-2xs text-center">
                   <div className="text-[9px] font-black uppercase tracking-wider" style={{ color: accentTextColor }}>
-                    {invoice.invoiceType.replace(/_/g, ' ')}
+                    {safeInvoiceTypeLabel}
                   </div>
                   <div className={`${fitToOnePage ? 'text-base' : 'text-lg'} font-extrabold font-mono`} style={{ color: headingTextColor }}>
                     {invoice.invoiceNumber}
@@ -1175,7 +1207,7 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {invoice.items.map((item, idx) => (
+              {safeItems.map((item, idx) => (
                 <tr 
                   key={item.id || idx}
                   className={template.tableStyle === 'STRIPED' && idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}
@@ -1330,10 +1362,10 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                 </div>
               )}
 
-              {invoice.roundOff !== 0 && (
+              {hasRoundOff && (
                 <div className="flex justify-between pt-1" style={{ color: mutedTextColor }}>
                   <span>Round Off:</span>
-                  <span className="font-mono">{invoice.roundOff > 0 ? `+${invoice.roundOff.toFixed(2)}` : invoice.roundOff.toFixed(2)}</span>
+                  <span className="font-mono">{safeRoundOff > 0 ? `+${safeRoundOff.toFixed(2)}` : safeRoundOff.toFixed(2)}</span>
                 </div>
               )}
 
@@ -1432,17 +1464,17 @@ export const InvoiceTemplateRenderer: React.FC<InvoiceTemplateRendererProps> = (
                 {hsnSummaryList.map((hsn, idx) => (
                   <tr key={idx} className={isCleanTableHeaders ? 'hover:bg-slate-50/20' : 'hover:bg-slate-50/50'}>
                     <td className="py-1 px-2 font-semibold" style={{ color: bodyTextColor }}>{hsn.hsnCode}</td>
-                    <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.taxableAmount.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{(Number(hsn.taxableAmount) || 0).toFixed(2)}</td>
                     <td className="py-1 px-2 text-center" style={{ color: bodyTextColor }}>{hsn.gstRate}%</td>
                     {invoice.isInterState ? (
-                      <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.igstAmount.toFixed(2)}</td>
+                      <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{(Number(hsn.igstAmount) || 0).toFixed(2)}</td>
                     ) : (
                       <>
-                        <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.cgstAmount.toFixed(2)}</td>
-                        <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{hsn.sgstAmount.toFixed(2)}</td>
+                        <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{(Number(hsn.cgstAmount) || 0).toFixed(2)}</td>
+                        <td className="py-1 px-2 text-right" style={{ color: bodyTextColor }}>{(Number(hsn.sgstAmount) || 0).toFixed(2)}</td>
                       </>
                     )}
-                    <td className="py-1 px-2 text-right font-bold" style={{ color: headingTextColor }}>{hsn.totalTax.toFixed(2)}</td>
+                    <td className="py-1 px-2 text-right font-bold" style={{ color: headingTextColor }}>{(Number(hsn.totalTax) || 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

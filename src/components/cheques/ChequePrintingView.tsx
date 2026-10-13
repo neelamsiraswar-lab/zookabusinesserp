@@ -20,9 +20,6 @@ import {
   ChequeBookManagerModal 
 } from './ChequeBookManagerModal';
 import { 
-  ChequeCalibrationTab 
-} from './ChequeCalibrationTab';
-import { 
   ChequeClearanceModal 
 } from './ChequeClearanceModal';
 import { 
@@ -79,7 +76,7 @@ export const ChequePrintingView: React.FC = () => {
   } = useApp();
 
   // Active View Tab
-  const [activeTab, setActiveTabState] = useState<'REGISTER' | 'ISSUED' | 'RECEIVED' | 'CHEQUE_BOOKS' | 'CALIBRATION'>('REGISTER');
+  const [activeTab, setActiveTabState] = useState<'REGISTER' | 'ISSUED' | 'RECEIVED' | 'CHEQUE_BOOKS'>('REGISTER');
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -93,7 +90,6 @@ export const ChequePrintingView: React.FC = () => {
   const [isBookModalOpen, setIsBookModalOpen] = useState<boolean>(false);
   const [activeChequeForPrint, setActiveChequeForPrint] = useState<ChequeRecord | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
-  const [calibrationChequeId, setCalibrationChequeId] = useState<string | null>(null);
 
   // Clearance Modal
   const [clearanceModalCheque, setClearanceModalCheque] = useState<ChequeRecord | null>(null);
@@ -263,14 +259,6 @@ export const ChequePrintingView: React.FC = () => {
   const handleOpenPrint = (cheque: ChequeRecord) => {
     setActiveChequeForPrint(cheque);
     setIsPrintModalOpen(true);
-  };
-
-  // Open Calibration Studio with a specific cheque
-  const handleOpenCalibration = (cheque?: ChequeRecord) => {
-    if (cheque) {
-      setCalibrationChequeId(cheque.id);
-    }
-    setActiveTabState('CALIBRATION');
   };
 
   // Open Reminder / WhatsApp Modal
@@ -641,7 +629,6 @@ export const ChequePrintingView: React.FC = () => {
             { id: 'ISSUED', label: 'Cheques Issued', count: cheques.filter(c => c.chequeType !== 'PAYMENT_IN').length },
             { id: 'RECEIVED', label: 'Cheques Received', count: cheques.filter(c => c.chequeType === 'PAYMENT_IN').length },
             { id: 'CHEQUE_BOOKS', label: 'Cheque Books', count: chequeBooks.length },
-            { id: 'CALIBRATION', label: 'Print Calibration Studio' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -670,14 +657,6 @@ export const ChequePrintingView: React.FC = () => {
           ))}
         </div>
       </div>
-
-      {/* CALIBRATION TAB */}
-      {activeTab === 'CALIBRATION' && (
-        <ChequeCalibrationTab 
-          initialChequeId={calibrationChequeId || undefined}
-          onBack={() => setActiveTabState('REGISTER')}
-        />
-      )}
 
       {/* CHEQUE BOOKS TAB */}
       {activeTab === 'CHEQUE_BOOKS' && (
@@ -1064,15 +1043,7 @@ export const ChequePrintingView: React.FC = () => {
                                 <Printer className="w-4 h-4" />
                               </button>
 
-                              {/* Layout Studio Calibration */}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenCalibration(cheque)}
-                                title="Calibrate Layout in Cheque Studio"
-                                className="p-1.5 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-950/40 transition cursor-pointer"
-                              >
-                                <Sliders className="w-4 h-4" />
-                              </button>
+
 
                               {/* Send Reminder / WhatsApp */}
                               <button
@@ -1159,7 +1130,6 @@ export const ChequePrintingView: React.FC = () => {
           setActiveChequeForPrint(null);
         }}
         onMarkPrinted={(id) => markChequeAsPrinted(id)}
-        onOpenCalibration={(chq) => handleOpenCalibration(chq)}
       />
 
       {/* CHEQUE BOOK MANAGER MODAL */}

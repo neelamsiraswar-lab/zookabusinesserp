@@ -2,12 +2,21 @@
  * Storage and comparison helpers for high-performance state synchronization
  */
 
+const storageStringCache = new Map<string, string>();
+const storageDebounceTimers = new Map<string, number>();
+
 /**
- * Safely sets an item in localStorage with error handling for quota exceed errors
+ * Safely sets an item in localStorage with error handling for quota exceed errors.
+ * Uses an in-memory cache to skip identical writes and prevent blocking the JS event loop.
  */
 export function safeStorageSet(key: string, value: any): boolean {
   try {
     const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    // Check if the serialized data is unchanged from previous write
+    if (storageStringCache.get(key) === serialized) {
+      return true;
+    }
+    storageStringCache.set(key, serialized);
     localStorage.setItem(key, serialized);
     return true;
   } catch (err: any) {
@@ -18,6 +27,21 @@ export function safeStorageSet(key: string, value: any): boolean {
     }
     return false;
   }
+}
+
+/**
+ * Debounced version of safeStorageSet for high-frequency collections
+ */
+export function safeStorageSetDebounced(key: string, value: any, delayMs: number = 200): void {
+  const existingTimer = storageDebounceTimers.get(key);
+  if (existingTimer !== undefined) {
+    window.clearTimeout(existingTimer);
+  }
+  const timer = window.setTimeout(() => {
+    storageDebounceTimers.delete(key);
+    safeStorageSet(key, value);
+  }, delayMs);
+  storageDebounceTimers.set(key, timer);
 }
 
 /**
@@ -108,14 +132,14 @@ export function mergeEntities<T extends { id?: string; updatedAt?: string }>(
   const map = new Map<string, T>();
   
   // Seed with local items
-  local.forEach(item => {
-    const key = item.id || JSON.stringify(item);
+  local.forEach((item, idx) => {
+    const key = item.id || `_idx_${idx}`;
     map.set(key, item);
   });
 
   // Merge remote items
-  remote.forEach(remoteItem => {
-    const key = remoteItem.id || JSON.stringify(remoteItem);
+  remote.forEach((remoteItem, idx) => {
+    const key = remoteItem.id || `_idx_${idx}`;
     const existing = map.get(key);
     if (!existing) {
       map.set(key, remoteItem);

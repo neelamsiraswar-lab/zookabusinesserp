@@ -254,7 +254,21 @@ export const LoginScreen: React.FC = () => {
       );
 
       if (isSuperMatch || matchingUser) {
-        await switchCompany(matchedComp.id, matchingUser?.id);
+        if (matchingUser) {
+          // User already proved their credentials in Step 1: switch workspace and authenticate directly
+          await switchCompany(matchedComp.id);
+          const authRes = authenticateAndSwitchUser(matchingUser.id, cleanSecret);
+          setIsVerifyingCompany(false);
+          setCompanyError(null);
+          setCompanySecret('');
+          if (authRes.success) {
+            showToast('success', 'Workspace Unlocked', `Welcome back, ${matchingUser.name}!`);
+            return;
+          }
+        }
+
+        // If super match or user password needs second step verification
+        await switchCompany(matchedComp.id);
         setIsVerifyingCompany(false);
         setCompanyError(null);
         setCompanySecret('');
@@ -262,7 +276,7 @@ export const LoginScreen: React.FC = () => {
           setSelectedUserId(matchingUser.id);
         }
         setLoginStep('login_credentials');
-        showToast('success', 'Company Workspace Unlocked', `Accessed ${matchedComp.tradeName || matchedComp.name}. Please authenticate your user account.`);
+        showToast('success', 'Company Workspace Unlocked', `Accessed ${matchedComp.tradeName || matchedComp.name}. Please select your user account.`);
       } else {
         setIsVerifyingCompany(false);
         setCompanyError(`Invalid password or PIN for "${matchedComp.tradeName || matchedComp.name}". Access denied.`);

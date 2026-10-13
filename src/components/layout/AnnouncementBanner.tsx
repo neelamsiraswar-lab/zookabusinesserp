@@ -119,7 +119,7 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({
   return (
     <>
       <div 
-        className={`w-full border-b backdrop-blur-md transition-all animate-fadeIn ${typeConfig.container} shadow-xs z-10`}
+        className={`w-full border-b backdrop-blur-md transition-all animate-fadeIn ${typeConfig.container} shadow-xs z-10 print:hidden`}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 sm:gap-4">
           

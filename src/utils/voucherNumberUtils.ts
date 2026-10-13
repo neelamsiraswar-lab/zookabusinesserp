@@ -154,9 +154,11 @@ export const getNextAvailableVoucherNumber = (
 
   let candidateVoucherNumber = formatVoucherSequence(prefix, candidateSeq);
 
-  while (existingSet.has(candidateVoucherNumber.trim().toLowerCase())) {
+  let loopSafety = 0;
+  while (existingSet.has(candidateVoucherNumber.trim().toLowerCase()) && loopSafety < 10000) {
     candidateSeq = candidateSeq + 1;
     candidateVoucherNumber = formatVoucherSequence(prefix, candidateSeq);
+    loopSafety++;
   }
 
   return {

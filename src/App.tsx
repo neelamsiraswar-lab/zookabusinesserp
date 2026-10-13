@@ -40,6 +40,7 @@ import { OfflineIndicatorBanner } from './components/pwa/OfflineIndicatorBanner'
 import { PwaUpdateToast } from './components/pwa/PwaUpdateToast';
 import { Crown } from 'lucide-react';
 import { ViewSkeleton } from './components/common/Skeleton';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const pageVariants = {
   initial: { opacity: 0, y: 12, filter: 'blur(2px)' },
@@ -82,16 +83,6 @@ const MainContent: React.FC = () => {
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
   const [editingInvoiceData, setEditingInvoiceData] = useState<Partial<Invoice> | undefined>(undefined);
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState<boolean>(false);
-  const [isTabTransitioning, setIsTabTransitioning] = useState<boolean>(false);
-
-  // Content Skeleton Shimmer on tab or company transition
-  useEffect(() => {
-    setIsTabTransitioning(true);
-    const timer = setTimeout(() => {
-      setIsTabTransitioning(false);
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [activeTab, currentCompany?.id]);
 
   // Handle PWA Manifest Shortcuts & URL Actions
   useEffect(() => {
@@ -254,57 +245,46 @@ const MainContent: React.FC = () => {
         />
 
         <main className="flex-1 p-3 sm:p-4 md:p-6 w-full max-w-[1720px] 2xl:max-w-[1920px] mx-auto transition-all duration-200">
-          <AnimatePresence mode="wait" initial={false}>
-            {/* If Print view is active, show the printable document overlay */}
-            {selectedInvoiceIdForPrint ? (
-              <motion.div
-                key="print-view"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-              >
-                <InvoicePrintView
-                  invoiceId={selectedInvoiceIdForPrint}
-                  onBack={() => setSelectedInvoiceIdForPrint(null)}
-                />
-              </motion.div>
-            ) : isEditorOpen ? (
-              /* If creating / editing invoice */
-              <motion.div
-                key="editor-view"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-              >
-                <InvoiceEditor
-                  initialData={editingInvoiceData}
-                  onClose={() => setIsEditorOpen(false)}
-                />
-              </motion.div>
-            ) : isTabTransitioning ? (
-              /* High-Fidelity Content Skeleton Shimmer on Tab Transition */
-              <motion.div
-                key={`skeleton-${activeTab}`}
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="w-full"
-              >
-                <ViewSkeleton tab={activeTab} />
-              </motion.div>
-            ) : (
-              /* Render Current View Tab with RBAC Protection */
-              <motion.div
-                key={activeTab}
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="w-full"
-              >
+          <ErrorBoundary fallbackTitle="View Rendering Error" onReset={() => setActiveTab('dashboard')}>
+            <AnimatePresence initial={false}>
+              {/* If Print view is active, show the printable document overlay */}
+              {selectedInvoiceIdForPrint ? (
+                <motion.div
+                  key="print-view"
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
+                  <InvoicePrintView
+                    invoiceId={selectedInvoiceIdForPrint}
+                    onBack={() => setSelectedInvoiceIdForPrint(null)}
+                  />
+                </motion.div>
+              ) : isEditorOpen ? (
+                /* If creating / editing invoice */
+                <motion.div
+                  key="editor-view"
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
+                  <InvoiceEditor
+                    initialData={editingInvoiceData}
+                    onClose={() => setIsEditorOpen(false)}
+                  />
+                </motion.div>
+              ) : (
+                /* Render Current View Tab with RBAC Protection */
+                <motion.div
+                  key={activeTab}
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="w-full"
+                >
                 {activeTab === 'dashboard' && (
                   <DashboardView 
                     onOpenNewInvoice={handleOpenNewInvoice}
@@ -395,7 +375,8 @@ const MainContent: React.FC = () => {
               </motion.div>
             )}
           </AnimatePresence>
-        </main>
+        </ErrorBoundary>
+      </main>
 
         {/* Global Business & Platform Footer */}
         <Footer />
@@ -438,8 +419,10 @@ const MainContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainContent />
-    </AppProvider>
+    <ErrorBoundary fallbackTitle="Application Initialization Recovery">
+      <AppProvider>
+        <MainContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

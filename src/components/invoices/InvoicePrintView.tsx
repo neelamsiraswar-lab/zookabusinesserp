@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Invoice } from '../../types';
 import { ShareInvoiceModal } from './ShareInvoiceModal';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 
 interface InvoicePrintViewProps {
   invoiceId: string;
@@ -48,7 +49,116 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
 
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  const invoice = invoices.find(i => i.id === invoiceId);
+  const [activeInvoiceId, setActiveInvoiceId] = useState<string>(invoiceId);
+
+  // Sync prop changes
+  React.useEffect(() => {
+    if (invoiceId) {
+      setActiveInvoiceId(invoiceId);
+    }
+  }, [invoiceId]);
+
+  const rawInvoice = useMemo(() => {
+    if (!activeInvoiceId) return null;
+    const cleanId = String(activeInvoiceId).trim();
+    const cleanLower = cleanId.toLowerCase();
+    const strippedId = cleanId.replace(/^[#\s]+/, '').toLowerCase();
+    const alphaNumericId = cleanId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+    const matchesInvoice = (i: Invoice): boolean => {
+      if (!i) return false;
+      const iId = String(i.id || '').trim().toLowerCase();
+      const iNum = String(i.invoiceNumber || '').trim().toLowerCase();
+      const iNumStripped = iNum.replace(/^[#\s]+/, '');
+      const iIdAlpha = iId.replace(/[^a-zA-Z0-9]/g, '');
+      const iNumAlpha = iNum.replace(/[^a-zA-Z0-9]/g, '');
+
+      return (
+        i.id === cleanId || 
+        i.invoiceNumber === cleanId || 
+        iId === cleanLower || 
+        iNum === cleanLower ||
+        iNumStripped === strippedId ||
+        (alphaNumericId.length >= 3 && (iIdAlpha === alphaNumericId || iNumAlpha === alphaNumericId)) ||
+        (cleanLower.length >= 4 && (iId.includes(cleanLower) || iNum.includes(cleanLower)))
+      );
+    };
+
+    // 1. Direct search in context invoices
+    const direct = invoices.find(matchesInvoice);
+    if (direct) return direct;
+
+    // 2. Search local storage across company partitions
+    try {
+      const keys = Object.keys(localStorage);
+      for (const key of keys) {
+        if (key.toLowerCase().includes('invoice') || key.includes('zooka') || key.includes('vyapar')) {
+          const raw = localStorage.getItem(key);
+          if (raw && (raw.startsWith('[') || raw.startsWith('{'))) {
+            try {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                const found = list.find(matchesInvoice);
+                if (found) return found;
+              } else if (list && typeof list === 'object' && matchesInvoice(list)) {
+                return list;
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading invoice from storage partitions:', e);
+    }
+
+    // 3. Search session storage
+    try {
+      const sKeys = Object.keys(sessionStorage);
+      for (const key of sKeys) {
+        if (key.toLowerCase().includes('invoice')) {
+          const raw = sessionStorage.getItem(key);
+          if (raw && (raw.startsWith('[') || raw.startsWith('{'))) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                const found = parsed.find(matchesInvoice);
+                if (found) return found;
+              } else if (parsed && typeof parsed === 'object' && matchesInvoice(parsed)) {
+                return parsed;
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+
+    // 4. Fallback: If requested recent/latest or only 1 invoice exists
+    if (invoices.length > 0) {
+      if (cleanLower === 'latest' || cleanLower === 'recent' || cleanLower === 'last') {
+        return invoices[0];
+      }
+    }
+
+    return null;
+  }, [invoices, activeInvoiceId]);
+
+  // Safe normalized invoice record with guaranteed properties to prevent template rendering crashes
+  const invoice: Invoice | null = useMemo(() => {
+    if (!rawInvoice) return null;
+    return {
+      ...rawInvoice,
+      items: Array.isArray(rawInvoice.items) ? rawInvoice.items : [],
+      customerName: rawInvoice.customerName || 'Walk-in Retail Customer',
+      invoiceNumber: rawInvoice.invoiceNumber || rawInvoice.id || 'INV-001',
+      invoiceDate: rawInvoice.invoiceDate || new Date().toISOString(),
+      invoiceType: rawInvoice.invoiceType || 'TAX_INVOICE',
+      grandTotal: typeof rawInvoice.grandTotal === 'number' ? rawInvoice.grandTotal : Number(rawInvoice.grandTotal) || 0,
+      amountPaid: typeof rawInvoice.amountPaid === 'number' ? rawInvoice.amountPaid : Number(rawInvoice.amountPaid) || 0,
+      amountDue: typeof rawInvoice.amountDue === 'number' ? rawInvoice.amountDue : Number(rawInvoice.amountDue) || 0,
+      paymentMethod: rawInvoice.paymentMethod || 'CASH',
+      status: rawInvoice.status || 'PAID',
+    } as Invoice;
+  }, [rawInvoice]);
 
   if (!invoice) {
     return (
@@ -59,9 +169,36 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
         <div>
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">Invoice Record Not Found</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-            The requested invoice (ID: <code className="font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{invoiceId || 'None'}</code>) could not be located in the current company ledger.
+            The requested invoice (ID: <code className="font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{activeInvoiceId || invoiceId || 'None'}</code>) could not be located in the current company ledger.
           </p>
         </div>
+
+        {invoices.length > 0 && (
+          <div className="pt-2 text-left bg-slate-50 dark:bg-slate-850 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1.5">
+              Select An Available Invoice to Print:
+            </span>
+            <div className="space-y-1 max-h-48 overflow-y-auto text-xs">
+              {invoices.slice(0, 8).map(inv => (
+                <button
+                  key={inv.id}
+                  type="button"
+                  onClick={() => setActiveInvoiceId(inv.id)}
+                  className="w-full text-left p-2 rounded-lg hover:bg-white dark:hover:bg-slate-800 flex items-center justify-between transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">{inv.invoiceNumber}</span>
+                    <span className="text-slate-500 dark:text-slate-400 truncate max-w-[150px]">{inv.customerName}</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    Load & Print →
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="pt-2 flex items-center justify-center gap-3">
           <button 
             type="button"
@@ -98,6 +235,60 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
     try {
       showToast('info', 'Opening Print Dialog', 'Preparing document for printing...');
 
+      // 1. Tag body for thermal CSS media query if applicable
+      if (isThermal) {
+        document.body.setAttribute('data-thermal', 'true');
+      } else {
+        document.body.removeAttribute('data-thermal');
+      }
+
+      // 2. Dynamically inject clean @page rule to guarantee correct page dimensions across all browsers
+      const printPageStyleId = 'invoice-dynamic-page-print-rule';
+      const existingStyle = document.getElementById(printPageStyleId);
+      if (existingStyle) existingStyle.remove();
+
+      const printStyle = document.createElement('style');
+      printStyle.id = printPageStyleId;
+      printStyle.textContent = `
+        @page {
+          size: ${isThermal ? '80mm auto' : 'A4 portrait'} !important;
+          margin: ${isThermal ? '2mm' : '6mm 8mm'} !important;
+        }
+      `;
+      document.head.appendChild(printStyle);
+
+      // Clean up helper after print dialog completes
+      const cleanup = () => {
+        document.body.removeAttribute('data-thermal');
+        const style = document.getElementById(printPageStyleId);
+        if (style) style.remove();
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
+
+      // 3. Trigger native window print directly on the fully rendered, styled invoice canvas
+      setTimeout(() => {
+        try {
+          window.focus();
+          window.print();
+        } catch (e) {
+          console.error('Direct window.print error, trying fallback:', e);
+          fallbackIframePrint();
+        }
+      }, 50);
+
+      // Failsafe cleanup timer
+      setTimeout(cleanup, 6000);
+    } catch (err) {
+      console.error('Print failed:', err);
+      window.print();
+    }
+  };
+
+  // Safe fallback iframe printer in case native window.print is restricted in specific container
+  const fallbackIframePrint = () => {
+    if (!invoiceRef.current) return;
+    try {
       const oldFrame = document.getElementById('print-invoice-iframe');
       if (oldFrame) oldFrame.remove();
 
@@ -106,8 +297,8 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
       printIframe.style.position = 'fixed';
       printIframe.style.right = '0';
       printIframe.style.bottom = '0';
-      printIframe.style.width = '0px';
-      printIframe.style.height = '0px';
+      printIframe.style.width = '0';
+      printIframe.style.height = '0';
       printIframe.style.border = '0';
       printIframe.style.visibility = 'hidden';
       document.body.appendChild(printIframe);
@@ -142,7 +333,7 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
                 }
-                .a4-sheet {
+                .a4-sheet, .thermal-receipt-sheet {
                   box-shadow: none !important;
                   border: none !important;
                   margin: 0 auto !important;
@@ -170,7 +361,7 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
         }, 300);
       }
     } catch (err) {
-      console.error('Print failed:', err);
+      console.error('Iframe print failed:', err);
       window.print();
     }
   };
@@ -506,13 +697,14 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
       </div>
 
       {/* Invoice Document Canvas */}
-      <div className="flex justify-center w-full overflow-x-auto pb-8">
+      <div className="flex justify-center w-full overflow-x-auto pb-8 print:p-0 print:m-0 print:overflow-visible print:block">
         <div 
+          id="invoice-printable-container"
           ref={invoiceRef}
           className={`bg-white text-slate-900 transition-all ${
             isThermal
-              ? 'w-[320px] p-4 font-mono text-[11px] leading-tight border border-slate-300 rounded-lg shadow-md print:shadow-none print:border-0'
-              : `a4-sheet w-[794px] max-w-full min-h-[1123px] bg-white border border-slate-300 rounded-lg shadow-xl print:shadow-none print:border-0 ${
+              ? 'thermal-receipt-sheet w-[320px] max-w-[80mm] p-4 font-mono text-[11px] leading-tight border border-slate-300 rounded-lg shadow-md print:shadow-none print:border-0 print:p-1 print:w-full'
+              : `a4-sheet w-[794px] max-w-full min-h-[1123px] bg-white border border-slate-300 rounded-lg shadow-xl print:shadow-none print:border-0 print:w-full ${
                   fitToOnePage ? 'p-5 text-[11px]' : 'p-8 text-xs'
                 }`
           }`}
@@ -522,13 +714,15 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
               : undefined
           }
         >
-          <InvoiceTemplateRenderer
-            invoice={invoice}
-            business={business}
-            template={activeTemplate}
-            printCopyType={printCopyType}
-            fitToOnePage={fitToOnePage}
-          />
+          <ErrorBoundary fallbackTitle="Invoice Template Render Error">
+            <InvoiceTemplateRenderer
+              invoice={invoice}
+              business={business}
+              template={activeTemplate}
+              printCopyType={printCopyType}
+              fitToOnePage={fitToOnePage}
+            />
+          </ErrorBoundary>
         </div>
       </div>
 

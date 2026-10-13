@@ -29,15 +29,13 @@ interface ChequePrintModalProps {
   cheque: ChequeRecord | null;
   onClose: () => void;
   onMarkPrinted?: (id: string) => void;
-  onOpenCalibration?: (cheque: ChequeRecord) => void;
 }
 
 export const ChequePrintModal: React.FC<ChequePrintModalProps> = ({
   isOpen,
   cheque,
   onClose,
-  onMarkPrinted,
-  onOpenCalibration
+  onMarkPrinted
 }) => {
   const { business, chequeTemplates, markChequeAsPrinted, showToast } = useApp();
 
@@ -477,19 +475,6 @@ export const ChequePrintModal: React.FC<ChequePrintModalProps> = ({
               <span>Printer Offset (mm)</span>
             </button>
 
-            {onOpenCalibration && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenCalibration(cheque);
-                }}
-                className="px-2.5 py-1.5 rounded-lg border border-purple-200 dark:border-purple-800/60 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 font-medium flex items-center gap-1.5 hover:bg-purple-100 transition"
-              >
-                <Sliders className="w-3.5 h-3.5 text-purple-600" />
-                <span>Layout Studio</span>
-              </button>
-            )}
           </div>
         </div>
 

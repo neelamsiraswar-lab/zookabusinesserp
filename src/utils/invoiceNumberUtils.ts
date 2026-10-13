@@ -104,9 +104,11 @@ export const getNextAvailableInvoiceNumber = (
 
   let candidateInvoiceNumber = formatInvoiceSequence(prefix, candidateSeq);
   
-  while (existingSet.has(candidateInvoiceNumber.trim().toLowerCase())) {
+  let loopSafety = 0;
+  while (existingSet.has(candidateInvoiceNumber.trim().toLowerCase()) && loopSafety < 10000) {
     candidateSeq = candidateSeq + 1;
     candidateInvoiceNumber = formatInvoiceSequence(prefix, candidateSeq);
+    loopSafety++;
   }
 
   return {
