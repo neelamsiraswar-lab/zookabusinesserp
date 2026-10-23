@@ -24,6 +24,7 @@ import {
 import { Invoice } from '../../types';
 import { ShareInvoiceModal } from './ShareInvoiceModal';
 import { ErrorBoundary } from '../common/ErrorBoundary';
+import { IsolatedPrintPortal } from '../common/IsolatedPrintPortal';
 
 interface InvoicePrintViewProps {
   invoiceId: string;
@@ -227,46 +228,15 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
   };
 
   const handlePrint = () => {
-    if (!invoiceRef.current) {
-      window.print();
-      return;
-    }
-
     try {
-      showToast('info', 'Opening Print Dialog', 'Preparing document for printing...');
-
-      // 1. Tag body for thermal CSS media query if applicable
+      showToast('info', 'Opening Print Dialog', 'Preparing invoice for isolated printing...');
+      document.body.classList.add('has-isolated-print-target');
       if (isThermal) {
         document.body.setAttribute('data-thermal', 'true');
       } else {
         document.body.removeAttribute('data-thermal');
       }
 
-      // 2. Dynamically inject clean @page rule to guarantee correct page dimensions across all browsers
-      const printPageStyleId = 'invoice-dynamic-page-print-rule';
-      const existingStyle = document.getElementById(printPageStyleId);
-      if (existingStyle) existingStyle.remove();
-
-      const printStyle = document.createElement('style');
-      printStyle.id = printPageStyleId;
-      printStyle.textContent = `
-        @page {
-          size: ${isThermal ? '80mm auto' : 'A4 portrait'} !important;
-          margin: ${isThermal ? '2mm' : '6mm 8mm'} !important;
-        }
-      `;
-      document.head.appendChild(printStyle);
-
-      // Clean up helper after print dialog completes
-      const cleanup = () => {
-        document.body.removeAttribute('data-thermal');
-        const style = document.getElementById(printPageStyleId);
-        if (style) style.remove();
-        window.removeEventListener('afterprint', cleanup);
-      };
-      window.addEventListener('afterprint', cleanup);
-
-      // 3. Trigger native window print directly on the fully rendered, styled invoice canvas
       setTimeout(() => {
         try {
           window.focus();
@@ -276,9 +246,6 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
           fallbackIframePrint();
         }
       }, 50);
-
-      // Failsafe cleanup timer
-      setTimeout(cleanup, 6000);
     } catch (err) {
       console.error('Print failed:', err);
       window.print();
@@ -725,6 +692,31 @@ export const InvoicePrintView: React.FC<InvoicePrintViewProps> = ({ invoiceId, o
           </ErrorBoundary>
         </div>
       </div>
+
+      {/* Dedicated Isolated Print Portal — Ensures ONLY the invoice is printed, hiding all window chrome */}
+      <IsolatedPrintPortal
+        pageSize={isThermal ? '80mm auto' : 'A4 portrait'}
+        pageMargin={isThermal ? '2mm' : '6mm 8mm'}
+        isThermal={isThermal}
+      >
+        <div
+          className={`bg-white text-slate-900 ${
+            isThermal
+              ? 'thermal-receipt-sheet w-[80mm] max-w-[80mm] mx-auto p-1 font-mono text-[11px] leading-tight'
+              : `a4-sheet w-full bg-white ${fitToOnePage ? 'p-2 text-[11px]' : 'p-4 text-xs'}`
+          }`}
+        >
+          <ErrorBoundary fallbackTitle="Invoice Print Render Error">
+            <InvoiceTemplateRenderer
+              invoice={invoice}
+              business={business}
+              template={activeTemplate}
+              printCopyType={printCopyType}
+              fitToOnePage={fitToOnePage}
+            />
+          </ErrorBoundary>
+        </div>
+      </IsolatedPrintPortal>
 
       {/* WhatsApp & Email Dispatch Modal */}
       <ShareInvoiceModal

@@ -273,11 +273,26 @@ body {
   margin-top: 6mm;
 }
 
+@media screen {
+  [data-isolated-print-portal="true"] {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    z-index: -9999 !important;
+  }
+}
+
 @media print {
   html, body {
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
@@ -287,12 +302,36 @@ body {
   }
 
   body:not([data-thermal="true"]) {
-    width: 210mm !important;
+    width: 100% !important;
   }
 
   body[data-thermal="true"] {
     width: 80mm !important;
     max-width: 80mm !important;
+  }
+
+  /* When an isolated print target (Invoice or Barcode Labels) is active, hide #root and all modals/portals */
+  body.has-isolated-print-target > *:not([data-active-print-portal="true"]) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.has-isolated-print-target > [data-active-print-portal="true"] {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    z-index: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Prevent filter / transform clipping during print from Framer Motion and animations */
